@@ -43,9 +43,37 @@ class ToolArgRule(_Frozen):
         return self
 
 
+class ArgCondition(_Frozen):
+    """True when the named argument equals (case-insensitively) one of ``values``."""
+
+    arg: Name
+    values: Annotated[tuple[Annotated[str, Field(min_length=1, max_length=64)], ...],
+                      Field(min_length=1)]
+
+
 class HighImpact(_Frozen):
+    """A tool (optionally only for certain argument values) that needs a human or is blocked."""
+
     action: Name
     decision: Literal[Decision.CONFIRM, Decision.BLOCK]
+    when: tuple[ArgCondition, ...] = ()  # empty = every call to the tool
+
+    def matches(self, arguments: dict[str, object]) -> bool:
+        for cond in self.when:
+            value = arguments.get(cond.arg)
+            if not isinstance(value, str) or value.upper() not in {v.upper() for v in cond.values}:
+                return False
+        return True
+
+
+class PageSubresourceRules(_Frozen):
+    """Rules for requests a PAGE initiates itself (img, script, fetch, XHR, form posts,
+    redirects, WebSocket, ...). They run in the same deterministic policy code path as
+    actions (``sentinelx.policy.evaluate_page_request``) and are versioned with the policy."""
+
+    enabled: bool = True
+    blocked_resource_types: tuple[Name, ...] = ("websocket", "eventsource", "ping")
+    allowed_methods: tuple[Name, ...] = ("GET", "HEAD", "POST")
 
 
 class PolicyConfig(_Frozen):
@@ -54,6 +82,7 @@ class PolicyConfig(_Frozen):
     allowed_tools: tuple[Name, ...]
     tool_argument_rules: tuple[ToolArgRule, ...]
     high_impact_actions: tuple[HighImpact, ...] = ()
+    page_subresource: PageSubresourceRules = PageSubresourceRules()
     blocked_destinations: tuple[str, ...] = ()
     secret_patterns: tuple[str, ...] = ()
     max_steps: Annotated[int, Field(ge=1, le=10_000)] = 20
@@ -79,21 +108,30 @@ class PolicyConfig(_Frozen):
         tools = [r.tool for r in self.tool_argument_rules]
         if len(set(tools)) != len(tools):
             raise ValueError("duplicate tool_argument_rules")
-        high = [h.action for h in self.high_impact_actions]
-        if len(set(high)) != len(high):
+        keys = [(h.action, h.model_dump_json(include={"when"})) for h in self.high_impact_actions]
+        if len(set(keys)) != len(keys):
             raise ValueError("duplicate high_impact_actions")
+        high = {h.action for h in self.high_impact_actions}
         known = set(tools)
-        if not set(self.allowed_tools) <= known or not set(high) <= known:
+        if not set(self.allowed_tools) <= known or not high <= known:
             raise ValueError("every allowed tool and high-impact action needs argument rules")
-        if set(self.allowed_tools) & set(high):
-            raise ValueError("a tool cannot be both allowed and high-impact")
+        for tool in set(self.allowed_tools) & high:  # allowed AND high-impact: only conditionally
+            if any(not h.when for h in self.high_impact_actions if h.action == tool):
+                raise ValueError(f"{tool}: allowed and unconditionally high-impact")
         return self
 
     def rule_for(self, tool: str) -> ToolArgRule | None:
         return next((r for r in self.tool_argument_rules if r.tool == tool), None)
 
-    def high_impact_decision(self, tool: str) -> Decision | None:
-        return next((h.decision for h in self.high_impact_actions if h.action == tool), None)
+    def high_impact_decision(
+        self, tool: str, arguments: dict[str, object] | None = None
+    ) -> Decision | None:
+        """BLOCK beats CONFIRM when several entries match; None = not high-impact."""
+        hits = [h.decision for h in self.high_impact_actions
+                if h.action == tool and h.matches(arguments or {})]
+        if not hits:
+            return None
+        return Decision.BLOCK if Decision.BLOCK in hits else Decision.CONFIRM
 
 
 def compute_policy_version(config: PolicyConfig) -> str:

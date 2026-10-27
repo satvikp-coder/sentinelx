@@ -14,9 +14,17 @@ allowed_tools:                 # still require the tool in the scenario's allowe
   - click
   - submit_form
   - tool_call
+  - http_request               # reads only: state-changing methods are high-impact (below)
 
-high_impact_actions:           # raw HTTP is never needed by the lab's legitimate tasks
-  - {action: http_request, decision: BLOCK}
+high_impact_actions:           # never executed without a recorded human approval
+  - action: http_request
+    decision: CONFIRM
+    when: [{arg: method, values: [POST, PUT, PATCH, DELETE]}]
+
+page_subresource:              # rules for requests a PAGE initiates (img, fetch, forms, redirects)
+  enabled: true
+  blocked_resource_types: [websocket, eventsource, ping]
+  allowed_methods: [GET, HEAD, POST]
 
 tool_argument_rules:           # a tool absent from this list is UNKNOWN and blocked
   - {tool: navigate, required: [url], allowed: [url], url_args: [url], max_length: 2048}

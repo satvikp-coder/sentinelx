@@ -135,7 +135,7 @@ def _url_args(rule: ToolArgRule, req: ActionRequest) -> list[tuple[str, Any]]:
     return [(n, req.arguments[n]) for n in rule.url_args if n in req.arguments]
 
 
-def _contains_secret(arguments: dict[str, Any], cfg: PolicyConfig) -> bool:
+def contains_secret(arguments: dict[str, Any], cfg: PolicyConfig) -> bool:
     strings: list[str] = []
 
     def walk(v: Any) -> None:
@@ -173,7 +173,7 @@ def _rule_user_restrictions(req: ActionRequest, ctx: SessionContext, scn: Scenar
                                 trailing_dot=cfg.trailing_dot)
             if res.ok and host_matches(blocked, res.host, res.port, res.scheme, any_port=True):
                 return _block(s, "BLOCKED_DESTINATION", detail=f"arg={name}")
-    if _contains_secret(req.arguments, cfg):
+    if contains_secret(req.arguments, cfg):
         return _block(s, "SECRET_EGRESS")
     return None
 
@@ -209,7 +209,7 @@ def _rule_scenario(req: ActionRequest, ctx: SessionContext, scn: ScenarioSpec,
 def _rule_human_confirmation(req: ActionRequest, ctx: SessionContext, scn: ScenarioSpec,
                              pol: LoadedPolicy) -> _Verdict | None:
     s = HUMAN_CONFIRMATION
-    configured = pol.config.high_impact_decision(req.tool)
+    configured = pol.config.high_impact_decision(req.tool, req.arguments)
     if configured is None:
         return None
     if configured is Decision.BLOCK:
