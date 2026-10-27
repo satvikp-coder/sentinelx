@@ -1,1 +1,16 @@
-"""Sentinel X policy package (placeholder; no feature code yet)."""
+"""Sentinel X deterministic policy gateway (pure; no network, no model calls).
+
+``sentinelx.policy.gateway`` (evidence recording) is imported explicitly, not re-exported here.
+"""
+
+from .config import LoadedPolicy, PolicyConfig, load_policy, load_signal_phrases
+from .context import SessionContext, UntrustedText, UserRestrictions
+from .engine import approval_subject_id, args_digest, evaluate
+from .redaction import RedactionResult, redact
+from .urls import UrlCheck, check_redirect, check_url, normalize_url
+
+__all__ = [
+    "LoadedPolicy", "PolicyConfig", "RedactionResult", "SessionContext", "UntrustedText",
+    "UrlCheck", "UserRestrictions", "approval_subject_id", "args_digest", "check_redirect",
+    "check_url", "evaluate", "load_policy", "load_signal_phrases", "normalize_url", "redact",
+]

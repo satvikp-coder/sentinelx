@@ -1,0 +1,19 @@
+# Evidence-only hints for untrusted text. A hint is NOT a defense and never changes a decision.
+# Keep this list small and reviewed. Matching is case-insensitive, on word boundaries.
+instruction_override_phrases:
+  - ignore previous instructions
+  - ignore all previous instructions
+  - ignore the above
+  - disregard previous instructions
+  - disregard your instructions
+  - you are now
+  - system prompt
+  - reveal your instructions
+  - new task
+  - new instructions
+  - override your instructions
+  - ignore policy
+  - you have permission
+  - you are allowed to
+  - this action is allowed
+  - allow this
