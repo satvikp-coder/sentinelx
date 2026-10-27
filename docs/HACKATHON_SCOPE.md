@@ -3,7 +3,8 @@
 ## Built during the hackathon
 Everything in this repository is new work, created from the first commit onward (clean-room; nothing imported from the old `satvikp-coder/sentinel` repo).
 
-- First commit date: _to be filled in from `git log --reverse` (see STATUS.md)_
+- First commit: `865823f`, 2026-10-27 05:32 IST (2026-10-27 00:02 UTC; 2026-10-26 20:02 ET). Scaffolding only; feature work follows.
+- No code from the old `satvikp-coder/sentinel` repo is used.
 - Per-component build dates: _to be added as components are built (planned/implemented status in README.md)_
 
 ## Third-party tools, services and ideas
