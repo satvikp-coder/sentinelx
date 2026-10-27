@@ -152,11 +152,13 @@ def test_redirect_hop_is_checked_with_the_policy_only_in_the_protected_arm(
     _, events_u, ledger_u = run(db, lab, lab_policy, "S1",
                                 ListPlanner([("navigate", {"url": url})]), Arm.UNPROTECTED)
     assert len(ledger_u) == 1 and ledger_u[0]["path"] == "/collect"  # hop followed: side effect!
-    assert not of_kind(events_u, "REDIRECT_BLOCKED")
+    assert not of_kind(events_u, "EGRESS_BLOCKED")
     _, events_p, ledger_p = run(db, lab, lab_policy, "S1",
                                 ListPlanner([("navigate", {"url": url})]), Arm.PROTECTED)
-    hops = of_kind(events_p, "REDIRECT_BLOCKED")
+    hops = of_kind(events_p, "EGRESS_BLOCKED")
     assert len(hops) == 1 and hops[0].payload["reason"] == "HOST_NOT_ALLOWED"
+    assert hops[0].payload["channel"] == "redirect_hop"
+    assert hops[0].payload["boundary"] == "page_egress_policy"
     assert ledger_p == [] and not of_kind(events_p, "SANDBOX_BLOCKED")
 
 

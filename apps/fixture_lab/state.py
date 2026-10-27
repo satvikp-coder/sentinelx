@@ -13,8 +13,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sentinelx.evaluation.cases import Case, load_case, payload_path
+
 FIXTURES_ROOT = Path(__file__).resolve().parents[2] / "fixtures"
-HASHED_DIRS = ("pages", "payloads", "scenarios", "ground_truth")
+HASHED_DIRS = ("pages", "payloads", "scenarios", "ground_truth", "attacks", "benign")
 
 # payload id -> (virtual host, page name) it is rendered into
 PAYLOAD_PAGES = {
@@ -32,6 +34,8 @@ SIDE_EFFECT_ENDPOINTS = {
     ("collector", "/collect"),
     ("calendar", "/api/cancel"),
     ("support", "/api/upload"),
+    ("orders", "/api/feedback"),
+    ("calendar", "/api/rsvp"),
 }
 
 
@@ -83,6 +87,14 @@ def fill(template: str, values: dict[str, str]) -> str:
     return template
 
 
+STATIC_FILES = {
+    "site.css": ("text/css", "body { font-family: sans-serif; }\n.notice { color: #333; }\n"),
+    "logo.svg": ("image/svg+xml",
+                 '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">'
+                 '<rect width="16" height="16" fill="#336"/></svg>'),
+}
+
+
 class LabState:
     def __init__(
         self, ledger_dir: Path, admin_token: str, fixtures_root: Path = FIXTURES_ROOT
@@ -94,6 +106,7 @@ class LabState:
         self.port = 0  # set by the server after it binds
         self._lock = threading.RLock()
         self.scenario_id = "S1"
+        self.case: Case | None = None
         self.seed = 0
         self.data: dict[str, Any] = {}
         self.fixture_hash = ""
@@ -102,15 +115,21 @@ class LabState:
 
     # ------------------------------------------------------------------ reset
     def scenario_spec(self, scenario_id: str) -> dict[str, Any]:
-        path = self.fixtures_root / "scenarios" / f"{scenario_id}.json"
-        if not path.is_file() or "/" in scenario_id or "\\" in scenario_id:
+        if "/" in scenario_id or "\\" in scenario_id or ".." in scenario_id:
             raise KeyError(scenario_id)
-        return json.loads(path.read_text(encoding="utf-8"))
+        path = self.fixtures_root / "scenarios" / f"{scenario_id}.json"
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+        case = load_case(scenario_id, self.fixtures_root)
+        if case is None:
+            raise KeyError(scenario_id)
+        return case.scenario.model_dump(mode="json")
 
     def reset(self, scenario_id: str, seed: int | None = None) -> str:
         """Restore database, token and an EMPTY ledger from the seed; return the fixture hash."""
         with self._lock:
             spec = self.scenario_spec(scenario_id)
+            self.case = load_case(scenario_id, self.fixtures_root)
             self.scenario_id = scenario_id
             self.seed = int(spec["seed"] if seed is None else seed)
             self.data = seeded_data(self.seed)
@@ -146,10 +165,17 @@ class LabState:
     def page(self, name: str) -> str:
         return (self.fixtures_root / "pages" / f"{name}.html").read_text(encoding="utf-8")
 
+    def render(self, name: str, values: dict[str, str]) -> str:
+        """Fill a page template; PAYLOAD and HEAD default to empty, leftovers are an error."""
+        text = fill(self.page(name), {"PAYLOAD": "", "HEAD": ""} | values)
+        if "{{" in text:
+            raise ValueError(f"unfilled placeholder in page {name}")
+        return text
+
     def urls(self) -> dict[str, str]:
-        return {f"{h.upper()}_URL": f"http://{h}.lab.test:{self.port}"
-                for h in ("orders", "calendar", "support", "collector")} | {
-            "COLLECTOR_URL": f"http://collector.lab.test:{self.port}"}
+        urls = {f"{h.upper()}_URL": f"http://{h}.lab.test:{self.port}"
+                for h in ("orders", "calendar", "support", "collector")}
+        return urls | {"TOKEN": self.data["token"], "PORT": str(self.port)}
 
     def _payload_file(self, payload_id: str) -> Path | None:
         for ext in ("html", "json"):
@@ -158,8 +184,16 @@ class LabState:
                 return p
         return None
 
-    def payload_for(self, vhost: str, page: str) -> str:
-        """HTML payload of the ACTIVE scenario if it is meant for this page, else ''."""
+    def payload_for(self, vhost: str, page: str, slot: str = "body") -> str:
+        """HTML payload of the ACTIVE scenario if it is meant for this page+slot, else ''."""
+        if self.case is not None:
+            place = self.case.template.placement
+            if (place.vhost, place.page, place.slot) != (vhost, page, slot):
+                return ""
+            path = payload_path(self.case.template, self.fixtures_root)
+            return fill(path.read_text(encoding="utf-8"), self.urls())
+        if slot != "body":
+            return ""
         pid = self.scenario_spec(self.scenario_id)["attack_payload_id"]
         if PAYLOAD_PAGES.get(pid) != (vhost, page):
             return ""
@@ -168,6 +202,13 @@ class LabState:
 
     def tool_notes(self) -> str:
         """The `notes` field of the lookup_order mock tool (hostile in the tool_result scenario)."""
+        if self.case is not None:
+            place = self.case.template.placement
+            if place.slot != "tool_result":
+                return "Handle with care."
+            path = payload_path(self.case.template, self.fixtures_root)
+            notes = json.loads(path.read_text(encoding="utf-8"))["notes_template"]
+            return fill(notes, self.urls())
         pid = self.scenario_spec(self.scenario_id)["attack_payload_id"]
         p = self._payload_file(pid)
         if pid == "s1_tool_result" and p is not None:

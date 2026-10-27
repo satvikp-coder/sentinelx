@@ -1,17 +1,23 @@
 """Playwright (Chromium, headless, async) execution adapter behind the sandbox boundary.
 
-Every browser request (navigations, subresources, each redirect hop) passes through
-``context.route``; the SandboxBoundary aborts anything outside ``*.lab.test:<lab port>`` in
-BOTH arms. In the protected arm each redirect hop is additionally checked with
-``sentinelx.policy.check_redirect``. Raw HTTP / mock-tool calls go through httpx to
-127.0.0.1 only AFTER the same sandbox check. The adapter never decides whether an action
-may run; the runner calls it only after the arm's rules say so.
+Every browser request (navigations, subresources, form posts, each redirect hop) passes through
+``context.route``. Two boundaries apply:
+
+* SANDBOX (both arms): anything outside ``*.lab.test:<lab port>`` is aborted -> SANDBOX_BLOCKED.
+* PAGE-EGRESS POLICY (protected arm only): the runner supplies ``page_policy``, a callable backed
+  by ``sentinelx.policy.evaluate_page_request``; every request, including redirect hops, must
+  pass the scenario's exact allowed-host rules or it is aborted -> EGRESS_BLOCKED.
+
+Raw HTTP / mock-tool calls go through httpx to 127.0.0.1 only AFTER the same sandbox check. The
+adapter never decides whether an ACTION may run; the runner calls it only after the arm's rules
+say so.
 """
 
 from __future__ import annotations
 
 import asyncio
 import re
+from collections import Counter
 from collections.abc import Callable
 from types import TracebackType
 from typing import Any
@@ -19,13 +25,14 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
-from sentinelx.common_schemas import ActionRequest
-from sentinelx.policy import check_redirect
+from sentinelx.common_schemas import ActionRequest, Decision
 
 from .sandbox import SandboxBoundary
 from .types import ActionOutcome
 
 EventCallback = Callable[[str, dict[str, Any]], None]
+# (url, resource_type, method, redirect source url | None) -> PolicyDecision-like object
+PagePolicy = Callable[[str, str, str, str | None], Any]
 MAX_TEXT = 20_000
 MAX_HOPS = 5
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
@@ -46,18 +53,20 @@ def clean_text(raw: str) -> str:
 
 
 class BrowserAdapter:
+    policy_abort_code = "aborted"  # how a policy-blocked request is cancelled in the browser
+
     def __init__(
         self,
         lab_port: int,
         on_event: EventCallback,
-        redirect_allowed_hosts: list[str] | None = None,
+        page_policy: PagePolicy | None = None,
         op_timeout: float = 8.0,
         headless: bool = True,
     ) -> None:
         self.lab_port = lab_port
         self.sandbox = SandboxBoundary(lab_port)
         self._emit = on_event
-        self._redirect_hosts = redirect_allowed_hosts  # None => unprotected arm (no hop check)
+        self._page_policy = page_policy  # None => unprotected arm: sandbox boundary only
         self.op_timeout = op_timeout
         self.headless = headless
         self._pw: Any = None
@@ -67,6 +76,9 @@ class BrowserAdapter:
         self._page: Any = None
         self._http: httpx.AsyncClient | None = None
         self._blocked_count = 0
+        self._egress_blocked = 0
+        self._passed_by_type: Counter[str] = Counter()
+        self._passed_by_host: Counter[str] = Counter()
 
     # ------------------------------------------------------------------ lifecycle
     async def __aenter__(self) -> BrowserAdapter:
@@ -84,6 +96,10 @@ class BrowserAdapter:
             self._context.set_default_timeout(self.op_timeout * 1000)
             self._context.set_default_navigation_timeout(self.op_timeout * 1000)
             await self._context.route("**/*", self._route)
+            try:  # WebSockets are not HTTP routes; close them all (see _route_ws)
+                await self._context.route_web_socket("**/*", self._route_ws)
+            except AttributeError:  # pragma: no cover - very old Playwright
+                pass
             self._context.on("page", self._on_new_page)
             self._page = await self._context.new_page()
             self._http = httpx.AsyncClient(timeout=self.op_timeout, follow_redirects=False)
@@ -145,15 +161,33 @@ class BrowserAdapter:
         body = request.post_data_buffer
         headers = {k: v for k, v in request.headers.items()
                    if k.lower() not in {"host", "content-length"}}
+        source: str | None = None
         for hop in range(MAX_HOPS + 1):
             ok, reason = self.sandbox.check(url)
             if not ok:
                 self._blocked_count += 1
                 self._emit("SANDBOX_BLOCKED", {
                     "url": url[:300], "reason": reason, "resource_type": request.resource_type,
-                    "channel": "browser", "hop": hop})
+                    "channel": "browser", "hop": hop, "boundary": "sandbox"})
                 await route.abort("blockedbyclient")
                 return
+            if self._page_policy is not None:
+                decision = self._page_policy(url, request.resource_type, method, source)
+                if decision.effective_action is not Decision.ALLOW:
+                    self._egress_blocked += 1
+                    self._emit("EGRESS_BLOCKED", {
+                        "url": url[:300], "source_url": (source or "")[:300],
+                        "resource_type": request.resource_type, "method": method,
+                        "channel": self._channel(request, hop), "hop": hop,
+                        "reason": decision.reason_code, "rule_ids": decision.rule_ids,
+                        "policy_version": decision.policy_version,
+                        "boundary": "page_egress_policy"})
+                    # "aborted" cancels the load without replacing the current document with an
+                    # error page, so a blocked page-initiated navigation does not wreck the task
+                    await route.abort(self.policy_abort_code)
+                    return
+            self._passed_by_type[request.resource_type] += 1
+            self._passed_by_host[urlsplit(url).hostname or "?"] += 1
             parts = urlsplit(url)
             target = f"http://127.0.0.1:{self.lab_port}{parts.path or '/'}"
             if parts.query:
@@ -167,21 +201,61 @@ class BrowserAdapter:
                 await route.fulfill(response=response)
                 return
             nxt = urljoin(url, location)
-            # the sandbox is authoritative in both arms: an off-lab hop is reported as
-            # SANDBOX_BLOCKED at the top of the next iteration, before any policy check
-            if self._redirect_hosts is not None and self.sandbox.check(nxt)[0]:
-                res = check_redirect(url, nxt, self._redirect_hosts)
-                if not res.ok:
-                    self._emit("REDIRECT_BLOCKED", {"source": url[:300], "target": nxt[:300],
-                                                    "reason": res.reason_code, "hop": hop})
-                    await route.abort("blockedbyclient")
-                    return
             if response.status == 303 or (response.status in {301, 302} and method == "POST"):
                 method, body = "GET", None
-            url = nxt
-        self._emit("REDIRECT_BLOCKED", {"source": url[:300], "target": "", "hop": MAX_HOPS,
-                                        "reason": "TOO_MANY_REDIRECTS"})
+            source, url = url, nxt
+        self._blocked_count += 1
+        self._emit("SANDBOX_BLOCKED", {"url": url[:300], "reason": "TOO_MANY_REDIRECTS",
+                                       "channel": "browser", "hop": MAX_HOPS,
+                                       "boundary": "sandbox"})
         await route.abort("blockedbyclient")
+
+    @staticmethod
+    def _channel(request: Any, hop: int) -> str:
+        if hop > 0:
+            return "redirect_hop"
+        if request.resource_type == "document":
+            try:
+                if request.frame.parent_frame is not None:
+                    return "iframe"
+            except Exception:  # noqa: S110 - frame already gone
+                pass
+            return "form_submission" if request.method == "POST" else "main_frame"
+        return "subresource"
+
+    async def _route_ws(self, ws: Any) -> None:
+        """No WebSocket is ever connected in the lab; every attempt is recorded and closed."""
+        url = ws.url
+        http_url = ("http" + url[2:]) if url.startswith("ws") else url  # ws->http, wss->https
+        ok, reason = self.sandbox.check(http_url)
+        if not ok:
+            self._blocked_count += 1
+            self._emit("SANDBOX_BLOCKED", {"url": url[:300], "reason": reason,
+                                           "resource_type": "websocket", "channel": "websocket",
+                                           "boundary": "sandbox"})
+        else:
+            decision = (self._page_policy(http_url, "websocket", "GET", None)
+                        if self._page_policy is not None else None)
+            if decision is not None and decision.effective_action is not Decision.ALLOW:
+                self._egress_blocked += 1
+                self._emit("EGRESS_BLOCKED", {
+                    "url": url[:300], "resource_type": "websocket", "method": "GET",
+                    "channel": "websocket", "hop": 0, "reason": decision.reason_code,
+                    "rule_ids": decision.rule_ids, "policy_version": decision.policy_version,
+                    "boundary": "page_egress_policy"})
+            else:
+                self._blocked_count += 1
+                self._emit("SANDBOX_BLOCKED", {
+                    "url": url[:300], "reason": "WEBSOCKET_UNSUPPORTED_IN_LAB",
+                    "resource_type": "websocket", "channel": "websocket", "boundary": "sandbox"})
+        await ws.close(code=1008, reason="blocked")
+
+    def egress_summary(self) -> dict[str, Any]:
+        """Aggregate counts (one event per run, not one per request)."""
+        return {"passed_by_resource_type": dict(self._passed_by_type),
+                "passed_by_host": dict(self._passed_by_host),
+                "egress_blocked": self._egress_blocked,
+                "sandbox_blocked": self._blocked_count}
 
     def _on_new_page(self, page: Any) -> None:
         if self._page is None:  # the first page is ours (this fires inside new_page())
@@ -242,7 +316,15 @@ class BrowserAdapter:
         resp = None
         for attempt in range(2):
             try:
-                resp = await self._page.goto(url, wait_until="load")
+                # Wait only for the response to COMMIT, then (briefly) for DOMContentLoaded and for
+                # the network to settle. A page-initiated navigation that policy aborts (meta
+                # refresh, auto-submitted form) can leave goto()'s own lifecycle wait pending
+                # until the timeout, although the document is already there.
+                resp = await self._page.goto(url, wait_until="commit")
+                try:
+                    await self._page.wait_for_load_state("domcontentloaded", timeout=1500)
+                except Exception:  # noqa: S110 - the document is committed; proceed
+                    pass
                 break
             except Exception as exc:
                 # After an aborted navigation Chromium may still be committing its error page;
@@ -251,6 +333,7 @@ class BrowserAdapter:
                     await asyncio.sleep(0.3)
                     continue
                 raise
+        await self._settle()
         return ActionOutcome(True, status=resp.status if resp else None, final_url=self._page.url)
 
     async def _read_page(self) -> ActionOutcome:
@@ -266,7 +349,16 @@ class BrowserAdapter:
             await self._page.wait_for_load_state("load", timeout=3000)
         except Exception:  # noqa: S110 - no navigation happened; fine
             pass
+        await self._settle()
         return ActionOutcome(True, final_url=self._page.url)
+
+    async def _settle(self) -> None:
+        """Wait for the network to go quiet so page-initiated requests (images, fetch, meta
+        refresh, form auto-submit) have happened before the next action (deterministic runs)."""
+        try:
+            await self._page.wait_for_load_state("networkidle", timeout=3000)
+        except Exception:  # noqa: S110 - best effort; a busy page just proceeds
+            pass
 
     async def _submit_form(self, selector: str, field: str, value: str) -> ActionOutcome:
         if not selector or not _FIELD_NAME.match(field):
@@ -275,6 +367,7 @@ class BrowserAdapter:
         await form.locator(f'[name="{field}"]').fill(value, timeout=3000)
         async with self._page.expect_navigation(wait_until="load", timeout=self.op_timeout * 1000):
             await form.locator("button[type=submit], input[type=submit]").first.click(timeout=3000)
+        await self._settle()
         return ActionOutcome(True, final_url=self._page.url)
 
     # -- raw HTTP and mock tools: sandbox-checked, then sent to 127.0.0.1 with the lab Host ------

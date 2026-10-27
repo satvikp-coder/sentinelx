@@ -20,7 +20,7 @@ import sqlite3
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -40,7 +40,13 @@ from sentinelx.common_schemas import (
 from sentinelx.evidence.records import RecordStore
 from sentinelx.evidence.sessions import SessionService
 from sentinelx.evidence.store import EvidenceStore
-from sentinelx.policy import LoadedPolicy, SessionContext, UntrustedText, evaluate
+from sentinelx.policy import (
+    LoadedPolicy,
+    SessionContext,
+    UntrustedText,
+    evaluate,
+    evaluate_page_request,
+)
 from sentinelx.policy.gateway import PROPOSED_KIND, decide_and_record
 from sentinelx.verifier.record import verify_and_record
 
@@ -84,6 +90,10 @@ class RunResult:
     policy_version: str
     verifier: VerifierResult | None
     steps: int
+    gateway_decision_ms: list[float] = field(default_factory=list)  # protected arm only
+    page_policy_ms: list[float] = field(default_factory=list)  # protected arm only
+    total_ms: float = 0.0
+    boundaries: tuple[str, ...] = ()
 
 
 def materialize_scenario(spec: ScenarioSpec, port: int) -> ScenarioSpec:
@@ -111,6 +121,10 @@ class _Runner:
         self.final_answer: str | None = None
         self.abort_reason: str | None = None
         self.adapter: BrowserAdapter | None = None
+        self.gateway_ms: list[float] = []
+        self.page_policy_ms: list[float] = []
+        self.boundaries = (("sandbox", "policy_gateway", "page_egress_policy") if self.protected
+                           else ("sandbox",))
 
     # ------------------------------------------------------------------ evidence helpers
     def _event(self, kind: str, payload: dict[str, Any],
@@ -126,6 +140,7 @@ class _Runner:
 
     # ------------------------------------------------------------------ main flow
     async def run(self) -> RunResult:
+        started = time.perf_counter()
         spec, cfg = self.spec, self.config
         records = RecordStore(self.conn)
         if records.get(ScenarioSpec, spec.id) is None:
@@ -146,6 +161,7 @@ class _Runner:
             "planner": {"name": self.planner.name, "kind": self.planner.kind,
                         "is_llm": False, "label": "SIMULATED scripted agent, not an LLM"},
             "protected": self.protected, "lab_port": self.lab.port, "max_steps": cfg.max_steps,
+            "boundaries": list(self.boundaries),
         })
         self._transition(SessionState.READY)
         self._transition(SessionState.RUNNING)
@@ -167,7 +183,8 @@ class _Runner:
         verifier = self._finalize(final_state)
         return RunResult(self.session_id, spec.id, cfg.arm, final_state, self.abort_reason,
                          self.final_answer, fixture_hash, self.policy.policy_version, verifier,
-                         len(self.history))
+                         len(self.history), list(self.gateway_ms), list(self.page_policy_ms),
+                         (time.perf_counter() - started) * 1000.0, self.boundaries)
 
     def _finalize(self, state: SessionState) -> VerifierResult | None:
         if self.abort_reason:
@@ -190,8 +207,8 @@ class _Runner:
         start-up leaves its connection tasks pending and can hang interpreter shutdown, so
         start-up is bounded only by Playwright's launch timeouts.
         """
-        hosts = self.scenario.allowed_hosts if self.protected else None
-        async with BrowserAdapter(self.lab.port, self._on_adapter_event, hosts,
+        page_policy = self._page_policy if self.protected else None
+        async with BrowserAdapter(self.lab.port, self._on_adapter_event, page_policy,
                                   self.config.op_timeout, self.config.headless) as adapter:
             self.adapter = adapter
             try:
@@ -199,6 +216,18 @@ class _Runner:
                     await self._steps()
             except TimeoutError:
                 self.abort_reason = "WALL_CLOCK_TIMEOUT"
+            finally:
+                self._event("EGRESS_SUMMARY", {"boundaries": list(self.boundaries),
+                                               **adapter.egress_summary()})
+
+    def _page_policy(self, url: str, resource_type: str, method: str, source: str | None) -> Any:
+        """Page-initiated requests go through the SAME deterministic policy code path."""
+        t0 = time.perf_counter()
+        decision = evaluate_page_request(
+            {"url": url, "resource_type": resource_type, "method": method, "source_url": source},
+            self.scenario, self.policy)
+        self.page_policy_ms.append((time.perf_counter() - t0) * 1000.0)
+        return decision
 
     async def _steps(self) -> None:
         obs = Observation(self.session_id, 1, datetime.now(UTC))
@@ -239,6 +268,7 @@ class _Runner:
             result = decide_and_record(self.conn, self.session_id, req, self.scenario,
                                        self.policy, ctx)
             proposal_id, decision = result.proposed_event_id, result.decision
+            self.gateway_ms.append(result.decision_ms)
             outcome = await self._execute_allowed(req, decision, proposal_id)
         else:
             proposal_id = self._event(PROPOSED_KIND, req.model_dump(mode="json"),

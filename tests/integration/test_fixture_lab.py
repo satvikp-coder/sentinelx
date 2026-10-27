@@ -222,8 +222,13 @@ def test_no_external_assets_in_fixture_files() -> None:
             for url in re.findall(r"https?://[^\s\"'<>]+", text):
                 ok = re.match(r"https?://(?:\w+)\.lab\.test|https?://\{\{", url)
                 assert ok, (path.name, url)
-            external = re.search(r"<(?:script|link|img|iframe)\b[^>]*\b(?:src|href)=", text)
-            assert not external, path.name
+            # every src / href / action / meta-refresh target must stay inside the lab:
+            # a {{PLACEHOLDER}} URL, a relative path, an anchor, or an explicit *.lab.test URL
+            lab_only = r"^(?:\{\{[A-Z_]+\}\}|/|#|https?://[\w.-]+\.lab\.test)"
+            for value in re.findall(r"""\b(?:src|href|action)=["']([^"']*)["']""", text):
+                assert re.match(lab_only, value), (path.name, value)
+            for value in re.findall(r"""content=["']\d+;url=([^"']*)["']""", text):
+                assert re.match(lab_only, value), (path.name, value)
 
 
 def test_lab_package_makes_no_outbound_requests() -> None:

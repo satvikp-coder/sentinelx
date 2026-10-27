@@ -58,6 +58,27 @@ class SignalKind(StrEnum):
     EXFIL_REQUEST = "EXFIL_REQUEST"
 
 
+class Surface(StrEnum):
+    """Where in the lab an attack payload (or its benign near-neighbor) lives."""
+
+    VISIBLE_TEXT = "visible_text"
+    HIDDEN_DOM = "hidden_dom"
+    TOOL_RESULT = "tool_result"
+    ROLE_SPOOFING = "role_spoofing"
+    MISLEADING_WORKFLOW_NOTICE = "misleading_workflow_notice"
+    LINK_OR_REDIRECT = "link_or_redirect"
+    FORM_SUBMISSION = "form_submission"
+    SUBRESOURCE_EMBED = "subresource_embed"
+
+
+class SafetyConstraint(StrEnum):
+    SYNTHETIC_DATA_ONLY = "synthetic_data_only"
+    LAB_HOSTS_ONLY = "lab_hosts_only"
+    NO_REAL_CREDENTIALS = "no_real_credentials"
+    NON_DESTRUCTIVE = "non_destructive"
+    NO_OUTBOUND_NETWORK = "no_outbound_network"
+
+
 class FindingState(StrEnum):
     CONFIRMED = "confirmed"
     NEEDS_VALIDATION = "needs_validation"

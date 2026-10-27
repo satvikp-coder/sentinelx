@@ -1,0 +1,563 @@
+{
+  "$defs": {
+    "AnswerRule": {
+      "additionalProperties": false,
+      "description": "How the scripted agent builds its final answer from what it actually observed.",
+      "properties": {
+        "failure": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure"
+        },
+        "kind": {
+          "enum": [
+            "regex",
+            "agenda",
+            "step_result"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "regex": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Regex"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        },
+        "success": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Success"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "AnswerRule",
+      "type": "object"
+    },
+    "FixtureAssertion": {
+      "additionalProperties": false,
+      "description": "Machine-checkable claim about what a lab page serves for this case (validated in tests).",
+      "properties": {
+        "kind": {
+          "enum": [
+            "page_contains",
+            "page_not_contains"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "vhost": {
+          "enum": [
+            "orders",
+            "calendar",
+            "support"
+          ],
+          "title": "Vhost",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "vhost",
+        "path",
+        "text"
+      ],
+      "title": "FixtureAssertion",
+      "type": "object"
+    },
+    "ForbiddenOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "minLength": 1,
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "endpoint"
+      ],
+      "title": "ForbiddenOutcome",
+      "type": "object"
+    },
+    "Placement": {
+      "additionalProperties": false,
+      "description": "Which lab page slot carries the case payload.",
+      "properties": {
+        "page": {
+          "minLength": 1,
+          "title": "Page",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "slot": {
+          "default": "body",
+          "enum": [
+            "body",
+            "head",
+            "tool_result"
+          ],
+          "title": "Slot",
+          "type": "string"
+        },
+        "vhost": {
+          "enum": [
+            "orders",
+            "calendar",
+            "support"
+          ],
+          "title": "Vhost",
+          "type": "string"
+        }
+      },
+      "required": [
+        "vhost",
+        "page"
+      ],
+      "title": "Placement",
+      "type": "object"
+    },
+    "SafetyConstraint": {
+      "enum": [
+        "synthetic_data_only",
+        "lab_hosts_only",
+        "no_real_credentials",
+        "non_destructive",
+        "no_outbound_network"
+      ],
+      "title": "SafetyConstraint",
+      "type": "string"
+    },
+    "Surface": {
+      "description": "Where in the lab an attack payload (or its benign near-neighbor) lives.",
+      "enum": [
+        "visible_text",
+        "hidden_dom",
+        "tool_result",
+        "role_spoofing",
+        "misleading_workflow_notice",
+        "link_or_redirect",
+        "form_submission",
+        "subresource_embed"
+      ],
+      "title": "Surface",
+      "type": "string"
+    },
+    "TaskScript": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "items": {
+            "$ref": "#/$defs/AnswerRule"
+          },
+          "minItems": 1,
+          "title": "Answer",
+          "type": "array"
+        },
+        "fallback_answer": {
+          "default": "I could not complete the task.",
+          "minLength": 1,
+          "title": "Fallback Answer",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/TaskStep"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps",
+        "answer"
+      ],
+      "title": "TaskScript",
+      "type": "object"
+    },
+    "TaskStep": {
+      "additionalProperties": false,
+      "description": "One step of the scripted agent's LEGITIMATE task (the user's intent).",
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Body"
+        },
+        "field_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Name"
+        },
+        "field_value": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Value"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "enum": [
+                "orders",
+                "calendar",
+                "support"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Method"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "only_if_text": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Only If Text"
+        },
+        "order_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order Id"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selector"
+        },
+        "tool": {
+          "enum": [
+            "navigate",
+            "read_page",
+            "click",
+            "submit_form",
+            "tool_call",
+            "http_request"
+          ],
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool"
+      ],
+      "title": "TaskStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_actions": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Actions",
+      "type": "array"
+    },
+    "attack_neighbor_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Attack Neighbor Id",
+      "type": "string"
+    },
+    "authorized_goal": {
+      "minLength": 1,
+      "title": "Authorized Goal",
+      "type": "string"
+    },
+    "expected_protected_rule": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Protected Rule"
+    },
+    "family": {
+      "enum": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "title": "Family",
+      "type": "string"
+    },
+    "fixture_assertions": {
+      "items": {
+        "$ref": "#/$defs/FixtureAssertion"
+      },
+      "minItems": 1,
+      "title": "Fixture Assertions",
+      "type": "array"
+    },
+    "forbidden_outcome": {
+      "$ref": "#/$defs/ForbiddenOutcome"
+    },
+    "goal_expected": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Goal Expected",
+      "type": "array"
+    },
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "notes": {
+      "default": "",
+      "title": "Notes",
+      "type": "string"
+    },
+    "payload_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Payload Id",
+      "type": "string"
+    },
+    "permitted_lab_target": {
+      "minLength": 1,
+      "title": "Permitted Lab Target",
+      "type": "string"
+    },
+    "placement": {
+      "$ref": "#/$defs/Placement"
+    },
+    "safety_constraints": {
+      "items": {
+        "$ref": "#/$defs/SafetyConstraint"
+      },
+      "title": "Safety Constraints",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "surface": {
+      "$ref": "#/$defs/Surface"
+    },
+    "task": {
+      "$ref": "#/$defs/TaskScript"
+    }
+  },
+  "required": [
+    "id",
+    "surface",
+    "authorized_goal",
+    "permitted_lab_target",
+    "forbidden_outcome",
+    "fixture_assertions",
+    "safety_constraints",
+    "family",
+    "seed",
+    "payload_id",
+    "placement",
+    "allowed_actions",
+    "goal_expected",
+    "task",
+    "attack_neighbor_id"
+  ],
+  "title": "BenignTemplate",
+  "type": "object"
+}

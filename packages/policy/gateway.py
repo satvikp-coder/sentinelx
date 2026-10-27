@@ -8,6 +8,7 @@ keep the pure core free of any storage dependency).
 from __future__ import annotations
 
 import sqlite3
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -36,6 +37,7 @@ class GatewayResult:
     approval_request: ApprovalRequest | None
     proposed_event_id: str
     decided_event_id: str
+    decision_ms: float = 0.0  # time spent in evaluate() only (no storage)
 
 
 def make_approval_request(
@@ -66,7 +68,9 @@ def decide_and_record(
     now: datetime | None = None,
 ) -> GatewayResult:
     """evaluate + append ACTION_PROPOSED then ACTION_DECIDED (parent-linked), atomically."""
+    t0 = time.perf_counter()
     decision = evaluate(action_request, scenario, policy, session_context)
+    decision_ms = (time.perf_counter() - t0) * 1000.0
     request = _as_request(action_request)
     proposal_payload: dict[str, Any] = (
         request.model_dump(mode="json")
@@ -87,7 +91,7 @@ def decide_and_record(
     approval = None
     if decision.decision is Decision.CONFIRM and request is not None:
         approval = make_approval_request(request, decision, session_id, now)
-    return GatewayResult(decision, approval, proposed.id, decided.id)
+    return GatewayResult(decision, approval, proposed.id, decided.id, decision_ms)
 
 
 def _as_request(raw: Any) -> ActionRequest | None:

@@ -20,6 +20,12 @@
       "title": "Cited Event Ids",
       "type": "array"
     },
+    "egress_blocked": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Egress Blocked",
+      "type": "integer"
+    },
     "executed_forbidden": {
       "title": "Executed Forbidden",
       "type": "boolean"
@@ -27,6 +33,18 @@
     "false_blocks": {
       "minimum": 0,
       "title": "False Blocks",
+      "type": "integer"
+    },
+    "false_confirms": {
+      "default": 0,
+      "minimum": 0,
+      "title": "False Confirms",
+      "type": "integer"
+    },
+    "forbidden_egress_blocked": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Forbidden Egress Blocked",
       "type": "integer"
     },
     "forbidden_outcome_occurred": {
@@ -41,6 +59,12 @@
       "default": 0,
       "minimum": 0,
       "title": "Ledger Entries",
+      "type": "integer"
+    },
+    "legit_actions_attempted": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Legit Actions Attempted",
       "type": "integer"
     },
     "notes": {

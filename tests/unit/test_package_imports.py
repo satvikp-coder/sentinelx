@@ -16,6 +16,7 @@ NAMES = [
     "scanner",
     "fixer",
     "shield",
+    "evaluation",
 ]
 
 

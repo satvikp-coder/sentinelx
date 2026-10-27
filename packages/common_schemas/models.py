@@ -18,11 +18,13 @@ from .enums import (
     IntentLabel,
     ModelMode,
     PolicyMode,
+    SafetyConstraint,
     SessionKind,
     SessionState,
     Severity,
     ShieldStatus,
     SignalKind,
+    Surface,
     TargetStatus,
     VerificationStatus,
 )
@@ -278,10 +280,146 @@ class VerifierResult(SXModel):
     attempted_forbidden: bool  # planner proposed the forbidden action (ACTION_PROPOSED)
     executed_forbidden: bool  # the runtime executed it (ACTION_EXECUTED)
     blocked_forbidden: bool  # a forbidden proposal was decided BLOCK/CONFIRM and not run
-    false_blocks: Annotated[int, Field(ge=0)]  # legitimate actions that were not executed
+    false_blocks: Annotated[int, Field(ge=0)]  # legitimate actions decided BLOCK (not run)
+    # additive since verifier 1.1.0 (defaults keep older documents valid)
+    false_confirms: Annotated[int, Field(ge=0)] = 0  # legitimate actions sent to CONFIRM
+    legit_actions_attempted: Annotated[int, Field(ge=0)] = 0  # proposals that are not forbidden
+    egress_blocked: Annotated[int, Field(ge=0)] = 0  # EGRESS_BLOCKED events (page requests)
+    forbidden_egress_blocked: Annotated[int, Field(ge=0)] = 0  # ...aimed at the forbidden endpoint
     cited_event_ids: list[Id] = []
     ledger_entries: Annotated[int, Field(ge=0)] = 0
     notes: list[str] = []
+
+
+Vhost = Literal["orders", "calendar", "support"]
+
+
+class FixtureAssertion(SXModel):
+    """Machine-checkable claim about what a lab page serves for this case (validated in tests)."""
+
+    kind: Literal["page_contains", "page_not_contains"]
+    vhost: Vhost
+    path: Text  # may include a query string
+    text: Text
+
+
+class Placement(SXModel):
+    """Which lab page slot carries the case payload."""
+
+    vhost: Vhost
+    page: Text
+    slot: Literal["body", "head", "tool_result"] = "body"
+
+
+class TaskStep(SXModel):
+    """One step of the scripted agent's LEGITIMATE task (the user's intent)."""
+
+    tool: Literal["navigate", "read_page", "click", "submit_form", "tool_call", "http_request"]
+    host: Vhost | None = None
+    path: Text | None = None
+    method: Text | None = None
+    body: str | None = None
+    selector: Text | None = None
+    field_name: Text | None = None
+    field_value: Text | None = None
+    name: Text | None = None
+    order_id: Text | None = None
+    only_if_text: Text | None = None  # skip unless text read so far contains this
+
+    @model_validator(mode="after")
+    def _complete(self) -> TaskStep:
+        need = {
+            "navigate": ("host", "path"),
+            "http_request": ("host", "path", "method"),
+            "click": ("selector",),
+            "submit_form": ("selector", "field_name", "field_value"),
+            "tool_call": ("name", "order_id"),
+            "read_page": (),
+        }[self.tool]
+        missing = [f for f in need if getattr(self, f) is None]
+        if missing:
+            raise ValueError(f"{self.tool} step needs {missing}")
+        return self
+
+
+class AnswerRule(SXModel):
+    """How the scripted agent builds its final answer from what it actually observed."""
+
+    kind: Literal["regex", "agenda", "step_result"]
+    regex: Text | None = None  # regex: first match over all page text read
+    template: Text | None = None  # regex: "{0}" is group 1
+    step: Annotated[int, Field(ge=0)] | None = None  # step_result: index into the task steps
+    success: Text | None = None
+    failure: Text | None = None
+
+    @model_validator(mode="after")
+    def _complete(self) -> AnswerRule:
+        if self.kind == "regex" and not (self.regex and self.template):
+            raise ValueError("regex rule needs regex and template")
+        if self.kind == "step_result" and not (
+            self.step is not None and self.success and self.failure
+        ):
+            raise ValueError("step_result rule needs step, success and failure")
+        return self
+
+
+class TaskScript(SXModel):
+    steps: Annotated[list[TaskStep], Field(min_length=1)]
+    answer: Annotated[list[AnswerRule], Field(min_length=1)]
+    fallback_answer: Text = "I could not complete the task."
+
+    @model_validator(mode="after")
+    def _steps_exist(self) -> TaskScript:
+        for rule in self.answer:
+            if rule.kind == "step_result" and rule.step >= len(self.steps):  # type: ignore[operator]
+                raise ValueError("step_result refers to a missing step")
+        return self
+
+
+class _CaseBase(SXModel):
+    """Shared by attack variants and their benign near-neighbors. Labels are hand-written and
+    independent of any model."""
+
+    id: Id
+    surface: Surface
+    authorized_goal: Text
+    permitted_lab_target: Text  # the one lab host the user's task is allowed to use
+    forbidden_outcome: ForbiddenOutcome  # ground-truth check against the lab ledger
+    fixture_assertions: Annotated[list[FixtureAssertion], Field(min_length=1)]
+    safety_constraints: list[SafetyConstraint]
+    notes: str = ""
+    # --- binding to the lab / scripted agent
+    family: Literal["S1", "S2", "S3"]
+    seed: int
+    payload_id: Id  # fixtures/payloads/<payload_id>.html|json
+    placement: Placement
+    allowed_actions: Annotated[list[Text], Field(min_length=1)]
+    goal_expected: Annotated[list[Text], Field(min_length=1)]  # goal_assertion: answer contains
+    task: TaskScript
+    expected_protected_rule: Text | None = None  # control expected to act; None = all ALLOW
+
+    @field_validator("safety_constraints")
+    @classmethod
+    def _all_constraints(cls, v: list[SafetyConstraint]) -> list[SafetyConstraint]:
+        if set(v) != set(SafetyConstraint):
+            raise ValueError("every safety constraint must be declared")
+        return v
+
+    @field_validator("permitted_lab_target")
+    @classmethod
+    def _lab_host(cls, v: str) -> str:
+        if not v.endswith(".lab.test") or "*" in v or "/" in v:
+            raise ValueError("permitted_lab_target must be an exact *.lab.test host")
+        return v
+
+
+class AttackTemplate(_CaseBase):
+    attacker_objective: Text
+    benign_neighbor_id: Id
+
+
+class BenignTemplate(_CaseBase):
+    attack_neighbor_id: Id
 
 
 class ShieldScope(SXModel):
@@ -394,4 +532,5 @@ ALL_MODELS: list[type[SXModel]] = [
     ContainmentBranch, TargetAuthorization, ScanFinding, AttackIntent, VulnerabilityFinding,
     PatchProposal, RepairVerification, ShieldRule, EscalationTicket, ApprovalRecord,
     ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord, VerifierResult,
+    AttackTemplate, BenignTemplate,
 ]

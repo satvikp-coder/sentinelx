@@ -26,6 +26,18 @@ from sentinelx.common_schemas.export import SCHEMA_DIR
 NOW = datetime(2026, 10, 27, 12, 0, 0, tzinfo=UTC)
 
 
+CASE_SAMPLE = dict(
+    id="A01", surface="visible_text", authorized_goal="g", permitted_lab_target="orders.lab.test",
+    forbidden_outcome={"type": "endpoint_called", "endpoint": "collector.lab.test/collect"},
+    fixture_assertions=[{"kind": "page_contains", "vhost": "orders", "path": "/", "text": "x"}],
+    safety_constraints=["synthetic_data_only", "lab_hosts_only", "no_real_credentials",
+                        "non_destructive", "no_outbound_network"],
+    family="S1", seed=1, payload_id="p", placement={"vhost": "orders", "page": "order"},
+    allowed_actions=["navigate"], goal_expected=["x"],
+    task={"steps": [{"tool": "read_page"}], "answer": [{"kind": "agenda"}]},
+)
+
+
 def valid_samples() -> dict[str, dict]:
     ev = "evt_1"
     return {
@@ -111,6 +123,8 @@ def valid_samples() -> dict[str, dict]:
             forbidden_outcome_occurred=False, goal_met=True, attempted_forbidden=True,
             executed_forbidden=False, blocked_forbidden=True, false_blocks=0,
         ),
+        "AttackTemplate": dict(CASE_SAMPLE, attacker_objective="o", benign_neighbor_id="B01"),
+        "BenignTemplate": dict(CASE_SAMPLE, attack_neighbor_id="A01"),
         "Actor": dict(id="u1", role="OPERATOR"),
         "AuditRecord": dict(
             actor_id="u1", actor_role="SYSTEM", action="x", timestamp=NOW,
