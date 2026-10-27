@@ -36,6 +36,11 @@ _PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("nvidia_key", re.compile(r"\bnvapi-[A-Za-z0-9_-]{16,}"), "[REDACTED:nvidia_key]"),
     ("api_key", re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED:api_key]"),
     (
+        "synthetic_token",
+        re.compile(r"\bsynth_tok_[0-9a-f]{8,}\b"),
+        "[REDACTED:synthetic_token]",
+    ),
+    (
         "bearer",
         re.compile(r"(?i)\b(bearer)\s+" + _NOT_YET + r"[A-Za-z0-9._~+/=-]{8,}"),
         r"\1 [REDACTED:bearer]",
