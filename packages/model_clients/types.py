@@ -48,6 +48,7 @@ class ModelResult:
     reasoning_chars: int = 0  # reasoning text is NOT kept; only its length and hash
     reasoning_hash: str | None = None
     finish_reason: str | None = None
+    reasoning_effort: str = ""  # setting SENT ('' / 'default' = parameter omitted)
     task: str = ""
     request_hash: str = ""
     extras: dict[str, Any] = field(default_factory=dict)

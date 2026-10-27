@@ -107,6 +107,7 @@ class ModelClient:
         result = ModelResult(
             status=S.MODEL_UNAVAILABLE, provider=self.provider_label,
             model=cfg.model or "(unset)", mode=self.mode, task=task,
+            reasoning_effort=eff["reasoning_effort"] or "default",
             request_hash=request_key(self.provider_label, cfg.model, task, sent, eff))
         reason = self._precheck()
         if reason:

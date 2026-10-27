@@ -53,7 +53,8 @@ def planner_info(planner: Any) -> PlannerInfo:
         provider=getattr(planner, "provider_label", "none"),
         model=getattr(planner, "model_label", "none"),
         mode=getattr(planner, "mode_label", "SIMULATED"),
-        prompt_version=getattr(planner, "prompt_version", None))
+        prompt_version=getattr(planner, "prompt_version", None),
+        reasoning_effort=getattr(planner, "reasoning_label", None))
 
 
 def _probe_task():  # a minimal valid TaskScript, used only to describe the planner

@@ -200,7 +200,8 @@ class _Runner:
                 "provider": getattr(p, "provider_label", "none"),
                 "model": getattr(p, "model_label", "none"),
                 "mode": getattr(p, "mode_label", "SIMULATED"),
-                "prompt_version": getattr(p, "prompt_version", None)}
+                "prompt_version": getattr(p, "prompt_version", None),
+                "reasoning_effort": getattr(p, "reasoning_label", None)}
 
     def _planner_stats(self) -> dict[str, Any]:
         stats = getattr(self.planner, "stats", None)

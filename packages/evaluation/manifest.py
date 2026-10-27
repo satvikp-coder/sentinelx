@@ -73,6 +73,8 @@ class Manifest(SXModel):
     # "generated": includes MODEL-GENERATED attack cases (fixtures/generated); kept separate
     source: Literal["hand_authored", "generated"] = "hand_authored"
     name: str
+    # how a SUBSET of a larger manifest was chosen (fixed before any result); empty otherwise
+    selection_rule: str = ""
     order_seed: int  # fixed seed for the recorded run order (order effects are reproducible)
     arms: Annotated[list[Literal["A", "B"]], Field(min_length=1)]
     repetitions: Annotated[int, Field(ge=1)] = 1
@@ -88,6 +90,8 @@ def canonical_bytes(m: Manifest) -> bytes:
     doc = m.model_dump(mode="json", exclude={"manifest_hash"})
     if doc.get("source") == "hand_authored":  # default value: keep sealed hashes unchanged
         doc.pop("source", None)
+    if not doc.get("selection_rule"):  # default value: keep sealed hashes unchanged
+        doc.pop("selection_rule", None)
     return json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
@@ -101,7 +105,7 @@ def seal(m: Manifest) -> Manifest:
 
 def build_manifest(
     *, name: str, order_seed: int, case_ids: list[str] | None = None, arms: list[str] | None = None,
-    repetitions: int = 1, policy_file: str = "configs/policy/lab.yaml",
+    repetitions: int = 1, policy_file: str = "configs/policy/lab.yaml", selection_rule: str = "",
     budgets: Budgets | None = None, fixtures: Path = FIXTURES, source: str = "hand_authored",
 ) -> Manifest:
     cases = [c for c in load_all_cases(fixtures, include_generated=source == "generated")
@@ -116,7 +120,7 @@ def build_manifest(
             label=c.label, surface=c.template.surface.value, case_hash=case_hash(c, fixtures))
         for c in cases
     ]
-    m = Manifest(source=source,  # type: ignore[arg-type]
+    m = Manifest(source=source, selection_rule=selection_rule,  # type: ignore[arg-type]
                  name=name, order_seed=order_seed, arms=arms or ["A", "B"],  # type: ignore[arg-type]
                  repetitions=repetitions, policy_file=policy_file,
                  policy_version=policy.policy_version, budgets=budgets or Budgets(), cases=entries)

@@ -148,6 +148,10 @@ class ModelPlanner:
         return self.client.config.model
 
     @property
+    def reasoning_label(self) -> str:
+        return self.client.config.reasoning_effort or "default"
+
+    @property
     def mode_label(self) -> str:
         return self.client.mode.value
 

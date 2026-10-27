@@ -35,6 +35,7 @@ class EvidenceRecorder:
             "reasoning_chars": result.reasoning_chars, "reasoning_hash": result.reasoning_hash,
             "finish_reason": result.finish_reason, "error": result.error,
             "prompt_version": self.prompt_version,
+            "reasoning_effort": result.reasoning_effort,
         }
         if debug_messages is not None:
             payload["debug_messages"] = debug_messages

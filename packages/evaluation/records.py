@@ -22,6 +22,7 @@ class PlannerInfo(SXModel):
     model: str = "none"
     mode: str = "SIMULATED"
     prompt_version: str | None = None
+    reasoning_effort: str | None = None
 
 
 class RunRecord(SXModel):

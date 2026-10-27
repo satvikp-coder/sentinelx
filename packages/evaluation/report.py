@@ -106,6 +106,7 @@ def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
             "mode": ("SIMULATED (no model, no LLM)" if not planner.is_llm
                      else f"{planner.mode} (real LLM)"),
             "prompt_version": planner.prompt_version,
+            "reasoning_effort": planner.reasoning_effort,
             "order_seed": manifest.order_seed,
             "repetitions": manifest.repetitions,
         },
@@ -239,6 +240,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| planner | {p['planner']} |",
         f"| model / provider | {p['model']} / {p['provider']} |",
         f"| prompt version | {p.get('prompt_version')} |",
+        f"| reasoning setting | {p.get('reasoning_effort')} |",
         f"| mode | {p['mode']} |",
         f"| order seed / repetitions | {p['order_seed']} / {p['repetitions']} |", "",
         f"Cases: {report['manifest']['attacks']} attack + {report['manifest']['benign']} benign. "
