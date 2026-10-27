@@ -57,7 +57,8 @@ def main() -> None:
         name="subset-v1", order_seed=20261028, case_ids=ids,
         selection_rule=RULE.format(sealed=sealed[:16], limit=args.limit_min,
                                    lat=args.mean_latency_s, cpr=args.calls_per_run,
-                                   kept=", ".join(f"{k}={first[k][0]}+{first[k][1]}" for k in kept)))
+                                   kept=", ".join(f"{k}={first[k][0]}+{first[k][1]}"
+                                         for k in kept)))
     out = ROOT / "evaluations" / "manifest_subset.json"
     write_manifest(manifest, out)
     print(f"wrote {out.name} hash {manifest.manifest_hash}; cases {sorted(ids)}")

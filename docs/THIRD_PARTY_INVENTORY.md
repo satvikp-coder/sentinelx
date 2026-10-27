@@ -10,7 +10,7 @@ Log an entry here BEFORE any use. All entries below are pre-filled placeholders;
 | ECC | TBD | n/a | n/a | MIT | dev process only | none | satvikp | not installed |
 | Tracecat | TBD | n/a | n/a | AGPL-3.0 | architecture inspiration only; NO code | none | satvikp | not installed |
 | PentAGI | TBD | n/a | n/a | MIT | optional, lab-only; needs its own model key so it is NOT Meta usage | none | satvikp | not installed |
-| NVIDIA hosted endpoint, Muse Glimmer 30B (build.nvidia.com/meta/muse-glimmer-30b) | https://build.nvidia.com/meta/muse-glimmer-30b | n/a | service | trial terms (verify) | default model service | none | satvikp | not installed |
+| NVIDIA hosted endpoint, Muse Glimmer 30B (build.nvidia.com/meta/muse-glimmer-30b) | https://build.nvidia.com/meta/muse-glimmer-30b | n/a | service (OpenAI-compatible, https://integrate.api.nvidia.com/v1) | NVIDIA API Trial ToS + NVIDIA Open Model Agreement; model Apache-2.0 (verified 2026-10-27; rate limit and pricing undocumented) | default model service, IN USE since Prompt 5 (client: packages/model_clients) | none | satvikp | used for lab runs with synthetic data only; key in .env (ignored)
 | Baseten | TBD | n/a | service | service terms | optional service | none | satvikp | not installed |
 | Modal | TBD | n/a | service | service terms | optional service | none | satvikp | not installed |
 | Fireworks | TBD | n/a | service | service terms | optional service | none | satvikp | not installed |

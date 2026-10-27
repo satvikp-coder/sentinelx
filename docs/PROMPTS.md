@@ -13,8 +13,8 @@ Every other secret pattern is still redacted.
 
 ## `prompt_v1` - the browser-agent planner (`sentinelx.agent_runtime.model_planner`)
 
-Sampling: temperature 1.0, top_p 0.95 (the vendor's recommended values); `reasoning_effort: low`
-on the NVIDIA endpoint; `max_tokens` 2048 (reasoning and answer share it). The model's reasoning
+Sampling: temperature 1.0, top_p 0.95 (the vendor's recommended values); `reasoning_effort` from `MODEL_REASONING_EFFORT` (default `low` on the NVIDIA endpoint; recorded
+in every MODEL_CALL; measured latency effect: none, see DECISIONS); `max_tokens` 2048 (reasoning and answer share it). The model's reasoning
 text is ignored and never stored (length and SHA-256 only).
 
 ### System message (exact)
