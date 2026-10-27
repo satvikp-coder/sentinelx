@@ -26,6 +26,7 @@ def browser_ready() -> tuple[bool, str]:
     return False, "Chromium is not installed: run `python scripts/setup_browsers.py`"
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item: pytest.Item) -> None:
     if item.get_closest_marker("browser") is None:
         return
