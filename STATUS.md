@@ -19,13 +19,23 @@ Last updated: 2026-10-27 (Prompt 0: project setup only; no feature code).
 
 No system packages were installed.
 
-## Verified results (this session)
+## Verified results (Prompt 1, 2026-10-27)
 - `ruff check .` -> All checks passed!
-- `pytest` -> 12 passed in 0.07s (placeholder import tests for the 12 packages)
-- `npm run build` (apps/web) -> built OK (tsc --noEmit + vite build)
+- `pytest` -> 194 passed (schemas, migrations, records, redaction, evidence store, state machine, imports)
+- Fresh-venv check: `pip install -e .` then `import sentinelx.policy, sentinelx.evidence` works; plain `import policy` -> ModuleNotFoundError.
+- `scripts/demo_evidence_chain.py`: clean chain verifies OK; editing one stored row makes `verify_chain` report MODIFIED at that event.
+- CI was not re-run on GitHub for these commits (local commits not pushed).
 
-## Implemented
-Scaffold only. No feature code. Everything in README table is "planned".
+## Implemented (Prompt 1; local only, no scanner/agent/model/UI code)
+- `sentinelx.common_schemas`: 20 strict versioned contracts + JSON Schemas in `packages/common_schemas/schemas/` (`python scripts/export_schemas.py`).
+- `sentinelx.evidence`: SQLite WAL + foreign keys, numbered migrations, RecordStore, append-only hash-chained EvidenceStore, citation checks, idempotent session creation, session state machine.
+- `sentinelx.policy.redaction`: best-effort secret redaction.
+- Everything else remains planned (see README table).
+
+## Known gaps
+- Organizers' reply text not yet recorded in docs/RULES_COMPLIANCE.md (not supplied).
+- Tail truncation of a chain is only detectable with an external anchor hash.
+- Redaction is pattern-based and best effort.
 
 ## Blockers / open items
 - php missing; Docker daemon not running; Playwright browsers untested.
@@ -34,11 +44,7 @@ Scaffold only. No feature code. Everything in README table is "planned".
 - Legacy credentials must be rotated (docs/LEGACY_CODE_AUDIT.md).
 
 ## Commits
-| hash | date (IST) | date (UTC) | summary |
-|---|---|---|---|
-| 865823f | 2026-10-27 05:32 | 2026-10-27 00:02 | Initial project scaffold (setup only, no feature code) |
-
-Recorded 2026-10-27 05:43 IST / 2026-10-27 00:13 UTC.
+See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC); Prompt 1 commits follow it (A1-A5, contracts, persistence, evidence, state machine).
 
 ## Next step
-Wait for the developer to start Prompt 1.
+Wait for the developer to start Prompt 2.

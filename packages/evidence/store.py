@@ -25,6 +25,8 @@ from pydantic import ValidationError
 from sentinelx.common_schemas import EvidenceEvent, EvidenceState, format_utc
 from sentinelx.policy.redaction import redact
 
+from .db import transaction
+
 GENESIS_HASH = "0" * 64
 
 
@@ -95,8 +97,7 @@ class EvidenceStore:
     ) -> EvidenceEvent:
         """Redact the payload, chain it to the session's previous event, and store it."""
         clean_payload = redact(payload).value
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
+        with transaction(self._conn):
             last = self._conn.execute(
                 "SELECT seq, event_hash FROM events WHERE session_id = ? ORDER BY seq DESC LIMIT 1",
                 (session_id,),
@@ -128,11 +129,6 @@ class EvidenceStore:
                     event.event_hash, event.schema_version,
                 ),
             )
-            self._conn.execute("COMMIT")
-        except BaseException:
-            if self._conn.in_transaction:
-                self._conn.execute("ROLLBACK")
-            raise
         return event
 
     # ------------------------------------------------------------------ read

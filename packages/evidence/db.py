@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -65,3 +67,19 @@ def migrate(conn: sqlite3.Connection) -> list[int]:
             raise
         applied.append(version)
     return applied
+
+
+@contextmanager
+def transaction(conn: sqlite3.Connection) -> Iterator[None]:
+    """BEGIN IMMEDIATE ... COMMIT; joins the caller's transaction if one is already open."""
+    if conn.in_transaction:
+        yield
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
