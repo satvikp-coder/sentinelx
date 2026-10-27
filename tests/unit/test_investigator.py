@@ -333,6 +333,21 @@ def test_an_unsupported_inferred_claim_yields_needs_validation(conn: sqlite3.Con
     assert shadow.claims[0].code == "UNSUPPORTED"
 
 
+def test_denying_a_block_needs_no_block_event_but_asserting_one_does(
+        conn: sqlite3.Connection) -> None:
+    ids = make_session(conn, "s1")
+    texts = {
+        "The session completed a benign lookup without any blocked or forbidden behavior.": True,
+        "Nothing was stopped and the request was not blocked.": True,
+        "The request was blocked by the gateway.": False,
+        "The gateway stopped the request, it was not allowed through.": False,
+    }
+    for text, passes in texts.items():
+        r = verify_finding(conn, "s1", finding_with(
+            [inferred("c1", text, [ids["start"]])], [ids["start"]]))
+        assert r.claims[0].passed is passes, text
+
+
 def test_a_session_without_a_verifier_result_cannot_back_outcome_claims(
         conn: sqlite3.Connection) -> None:
     SessionService(conn).create(SessionKind.AGENT_RUN, "p1", SYS, session_id="nv")

@@ -118,6 +118,11 @@ OUTCOME_POSITIVE = re.compile(
 ATTEMPT = re.compile(r"forbidden (action|request|outcome)?\s*(was )?(proposed|attempted)"
                      r"|attempt\w* to redirect", re.IGNORECASE)
 BLOCKED = re.compile(r"\b(blocked|prevented|denied|stopped|refused)\b", re.IGNORECASE)
+# "without any blocked ...", "was not blocked", "nothing was stopped": it denies a block, so it
+# needs no BLOCK event (a false denial is still caught when the verifier/outcome claims disagree)
+NEGATED_BLOCK = re.compile(
+    r"\b(no|not|never|without|neither|nor|none|nothing|n't)\b[^.;]{0,40}"
+    r"\b(blocked|prevented|denied|stopped|refused)\b", re.IGNORECASE)
 GOAL_FAILED = re.compile(r"(task|goal)[^.]*\b(failed|not completed|not met|incomplete)\b",
                          re.IGNORECASE)
 GOAL_MET = re.compile(r"(task|goal)[^.]*\b(completed|met|succeeded)\b", re.IGNORECASE)
@@ -156,7 +161,8 @@ def check_inferred(claim: Claim, cited: list[EvidenceEvent],
         if not ok(verifier):
             return (False, "CONTRADICTS_VERIFIER",
                     f"claim {what}; the verifier result says otherwise")
-    if BLOCKED.search(text) and not any(_stopping_event(e) for e in cited):
+    says_blocked = BLOCKED.search(text) and not NEGATED_BLOCK.search(text)
+    if says_blocked and not any(_stopping_event(e) for e in cited):
         return False, "UNSUPPORTED", ("claim says something was blocked but no cited event is a "
                                       "BLOCK/CONFIRM decision or an egress/sandbox block")
     return True, "VERIFIED", "cited events exist and nothing contradicts the verifier"
