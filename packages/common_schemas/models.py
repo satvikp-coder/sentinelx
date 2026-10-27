@@ -150,6 +150,52 @@ class EvidenceEvent(SXModel):
     event_hash: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
+class ClaimAssertion(SXModel):
+    """A machine-checkable statement about ONE cited event's actual contents.
+
+    ``field_path`` is dotted ("decision.reason_code", "arguments.url", "rule_ids.0") and is looked
+    up in the event payload; the prefix ``event.`` addresses kind/state/source/seq instead.
+    """
+
+    event_id: Id
+    field_path: Annotated[str, Field(min_length=1, max_length=200)]
+    op: Literal["equals", "contains", "exists"]
+    value: JsonValue = None
+
+
+class ClaimDraft(SXModel):
+    """A claim before an id is assigned (this is the shape a model may produce)."""
+
+    kind: Literal["OBSERVED", "INFERRED"]
+    subject: Annotated[str, Field(min_length=1, max_length=120)]
+    text: Annotated[str, Field(min_length=1, max_length=300)]
+    cited_event_ids: Annotated[list[Id], Field(min_length=1, max_length=12)]
+    assertion: ClaimAssertion | None = None  # required for OBSERVED, forbidden for INFERRED
+    confidence: Literal["low", "medium", "high"] | None = None  # required for INFERRED
+
+    @model_validator(mode="after")
+    def _shape_matches_kind(self) -> ClaimDraft:
+        if any(c in self.text for c in "<>`") or "\n" in self.text:
+            raise ValueError("claim text must be plain single-line text")
+        if self.kind == "OBSERVED":
+            if self.assertion is None:
+                raise ValueError("an OBSERVED claim needs a structured assertion")
+            if self.assertion.event_id not in self.cited_event_ids:
+                raise ValueError("the assertion's event_id must be one of cited_event_ids")
+            if self.confidence is not None:
+                raise ValueError("an OBSERVED claim carries no confidence")
+        else:
+            if self.confidence is None:
+                raise ValueError("an INFERRED claim needs a confidence (low|medium|high)")
+            if self.assertion is not None:
+                raise ValueError("an INFERRED claim has no structured assertion")
+        return self
+
+
+class Claim(ClaimDraft):
+    claim_id: Id
+
+
 class IncidentFinding(SXModel):
     incident_id: Id
     finding: Text
@@ -158,6 +204,15 @@ class IncidentFinding(SXModel):
     observed: list[Text]
     inferred: list[Text]
     recommended_mitigations: list[Text]
+    # additive since Prompt 7 (defaults keep older documents valid)
+    claims: list[Claim] = []
+    severity: Severity | None = None  # independent of confidence and of attack success
+    finding_state: FindingState | None = None  # "confirmed" only after the verifier passes
+    verifier_version: Text | None = None
+    investigator_mode: Literal["MODEL", "BASELINE"] | None = None
+    model_provider: Text | None = None
+    model_name: Text | None = None
+    prompt_version: Text | None = None
 
 
 class ContainmentBranch(SXModel):
@@ -552,5 +607,5 @@ ALL_MODELS: list[type[SXModel]] = [
     ContainmentBranch, TargetAuthorization, ScanFinding, AttackIntent, VulnerabilityFinding,
     PatchProposal, RepairVerification, ShieldRule, EscalationTicket, ApprovalRecord,
     ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord, VerifierResult,
-    AttackTemplate, BenignTemplate, GenerationInfo,
+    AttackTemplate, BenignTemplate, GenerationInfo, ClaimAssertion, Claim,
 ]

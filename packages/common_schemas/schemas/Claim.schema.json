@@ -1,0 +1,130 @@
+{
+  "$defs": {
+    "ClaimAssertion": {
+      "additionalProperties": false,
+      "description": "A machine-checkable statement about ONE cited event's actual contents.\n\n``field_path`` is dotted (\"decision.reason_code\", \"arguments.url\", \"rule_ids.0\") and is looked\nup in the event payload; the prefix ``event.`` addresses kind/state/source/seq instead.",
+      "properties": {
+        "event_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "field_path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "equals",
+            "contains",
+            "exists"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "event_id",
+        "field_path",
+        "op"
+      ],
+      "title": "ClaimAssertion",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assertion": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClaimAssertion"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "cited_event_ids": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 12,
+      "minItems": 1,
+      "title": "Cited Event Ids",
+      "type": "array"
+    },
+    "claim_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Claim Id",
+      "type": "string"
+    },
+    "confidence": {
+      "anyOf": [
+        {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "kind": {
+      "enum": [
+        "OBSERVED",
+        "INFERRED"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "subject": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Subject",
+      "type": "string"
+    },
+    "text": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "subject",
+    "text",
+    "cited_event_ids",
+    "claim_id"
+  ],
+  "title": "Claim",
+  "type": "object"
+}

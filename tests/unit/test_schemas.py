@@ -125,6 +125,12 @@ def valid_samples() -> dict[str, dict]:
         ),
         "AttackTemplate": dict(CASE_SAMPLE, attacker_objective="o", benign_neighbor_id="B01"),
         "BenignTemplate": dict(CASE_SAMPLE, attack_neighbor_id="A01"),
+        "ClaimAssertion": dict(event_id=ev, field_path="decision.decision", op="equals",
+                               value="BLOCK"),
+        "Claim": dict(claim_id="c1", kind="OBSERVED", subject="gateway", text="decided BLOCK",
+                      cited_event_ids=[ev],
+                      assertion=dict(event_id=ev, field_path="decision.decision", op="equals",
+                                     value="BLOCK")),
         "GenerationInfo": dict(
             seed_case_id="A01", provider="nvidia", model="m", mode="LIVE",
             prompt_version="gen_prompt_v1", prompt_hash="a" * 64, surface="visible_text",

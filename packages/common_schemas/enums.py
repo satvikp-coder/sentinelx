@@ -92,6 +92,19 @@ class Severity(StrEnum):
     CRITICAL = "critical"
 
 
+class Mitigation(StrEnum):
+    """The ONLY mitigations an investigator may recommend (a catalog, never free text)."""
+
+    BLOCK_ONLY = "BLOCK_ONLY"
+    PAUSE_AND_CONFIRM = "PAUSE_AND_CONFIRM"
+    STRIP_UNTRUSTED_INSTRUCTION = "STRIP_UNTRUSTED_INSTRUCTION"
+    LIMIT_NAVIGATION = "LIMIT_NAVIGATION"
+    ROLLBACK_AND_RETRY = "ROLLBACK_AND_RETRY"
+    REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
+    ADD_SHIELD_RULE = "ADD_SHIELD_RULE"
+    ESCALATE_TO_HUMAN = "ESCALATE_TO_HUMAN"
+
+
 class ModelMode(StrEnum):
     LIVE = "LIVE"
     RECORDED = "RECORDED"

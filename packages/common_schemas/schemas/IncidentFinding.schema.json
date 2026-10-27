@@ -1,6 +1,163 @@
 {
+  "$defs": {
+    "Claim": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClaimAssertion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cited_event_ids": {
+          "items": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Cited Event Ids",
+          "type": "array"
+        },
+        "claim_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "kind": {
+          "enum": [
+            "OBSERVED",
+            "INFERRED"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "subject": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Subject",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "subject",
+        "text",
+        "cited_event_ids",
+        "claim_id"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "ClaimAssertion": {
+      "additionalProperties": false,
+      "description": "A machine-checkable statement about ONE cited event's actual contents.\n\n``field_path`` is dotted (\"decision.reason_code\", \"arguments.url\", \"rule_ids.0\") and is looked\nup in the event payload; the prefix ``event.`` addresses kind/state/source/seq instead.",
+      "properties": {
+        "event_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "field_path": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Field Path",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "equals",
+            "contains",
+            "exists"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "event_id",
+        "field_path",
+        "op"
+      ],
+      "title": "ClaimAssertion",
+      "type": "object"
+    },
+    "FindingState": {
+      "enum": [
+        "confirmed",
+        "needs_validation",
+        "rejected"
+      ],
+      "title": "FindingState",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
   "additionalProperties": false,
   "properties": {
+    "claims": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Claim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
     "confidence": {
       "maximum": 1.0,
       "minimum": 0.0,
@@ -22,6 +179,17 @@
       "title": "Finding",
       "type": "string"
     },
+    "finding_state": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FindingState"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "incident_id": {
       "maxLength": 200,
       "minLength": 1,
@@ -36,6 +204,48 @@
       "title": "Inferred",
       "type": "array"
     },
+    "investigator_mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "MODEL",
+            "BASELINE"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Investigator Mode"
+    },
+    "model_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Name"
+    },
+    "model_provider": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Provider"
+    },
     "observed": {
       "items": {
         "minLength": 1,
@@ -43,6 +253,19 @@
       },
       "title": "Observed",
       "type": "array"
+    },
+    "prompt_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt Version"
     },
     "recommended_mitigations": {
       "items": {
@@ -56,6 +279,30 @@
       "default": "1.0",
       "title": "Schema Version",
       "type": "string"
+    },
+    "severity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Severity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "verifier_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verifier Version"
     }
   },
   "required": [
