@@ -55,3 +55,22 @@ Still open, stated precisely:
 - **Same-origin attacker-controlled state** (e.g. stored XSS on an allowed host) is out of scope of this prototype.
 - **Policy coverage was authored together with the cases.** The case set shows how the controls behave on these 30 cases, not on unseen attacks.
 - Response bodies, cookies and storage are not inspected; only requests are.
+
+
+## Abuse case: Sentinel X's scanner pointed at a stranger's site (Part 2, implemented controls)
+| Threat | Control (implemented and tested) |
+|---|---|
+| A user (or a prompt) registers a site they do not own | Non-lab targets are OFF by default; need `ALLOW_NON_LAB_TARGETS`, a token served at the site's exact origin (`/.well-known/sentinelx-verify.txt`), the owner's acknowledgement phrase, and expire after 24 h; only a hash of the token is stored |
+| `lab=true` used to smuggle a real host | Registration rejects it unless every host is loopback or `*.lab.test` |
+| Scope tricks: `http://good@evil/`, `good.evil`, other port/scheme, IP literals, IDN/dot tricks | Strict normalizer plus exact scheme/host/port match; any `@` in the authority is refused (USERINFO_IN_URL) |
+| Redirect from an allowed site to an internal or foreign address | Every hop is re-checked against scope; off-scope hops are never requested |
+| SSRF to private/metadata addresses (non-lab) | One resolution, all answers must be public, connection pinned to the checked IP (IPv4, IPv6, IPv4-mapped); metadata hosts blocked by name and address |
+| DNS rebinding | The resolved address is pinned for the life of the scan; the resolver is called once per host |
+| State-changing requests | GET/HEAD/OPTIONS only by default; writes only on lab targets, declared in the scan profile, with a reason and a synthetic account; operator-only switch |
+| Runaway or noisy scan | Request budget (500), rate limit, per-host concurrency, wall-clock, body/response caps; each stop is explicit |
+| Cannot stop a scan | Kill switch (flag or file) checked before every request |
+| Scanner code bypasses the gate | A static test fails if scanner code imports httpx/requests/urllib.request/socket/etc. anywhere except `GuardedClient` |
+| Secrets leak into evidence | URLs are redacted (secret-looking query values masked), only header NAMES and sizes are stored, no bodies |
+| A model or scanned page changes the rules | Config and profile are frozen objects set by the operator; recorded in the evidence at scan start |
+
+Still open: the ownership proof trusts whoever controls the origin at that moment; TLS certificate validation of non-lab hosts relies on the HTTP client defaults; the gate is only as complete as the code that uses `GuardedClient` (future scanner code must keep using it). Not exercised against the real internet: non-lab targets were tested only against local stub servers.

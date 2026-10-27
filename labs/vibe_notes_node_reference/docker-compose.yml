@@ -1,0 +1,11 @@
+# Optional Docker run of the notes lab (documented default: npm start). Loopback publish only.
+services:
+  notes:
+    build: .
+    ports:
+      - "127.0.0.1:${NOTES_PORT:-18083}:18083"
+    volumes:
+      - ./data:/data
+    environment:
+      NOTES_PORT: "18083"
+      NOTES_DB: /data/notes.db

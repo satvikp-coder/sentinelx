@@ -82,5 +82,9 @@ See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UT
 - Live model suggestion (`containment_prompt_v1`, nvidia / meta/muse-glimmer-30b, LIVE, one call per case, first 3 attack cases A01-A03, 28-52 s each): the suggested subset included the full-catalog winner in 3/3 cases; selection stayed deterministic code.
 - Honest limits: the agent is SIMULATED and scripted; cases and policy were authored together; branches are re-executions in our own lab; 15 cases, one run per branch; weights are our choice; STRIP and LIMIT_NAVIGATION lose to BLOCK_ONLY partly because the lab policy was built knowing these attacks.
 
+## Site Guard foundations (Prompt 8, 2026-10-27)
+- Built: authorization gate (`sentinelx.scanner.authz`, `GuardedClient`), two vulnerable labs + hand-fixed reference copies, hand-authored `PLANTED.json` (10 + 10), benign traffic generators, lab control scripts, `scripts/demo_authz.py`. No scanner checks and no model calls (Prompt 9).
+- See the test counts and demo output in the Prompt 8 final report; limits: lab-only; the non-lab ownership path was exercised only against local stub servers; Docker-dependent tests need a running daemon (loud skip locally, failure under `SENTINELX_CI=1`).
+
 ## Next step
 Wait for the developer to start the next prompt.

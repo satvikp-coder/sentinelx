@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PORT = process.env.NOTES_PORT || 18083;
-const HOST = '127.0.0.1';
+const HOST = process.env.NOTES_HOST || '127.0.0.1';
 const DB_PATH = process.env.NOTES_DB || path.join(__dirname, 'data', 'notes.db');
 const SECRET = process.env.NOTES_SECRET || crypto.randomBytes(32).toString('hex');
 const SEED = 20261027;

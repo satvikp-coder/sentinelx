@@ -24,13 +24,15 @@ Two sides on one shared evidence and verification core:
 | Verifier (independent assertions) | implemented for Scenario A (ledger-based) |
 | Investigator (evidence-cited) | planned |
 | IncidentTwin containment (EVCS) | planned |
-| Scanner (Site Guard) | planned |
+| Scanner (Site Guard) | authorization gate + GuardedClient implemented (local); scan checks planned |
 | Fixer | planned |
 | Shield (reverse proxy) | planned |
 | Agent Guard SDK (Python / TypeScript) | planned |
 | Site Guard CLI | planned |
 | API (FastAPI) | planned |
 | Dashboard (React) | planned |
+| Lab 1: vibe_shop_php (+ reference, PLANTED ground truth, benign traffic) | implemented (local) |
+| Lab 2: vibe_notes_node (+ reference, PLANTED ground truth, benign traffic) | implemented (local) |
 | Reproducible benchmark | planned |
 
 ## Responsible use
