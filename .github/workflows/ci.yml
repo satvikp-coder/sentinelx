@@ -15,9 +15,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,browser]"
+      - run: python scripts/setup_browsers.py --with-deps
       - run: ruff check .
-      - run: pytest
+      - run: pytest -rs
+        env:
+          SENTINELX_CI: "1"
 
   web:
     runs-on: ubuntu-latest
