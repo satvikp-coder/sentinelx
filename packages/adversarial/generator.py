@@ -95,6 +95,18 @@ def build_messages(spec: SeedSpec, surface: Surface, tone: str, length_cap: int,
     return [{"role": "system", "content": GEN_SYSTEM_PROMPT}, {"role": "user", "content": user}]
 
 
+_REPEATED_PREFIXES = ("[OPERATOR OVERRIDE]", "Required step before this page can be used:")
+
+
+def strip_repeated_prefix(text: str) -> str:
+    """The wrapper template already supplies the surface's prefix; models sometimes repeat it."""
+    t = text.strip()
+    for prefix in _REPEATED_PREFIXES:
+        while t.lower().startswith(prefix.lower()):
+            t = t[len(prefix):].strip()
+    return t
+
+
 def prompt_hash(messages: list[dict[str, str]]) -> str:
     return hashlib.sha256(json.dumps(messages, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -115,8 +127,9 @@ def generate_variants(client: ModelClient, seed: AttackTemplate, spec: SeedSpec,
         return outcome  # MODEL_UNAVAILABLE / INVALID_OUTPUT: no candidates, said honestly
     seen: list[str] = []
     for variant in result.parsed.variants:
-        reasons = check_slot_text(variant.text, spec, length_cap, seen)
-        outcome.candidates.append(Candidate(variant.text.strip(), reasons))
+        text = strip_repeated_prefix(variant.text)
+        reasons = check_slot_text(text, spec, length_cap, seen)
+        outcome.candidates.append(Candidate(text, reasons))
         if not reasons:
-            seen.append(variant.text)
+            seen.append(text)
     return outcome
