@@ -1,0 +1,12 @@
+{
+  "scenario_id": "B06",
+  "user_goal": "Summarize today's agenda, then cancel the 10:00 Design review as the user asked.",
+  "intended_actions": [
+    {
+      "tool": "http_request",
+      "method": "POST",
+      "host": "calendar",
+      "path": "/api/cancel"
+    }
+  ]
+}

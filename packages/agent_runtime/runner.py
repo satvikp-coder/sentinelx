@@ -20,6 +20,7 @@ import sqlite3
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -28,6 +29,8 @@ from sentinelx.common_schemas import (
     ActionRequest,
     Actor,
     ActorRole,
+    ApprovalDecision,
+    ApprovalRecord,
     Arm,
     Decision,
     EvidenceState,
@@ -47,6 +50,7 @@ from sentinelx.policy import (
     evaluate,
     evaluate_page_request,
 )
+from sentinelx.policy.engine import args_digest as approval_args_digest
 from sentinelx.policy.gateway import PROPOSED_KIND, decide_and_record
 from sentinelx.verifier.record import verify_and_record
 
@@ -77,6 +81,12 @@ class RunConfig:
     wall_clock_seconds: float = 90.0
     op_timeout: float = 8.0
     headless: bool = True
+    # --- containment / approval hooks (all default to today's behaviour) ---------------------
+    approver: Any = None  # sentinelx.agent_runtime.approvers.Approver; None = CONFIRM just blocks
+    scenario_override: Callable[[ScenarioSpec], ScenarioSpec] | None = None  # gateway side only
+    observation_filter: Callable[[str], tuple[str, dict[str, Any]]] | None = None  # planner view
+    session_kind: SessionKind = SessionKind.AGENT_RUN
+    run_note: dict[str, Any] | None = None  # extra, JSON-safe fields for RUN_STARTED
 
 
 @dataclass
@@ -116,6 +126,9 @@ class _Runner:
         self.protected = config.arm is Arm.PROTECTED
         self.session_id = ""
         self.scenario = materialize_scenario(spec, lab.port)
+        if config.scenario_override is not None:  # e.g. LIMIT_NAVIGATION: the GATEWAY's view only;
+            self.scenario = config.scenario_override(self.scenario)  # the verifier keeps `spec`
+        self.stripped: list[dict[str, Any]] = []
         self.history: list[HistoryEntry] = []
         self.request_times: deque[float] = deque()
         self.page_texts: dict[str, str] = {}
@@ -148,7 +161,7 @@ class _Runner:
         if records.get(ScenarioSpec, spec.id) is None:
             records.insert(spec)
         session, _ = self.svc.create(
-            SessionKind.AGENT_RUN, self.policy.policy_version, SYSTEM, scenario_id=spec.id,
+            cfg.session_kind, self.policy.policy_version, SYSTEM, scenario_id=spec.id,
             arm=cfg.arm, model=getattr(self.planner, "model_label", self.planner.name),
             provider=getattr(self.planner, "provider_label", PROVIDER_LABEL),
             fixture_version=spec.fixture_version,
@@ -167,6 +180,8 @@ class _Runner:
             "planner": self._planner_info(),
             "protected": self.protected, "lab_port": self.lab.port, "max_steps": cfg.max_steps,
             "boundaries": list(self.boundaries),
+            "approver": getattr(cfg.approver, "name", None),
+            **(cfg.run_note or {}),
         })
         self._transition(SessionState.READY)
         self._transition(SessionState.RUNNING)
@@ -301,6 +316,8 @@ class _Runner:
                                        self.policy, ctx)
             proposal_id, decision = result.proposed_event_id, result.decision
             self.gateway_ms.append(result.decision_ms)
+            if decision.decision is Decision.CONFIRM and result.approval_request is not None:
+                decision = self._resolve_approval(req, result, ctx, proposal_id)
             outcome = await self._execute_allowed(req, decision, proposal_id)
         else:
             proposal_id = self._event(PROPOSED_KIND, req.model_dump(mode="json"),
@@ -313,6 +330,44 @@ class _Runner:
             decision = None
         self.last_step = req.step
         return self._observe(req, step, outcome, decision)
+
+    def _resolve_approval(self, req: ActionRequest, result: Any, ctx: SessionContext,
+                          proposal_id: str) -> PolicyDecision:
+        """Pause a CONFIRM, ask the approver, then let the gateway RE-EVALUATE. Without an
+        approver (or on reject / timeout) the decision stays CONFIRM and nothing executes."""
+        approver, request = self.config.approver, result.approval_request
+        if approver is None:
+            return result.decision
+        assert request.session_id == self.session_id
+        requested = self._event("APPROVAL_REQUESTED", {
+            **request.model_dump(mode="json"), "paused": True,
+            "label": "action frozen until an approver answers; not executed"},
+            EvidenceState.OBSERVED, result.decided_event_id)
+        verdict = approver.decide(request, req)
+        record = ApprovalRecord(
+            id=request.id, subject_type="action", subject_id=request.subject_id,
+            reviewer=verdict.reviewer,
+            decision=(ApprovalDecision.APPROVE if verdict.outcome == "approve"
+                      else ApprovalDecision.REJECT),
+            rationale=verdict.rationale, timestamp=datetime.now(UTC))
+        self._event("APPROVAL_RECORDED", {
+            "approval_id": record.id, "subject_id": record.subject_id, "outcome": verdict.outcome,
+            "approver": approver.name, "reviewer": record.reviewer, "rationale": record.rationale,
+            "simulated": bool(approver.simulated), "policy_version": self.policy.policy_version},
+            EvidenceState.SIMULATED if approver.simulated else EvidenceState.OBSERVED, requested)
+        RecordStore(self.conn).insert(record)
+        # an approval is valid only for this session, this policy version and these exact args
+        bound = (request.policy_version == self.policy.policy_version
+                 and request.args_digest == approval_args_digest(req.tool, req.arguments))
+        if verdict.outcome != "approve" or not bound:
+            return result.decision
+        again = evaluate(req, self.scenario, self.policy,
+                         ctx.model_copy(update={"approvals": (record,)}))
+        self._event("ACTION_DECIDED", {"decision": again.model_dump(mode="json"),
+                                       "reevaluated_after_approval": True,
+                                       "approval_id": record.id}, EvidenceState.OBSERVED,
+                    proposal_id)
+        return again
 
     async def _execute_allowed(self, req: ActionRequest, decision: PolicyDecision,
                                proposal_id: str) -> ActionOutcome | None:
@@ -351,8 +406,16 @@ class _Runner:
                 "text_sha256": hashlib.sha256(outcome.text.encode()).hexdigest(),
                 "excerpt": outcome.text[:1500], "untrusted": True,
             }, parent=None)
+        seen = outcome.text if outcome.ok else ""
+        flt = self.config.observation_filter
+        if flt is not None and seen:
+            seen, info = flt(seen)
+            if info.get("stripped_chars"):
+                self.stripped.append(info)
+                self._event("INSTRUCTIONS_STRIPPED", {**info, "action_id": req.action_id,
+                                                      "label": "planner saw the filtered text"})
         return Observation(self.session_id, step + 1, now, outcome.final_url or self._url(),
-                           text=outcome.text if outcome.ok else "", outcome=status,
+                           text=seen, outcome=status,
                            blocked_reason=outcome.error, tool_result=outcome.tool_result,
                            event_id=event_id, structure=outcome.structure if outcome.ok else "")
 

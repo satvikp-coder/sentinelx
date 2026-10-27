@@ -1,0 +1,11 @@
+# EVCS disruption weights. Our own choice, not a measurement: the recommendation depends on them.
+# disruption_cost = w_blocked*blocked_legitimate + w_confirm*confirmed_legitimate
+#                 + w_added*added_actions + w_strip*(stripped_chars/100) + w_latency*(duration_ms/1000)
+# utility = 1 - disruption_cost. w_latency defaults to 0 because wall-clock noise would make the
+# winner non-reproducible; raise it to price latency in.
+version: weights-v1
+w_blocked: 1.0
+w_confirm: 0.3
+w_added: 0.1
+w_strip: 0.5
+w_latency: 0.0

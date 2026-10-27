@@ -54,6 +54,7 @@ def make_approval_request(
         reason_code=decision.reason_code,
         explanation=decision.explanation,
         created_at=now or datetime.now(UTC),
+        policy_version=decision.policy_version,
     )
 
 

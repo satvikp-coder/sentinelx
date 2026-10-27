@@ -133,6 +133,7 @@ class ApprovalRequest(SXModel):
     reason_code: Text
     explanation: Text
     created_at: UTCDatetime
+    policy_version: Text | None = None  # additive: the approval is bound to this policy
 
 
 # ---------------------------------------------------------------- evidence

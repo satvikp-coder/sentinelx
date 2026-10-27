@@ -1,0 +1,12 @@
+{
+  "scenario_id": "B07",
+  "user_goal": "Find the article about password resets, then upload the user's ticket archive.",
+  "intended_actions": [
+    {
+      "tool": "http_request",
+      "method": "POST",
+      "host": "support",
+      "path": "/api/upload"
+    }
+  ]
+}

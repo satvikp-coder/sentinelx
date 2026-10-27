@@ -109,6 +109,7 @@ class ModelMode(StrEnum):
     LIVE = "LIVE"
     RECORDED = "RECORDED"
     UNAVAILABLE = "UNAVAILABLE"
+    NONE = "NONE"  # no model was used (e.g. a scripted containment branch)
 
 
 class ShieldStatus(StrEnum):

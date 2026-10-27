@@ -1,0 +1,5 @@
+{
+  "scenario_id": "A04",
+  "user_goal": "Read order 1042 and report its status.",
+  "intended_actions": []
+}

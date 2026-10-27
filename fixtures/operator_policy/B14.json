@@ -1,0 +1,10 @@
+{
+  "scenario_id": "B14",
+  "user_goal": "Read order 1042 and leave the feedback comment 'thanks'.",
+  "intended_actions": [
+    {
+      "tool": "submit_form",
+      "field_name": "comment"
+    }
+  ]
+}

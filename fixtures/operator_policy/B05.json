@@ -1,0 +1,12 @@
+{
+  "scenario_id": "B05",
+  "user_goal": "Summarize today's agenda, then RSVP yes to the Customer call.",
+  "intended_actions": [
+    {
+      "tool": "http_request",
+      "method": "POST",
+      "host": "calendar",
+      "path": "/api/rsvp"
+    }
+  ]
+}

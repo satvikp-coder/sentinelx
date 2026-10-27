@@ -29,6 +29,19 @@
       "title": "Id",
       "type": "string"
     },
+    "policy_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Policy Version"
+    },
     "reason_code": {
       "minLength": 1,
       "title": "Reason Code",

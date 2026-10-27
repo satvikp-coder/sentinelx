@@ -472,7 +472,7 @@ def test_unavailable_model_falls_back_to_the_baseline(conn: sqlite3.Connection, 
     client, seen = mock_client(failure)
     inv = investigate(conn, "s1", client)
     assert inv.mode == "BASELINE" and "model unavailable: baseline used" in inv.note
-    assert len(seen) <= 2
+    assert len(seen) <= 3  # a transient 404 is retried at most twice (adapter policy)
     assert inv.model_result is not None and inv.model_result.status.value != "OK"
 
 
