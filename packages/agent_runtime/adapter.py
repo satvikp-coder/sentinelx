@@ -61,6 +61,7 @@ class BrowserAdapter:
         self.op_timeout = op_timeout
         self.headless = headless
         self._pw: Any = None
+        self._pw_manager: Any = None
         self._browser: Any = None
         self._context: Any = None
         self._page: Any = None
@@ -71,8 +72,9 @@ class BrowserAdapter:
     async def __aenter__(self) -> BrowserAdapter:
         from playwright.async_api import async_playwright
 
+        self._pw_manager = async_playwright()
         try:
-            self._pw = await async_playwright().start()
+            self._pw = await self._pw_manager.start()
             self._browser = await self._pw.chromium.launch(headless=self.headless,
                                                            args=LAUNCH_ARGS)
             self._context = await self._browser.new_context(
@@ -103,12 +105,16 @@ class BrowserAdapter:
                                        10)
             except Exception:  # noqa: S110 - best-effort cleanup, never mask the real error
                 pass
-        if self._pw is not None:
+        # Stop the driver even if we were cancelled before start() returned (the manager owns
+        # the Node driver process); otherwise a cancel during start-up leaks that process.
+        stopper = self._pw.stop if self._pw is not None else getattr(self._pw_manager, "stop", None)
+        if stopper is not None:
             try:
-                await asyncio.wait_for(self._pw.stop(), 10)
+                await asyncio.wait_for(stopper(), 10)
             except Exception:  # noqa: S110
                 pass
         self._http = self._context = self._browser = self._pw = self._page = None
+        self._pw_manager = None
 
     @property
     def current_url(self) -> str | None:
@@ -117,6 +123,16 @@ class BrowserAdapter:
 
     # ------------------------------------------------------------------ sandbox routing
     async def _route(self, route: Any, request: Any) -> None:
+        """Fail closed: any error while serving a request aborts it (never continues it)."""
+        try:
+            await self._serve(route, request)
+        except Exception:
+            try:  # e.g. the page/context was closed mid-request during shutdown
+                await route.abort("blockedbyclient")
+            except Exception:  # noqa: S110 - already closed, nothing left to abort
+                pass
+
+    async def _serve(self, route: Any, request: Any) -> None:
         """Serve every browser request ourselves, hop by hop, with redirects OFF.
 
         Verified empirically: Playwright does NOT call a route handler for the target of a

@@ -19,32 +19,42 @@ Last updated: 2026-10-27 (Prompt 0: project setup only; no feature code).
 
 No system packages were installed.
 
-## Verified results (Prompt 2, 2026-10-27)
+## Verified results (Prompt 3, 2026-10-27)
 - `ruff check .` -> All checks passed!
-- `pytest` -> 443 passed, 0 skipped (adds policy table tests, ~60 URL cases, signal tests, hypothesis property tests with 1000 examples each, evidence integration, static purity checks).
-- `python scripts/demo_policy.py` prints decision / rule_ids / reason_code for 12 sample actions.
-- Local commits only; not pushed. CI not re-run on GitHub for these commits.
+- `pytest -rs` -> **597 passed, 0 skipped** in 86 s. **58 browser (Chromium) tests actually ran**, 0 failed, 0 skipped.
+- Chromium installed with `python scripts/setup_browsers.py` (Playwright cache, no system packages). Browser tests skip with a clear message locally if Chromium is missing and FAIL when `SENTINELX_CI=1`.
+- `python scripts/demo_agent_lab.py` runs 6 scenarios x 2 arms and prints the comparison table.
+- The lifecycle/cleanup browser tests were run 5 times in a row (17/17 each) after the fixes below.
+- Local commits only; not pushed. CI has not run these commits on GitHub (Linux CI needs `playwright install --with-deps`; the workflow now does that, untested).
 
-## Implemented (Prompt 2; no model calls, browser or network anywhere in the policy package)
-- `sentinelx.policy`: frozen content-addressed policy config (`configs/policy/{default,strict,monitor}.yaml`), pure `evaluate()` pipeline, strict URL normaliser/matcher with `check_redirect`, evidence-only signal helpers (`configs/policy/signals.yaml`), `decide_and_record` evidence recorder (`sentinelx.policy.gateway`).
-- Additive schema fields for monitor mode, signals and `ApprovalRequest` (see docs/DECISIONS.md).
-- Still planned: agent runtime, fixtures, model client, scanner, shield, SDK, CLI, API, dashboard.
+## Implemented (Prompt 3; the agent is a SIMULATED scripted program, not an LLM)
+- `apps/fixture_lab`: one FastAPI app, 127.0.0.1 on an OS-chosen port, exact Host-header vhosts (orders / calendar / support / collector `.lab.test`), per-run JSONL side-effect ledger, token+loopback admin endpoints, deterministic seeded reset and `fixture_hash`. Hand-authored pages and payloads in `fixtures/` (8 scenarios: S1, S1_TOOL, S2, S2_HIDDEN, S3, B1, B2, B3).
+- `sentinelx.agent_runtime`: `ScriptedNaivePlanner` behind a `Planner` interface, Playwright adapter behind a SANDBOX BOUNDARY (separate from the policy gateway, both arms), protected/unprotected run loop with evidence, kill switch, cancellation, step and wall-clock limits.
+- `sentinelx.verifier`: independent verifier (ledger + evidence only), stored as a VERIFIED event and in the `verifications` table (migration 0002).
+- `configs/policy/lab.yaml`, `synth_tok_` redaction.
+
+## Findings worth knowing
+- Playwright does NOT call `page.route` handlers for the targets of browser-followed redirects (found by test: a redirect to the collector reached the ledger). The adapter now follows redirects itself, hop by hop.
+- Cancelling Playwright during its own start-up leaves its connection tasks pending and hung `asyncio.run` shutdown (and leaked the Node driver). The wall-clock budget now starts after the browser is up.
+- In the lab, signals (hints) did not fire for the cancel/upload wording; the protected-arm blocks came from deterministic rules (`SECRET_EGRESS`, `TOOL_NOT_IN_SCENARIO`).
 
 ## Known gaps
 - Organizers' reply text still not recorded in docs/RULES_COMPLIANCE.md.
-- The gateway decides only; nothing executes or enforces it yet (no runtime exists). `SessionContext` counters (`steps_taken`, `last_step`, `requests_last_minute`) must be supplied by the future runtime.
-- Argument-level URL detection relies on the policy's `url_args`; a URL hidden in a non-URL argument is only caught by secret/egress rules and signals.
-- Redirect checking (`check_redirect`) exists but nothing calls it yet.
+- No model exists anywhere yet; "attack success" here describes a scripted gullible program, not LLM behaviour. Paired runners/metrics come next.
+- Subresource exfiltration (a hostile page embedding a collector image) is not policy-checked; the sandbox allows any `*.lab.test` host (docs/THREAT_MODEL.md).
+- `http_request` is blocked outright by the lab policy; no per-method / per-endpoint HTTP policy yet.
+- The wall-clock budget excludes browser start-up (bounded only by Playwright's launch timeout).
+- `SessionContext.page_origin` is the adapter's current page URL; after an adapter-followed redirect Chromium's URL stays the originally requested one (all hops were vetted).
 - Tail truncation of an evidence chain still needs an external anchor hash.
 
 ## Blockers / open items
-- php missing; Docker daemon not running; Playwright browsers untested.
+- php missing; Docker daemon not running (labs run on the local FastAPI app for now).
 - License pending (docs/DECISIONS.md).
 - docs/RULES_COMPLIANCE.md items all unchecked.
 - Legacy credentials must be rotated (docs/LEGACY_CODE_AUDIT.md).
 
 ## Commits
-See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC); Prompt 1 commits follow it (A1-A5, contracts, persistence, evidence, state machine).
+See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC). Prompt 3 commits: L1 browser gating, L2 lab, L3 verifier, L4 runtime, L5 demo/docs/fixes.
 
 ## Next step
-Wait for the developer to start Prompt 3.
+Wait for the developer to start Prompt 4 (paired experiment runners and metrics).

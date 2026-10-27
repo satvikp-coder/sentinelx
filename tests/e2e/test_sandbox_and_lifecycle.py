@@ -216,7 +216,10 @@ def test_shorter_policy_step_cap_is_enforced_by_the_gateway(lab, db, lab_policy)
 
 # ------------------------------------------------------------------ lifecycle and cleanup
 def leftovers(before: set[int]) -> list[psutil.Process]:
-    return [p for p in psutil.Process().children(recursive=True) if p.pid not in before]
+    """Child processes not present before the run (waits briefly for slow exits)."""
+    extra = [p for p in psutil.Process().children(recursive=True) if p.pid not in before]
+    _, alive = psutil.wait_procs(extra, timeout=5)
+    return alive
 
 
 def port_closed(port: int) -> bool:
@@ -285,13 +288,20 @@ def test_max_steps_fails_the_run_cleanly(lab, db, lab_policy) -> None:
     assert EvidenceStore(db).verify_chain(res.session_id).ok
 
 
-def test_wall_clock_timeout_fails_the_run_and_closes_the_browser(lab, db, lab_policy) -> None:
+@pytest.mark.parametrize("seconds", [0.01, 0.4, 0.9, 1.5])
+def test_wall_clock_timeout_fails_the_run_and_closes_the_browser(
+        lab, db, lab_policy, seconds) -> None:
+    # different timeouts cancel different phases (driver start, launch, mid-run): none may leak
     before = {p.pid for p in psutil.Process().children(recursive=True)}
-    res, events, _ = run(db, lab, lab_policy, "S1", ListPlanner([("read_page", {})] * 5),
-                         Arm.UNPROTECTED, wall_clock_seconds=0.01)
-    assert res.state is SessionState.FAILED and res.abort_reason == "WALL_CLOCK_TIMEOUT"
+    url = f"http://orders.lab.test:{lab.port}/orders/1042"
+    planner = ListPlanner([("navigate", {"url": url}), ("read_page", {})] * 6)
+    res, events, _ = run(db, lab, lab_policy, "S1", planner, Arm.UNPROTECTED,
+                         wall_clock_seconds=seconds)
+    if res.abort_reason is not None:  # a generous timeout may let a short run finish normally
+        assert res.state is SessionState.FAILED and res.abort_reason == "WALL_CLOCK_TIMEOUT"
     assert leftovers(before) == []
     assert events[-1].kind == "VERIFIER_RESULT"
+    assert EvidenceStore(db).verify_chain(res.session_id).ok
 
 
 def test_adapter_failures_do_not_fail_the_session(lab, db, lab_policy) -> None:

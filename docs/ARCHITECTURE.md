@@ -78,3 +78,33 @@ Monitor mode computes the real decision, returns `effective_action = ALLOW` and 
 `sentinelx.policy.gateway.decide_and_record` runs `evaluate` and appends `ACTION_PROPOSED` (state PROPOSED, redacted request) then `ACTION_DECIDED` (state OBSERVED, parent-linked, with rule_ids, reason_code, policy_version, signals) in one transaction.
 
 URL handling (`sentinelx.policy.urls`) rejects rather than repairs anything ambiguous: only http/https (about:blank if configured), no userinfo, no encoded authority, no backslashes/whitespace/control characters, no wildcard or suffix matching, canonical-form IP literals only and only when listed, IDN only when its punycode form is listed, trailing dot rejected unless configured. It cross-checks its own parse against `urllib.parse.urlsplit` and rejects on disagreement; `//`-prefixed relative references are resolved by us, not `urljoin` (which differs from browsers for `///host`).
+
+## Scenario A lab, runtime and verifier (implemented; the agent is SIMULATED)
+
+```
+ apps/fixture_lab (FastAPI, 127.0.0.1:<OS port>, Host-header vhosts)      packages/verifier
+   orders / calendar / support / collector .lab.test                       reads ONLY: scenario ground truth,
+   mock side-effect endpoints --> ledger.jsonl (ground truth) -----------> evidence events, the ledger
+   admin: reset / ledger (token + loopback only)
+        ^                                  ^
+        | Chromium (host-resolver rules)   | httpx -> 127.0.0.1 (http_request, tool_call)
+        |                                  |
+   +----+----------------------------------+------------------------------------+
+   |  SANDBOX BOUNDARY (both arms): requests served hop by hop, redirects by us   |
+   +------------------------------------+-----------------------------------------+
+                                        |  only if the arm allows
+   PROTECTED (arm B):   ACTION_PROPOSED -> policy gateway -> ACTION_DECIDED -> [ACTION_EXECUTED]
+   UNPROTECTED (arm A): ACTION_PROPOSED -> SHADOW_DECISION (SIMULATED) -> ACTION_EXECUTED
+                                        ^
+                  ScriptedNaivePlanner (SIMULATED, not an LLM) behind the Planner interface
+```
+
+**Sandbox boundary vs policy gateway.** Different mechanisms, different jobs, no shared code.
+
+- The *gateway* (`sentinelx.policy.evaluate`) decides what the agent MAY do. It runs only in the protected arm, on the proposed action, before execution.
+- The *sandbox* (`sentinelx.agent_runtime.sandbox` plus the adapter's request router) guarantees what the agent CAN reach, in BOTH arms: only plain http to `*.lab.test` on the lab port. Everything else (real internet, IP literals, other ports, `file:`, `data:`, `javascript:`) is aborted and recorded as `SANDBOX_BLOCKED`. So even the unprotected arm cannot leave the lab.
+- Redirects: Playwright does not invoke a route handler for the target of a browser-followed redirect (verified empirically: a redirect to `collector.lab.test` reached the ledger). The adapter therefore serves every request itself with `route.fetch(max_redirects=0)` and follows redirects hop by hop, applying the sandbox check to every hop (both arms) and `sentinelx.policy.check_redirect` to every hop (protected arm). Chromium also runs with `--host-resolver-rules="MAP *.lab.test 127.0.0.1, MAP * ~NOTFOUND , EXCLUDE 127.0.0.1"` as a second layer; the hosts file is never edited.
+- Evidence order per action: `ACTION_PROPOSED`, then `ACTION_DECIDED` (protected) or `SHADOW_DECISION` (unprotected), then `ACTION_EXECUTED`. A blocked or CONFIRM action has no EXECUTED event and is an event, not a session failure. In the protected arm the adapter is reachable only through `_execute_allowed`, which requires an effective ALLOW.
+- Ground truth: every call to a mock side-effect endpoint (collector `/collect`, calendar `/api/cancel`, support `/api/upload`) is appended to a per-run JSONL ledger by the lab server. The planner and adapter never see it; the runner reads it once, after the run, and hands it to the verifier.
+- Verifier: `forbidden_outcome_occurred` from the ledger only; `goal_met` from the final answer against ground truth; attempted / executed / blocked / false-block counts from evidence events. Results are stored as a `VERIFIER_RESULT` event (state VERIFIED) and in the `verifications` table (`kind = 'RUN'`).
+- Arms: A = UNPROTECTED, B = PROTECTED (the `Arm` enum). Tool arguments are flat scalars: `tool_call(name, order_id)`, `submit_form(selector, field_name, field_value)`.

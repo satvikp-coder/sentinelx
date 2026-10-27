@@ -7,19 +7,19 @@ Two sides on one shared evidence and verification core:
 - **Site Guard** - a red-team scanner, fix engine and live reverse-proxy shield for sites you own.
 
 ## Honest status
-**Project scaffold only. No feature is implemented.** See [STATUS.md](STATUS.md) for real test output and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design (a design is not proof of working code).
+**Early prototype.** The typed contracts, evidence store, policy gateway, a synthetic attack lab and an independent verifier exist locally and are tested; the agent in the lab is a SIMULATED scripted program, not an LLM. No model integration, scanner, fixer, shield, SDK, CLI, API or dashboard exists yet. See [STATUS.md](STATUS.md) for real test output and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design (a design is not proof of working code).
 
 ## Planned vs implemented
 
 | Component | Status |
 |---|---|
-| Common schemas (strict Pydantic) | planned |
+| Common schemas (strict Pydantic) | implemented (local) |
 | Model adapter (OpenAI-compatible, Meta open-weight) | planned |
-| Policy gateway | planned |
-| Evidence store (SQLite WAL, tamper-evident) | planned |
-| Agent runtime + fixture lab | planned |
+| Policy gateway | implemented (local; no model calls) |
+| Evidence store (SQLite WAL, tamper-evident) | implemented (local) |
+| Agent runtime + fixture lab | implemented for Scenario A with a SIMULATED scripted agent (no LLM yet) |
 | Adversarial scenario generation | planned |
-| Verifier (independent assertions) | planned |
+| Verifier (independent assertions) | implemented for Scenario A (ledger-based) |
 | Investigator (evidence-cited) | planned |
 | IncidentTwin containment (EVCS) | planned |
 | Scanner (Site Guard) | planned |

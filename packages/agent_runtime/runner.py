@@ -151,10 +151,7 @@ class _Runner:
         self._transition(SessionState.RUNNING)
         final_state = SessionState.COMPLETED
         try:
-            async with asyncio.timeout(cfg.wall_clock_seconds):
-                await self._loop()
-        except TimeoutError:
-            self.abort_reason = "WALL_CLOCK_TIMEOUT"
+            await self._session()
         except asyncio.CancelledError:
             self.abort_reason = "TASK_CANCELLED"
             self._finalize(SessionState.CANCELLED)
@@ -186,28 +183,40 @@ class _Runner:
                                            "message": str(exc)[:300]})
             return None
 
-    async def _loop(self) -> None:
-        shared = self._on_adapter_event
+    async def _session(self) -> None:
+        """Start the browser, then run the steps under the wall-clock budget.
+
+        The budget starts once the browser is up: cancelling Playwright in the middle of its own
+        start-up leaves its connection tasks pending and can hang interpreter shutdown, so
+        start-up is bounded only by Playwright's launch timeouts.
+        """
         hosts = self.scenario.allowed_hosts if self.protected else None
-        async with BrowserAdapter(self.lab.port, shared, hosts, self.config.op_timeout,
-                                  self.config.headless) as adapter:
+        async with BrowserAdapter(self.lab.port, self._on_adapter_event, hosts,
+                                  self.config.op_timeout, self.config.headless) as adapter:
             self.adapter = adapter
-            obs = Observation(self.session_id, 1, datetime.now(UTC))
-            while True:
-                if self.kill.active:
-                    self.abort_reason = "KILL_SWITCH"
-                    return
-                if self.cancel.is_set():
-                    self.abort_reason = "CANCELLED"
-                    return
-                if len(self.history) >= self.config.max_steps:
-                    self.abort_reason = "MAX_STEPS"
-                    return
-                planned = self.planner.next_action(obs, self.history)
-                if isinstance(planned, Finish):
-                    self.final_answer = planned.answer
-                    return
-                obs = await self._step(planned, obs.step)
+            try:
+                async with asyncio.timeout(self.config.wall_clock_seconds):
+                    await self._steps()
+            except TimeoutError:
+                self.abort_reason = "WALL_CLOCK_TIMEOUT"
+
+    async def _steps(self) -> None:
+        obs = Observation(self.session_id, 1, datetime.now(UTC))
+        while True:
+            if self.kill.active:
+                self.abort_reason = "KILL_SWITCH"
+                return
+            if self.cancel.is_set():
+                self.abort_reason = "CANCELLED"
+                return
+            if len(self.history) >= self.config.max_steps:
+                self.abort_reason = "MAX_STEPS"
+                return
+            planned = self.planner.next_action(obs, self.history)
+            if isinstance(planned, Finish):
+                self.final_answer = planned.answer
+                return
+            obs = await self._step(planned, obs.step)
 
     # ------------------------------------------------------------------ one action
     def _context(self) -> SessionContext:

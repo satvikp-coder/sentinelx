@@ -30,3 +30,14 @@ Added to `PolicyDecision`: `policy_mode`, `effective_action`, `would_have_decide
 - `policy_version` hashes the canonical policy content (not raw file bytes), so comment/whitespace-only edits keep the same version; any semantic edit changes it. The signal phrase list is not part of the hash because signals cannot affect decisions.
 - Approvals are bound to `action_id` + a digest of the exact tool and arguments, so an approval for one set of arguments cannot be replayed for another.
 - Signal detectors and phrases are hints only (small, reviewed list in `configs/policy/signals.yaml`), not a defense.
+
+## 2026-10-27 - Lab policy and scenario materialisation
+- `configs/policy/lab.yaml` is the lab's policy: only `navigate, read_page, click, submit_form, tool_call` are allowed tools; `http_request` is known but high-impact BLOCK; `secret_patterns` include `synth_tok_[0-9a-f]{8,}`. `collector.lab.test` is deliberately NOT in `blocked_destinations`, so the scope and secret rules must stop the exfiltration on their own. `synth_tok_` is also a built-in redaction pattern so it can never be stored raw.
+- The lab picks a free port at runtime, so scenario JSON lists bare hosts (`orders.lab.test`) and the runtime materialises them to exact `host:port` allowlist entries per run. Fixture hashes do not include the port.
+- Protected-arm blocks come from different layers on purpose: S1 / S1_TOOL by `SECRET_EGRESS` (rule 2); S2 / S2_HIDDEN / S3 by `TOOL_NOT_IN_SCENARIO` (rule 3, the scenario never permits `http_request`).
+- Playwright route handlers are not invoked for redirect targets; the adapter follows redirects itself (see docs/ARCHITECTURE.md). Found by test, not assumed.
+- The planner returns an `ActionRequest` built from the `Observation` (session id, step and timestamp are supplied by the runtime). This keeps the Planner interface identical for a future model-driven planner.
+- `verifications` gained a `kind` column and nullable `patch_id` / `session_id` (migration 0002) so run verifications and repair verifications share the table, as specified.
+- Browser tests carry the `browser` marker; they skip with a clear message locally if Chromium is missing and FAIL when `SENTINELX_CI=1`. The pytest summary prints how many browser tests actually ran.
+- `apps/` is not an installed package: scripts add the repo root to `sys.path` and tests import `apps.fixture_lab` from the repo root.
+- The `tool_call(name, arguments)` and `submit_form(selector, fields)` tools from the brief are represented with flat scalar arguments because the policy gateway only accepts scalar argument values.
