@@ -53,3 +53,4 @@ fixtures/generated/payloads/*
 evaluations/manifest_generated.json
 fixtures/recorded_model/*
 !fixtures/recorded_model/.gitkeep
+evaluations/manifest_generated_subset.json

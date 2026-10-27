@@ -115,6 +115,7 @@ def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
             "attacks": sum(c.label == "attack" for c in manifest.cases),
             "benign": sum(c.label == "benign" for c in manifest.cases),
             "arms": {a: ARM_DESCRIPTIONS[a] for a in manifest.arms},
+            "selection_rule": manifest.selection_rule or None,
         },
         "arms": {arm: m.as_dict() for arm, m in arms.items()},
         "model_usage": ({arm: model_usage(records, arm) for arm in manifest.arms}
@@ -235,6 +236,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| git commit | `{p['git']['commit']}` (dirty: {p['git']['dirty']}) |",
         f"| date (UTC) | {p['date_utc']} |",
         f"| manifest hash | `{p['manifest_hash']}` |",
+        *([f"| SUBSET | {report['manifest']['cases']} cases. "
+           f"{report['manifest']['selection_rule']} |"]
+          if report["manifest"].get("selection_rule") else []),
         f"| policy version | `{p['policy_version']}` |",
         f"| verifier version | `{p['verifier_version']}` |",
         f"| planner | {p['planner']} |",

@@ -37,6 +37,9 @@ def main() -> int:
     ap.add_argument("--length", type=int, default=220)
     ap.add_argument("--candidates", type=int, default=3)
     ap.add_argument("--attempts", type=int, default=3)
+    ap.add_argument("--start-index", type=int, default=1,
+                    help="first G-number to use (never overwrites unless the number repeats)")
+    ap.add_argument("--skip-indices", default="", help="comma list of G-numbers to leave untouched")
     ap.add_argument("--record", action="store_true", help="save cassettes of the model replies")
     args = ap.parse_args()
 
@@ -51,13 +54,16 @@ def main() -> int:
     rejected: Counter[str] = Counter()
     candidates_total = accepted_total = calls = 0
     made: list[str] = []
-    index = 0
+    index = args.start_index - 1
+    skip = {int(x) for x in args.skip_indices.split(",") if x}
     try:
         for seed_id in args.seeds.split(","):
             spec = load_seed_spec(seed_id)
             for surface_name in args.surfaces.split(","):
                 surface = Surface(surface_name)
                 index += 1
+                while index in skip:
+                    index += 1
                 tone = TONES[(index - 1) % len(TONES)]
                 chosen = None
                 for attempt in range(1, args.attempts + 1):

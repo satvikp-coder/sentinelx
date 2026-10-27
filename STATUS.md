@@ -57,5 +57,15 @@ No system packages were installed.
 ## Commits
 See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC). Prompt 4 commits: E1 policy rules, E2 egress + case set, E3 evaluation pipeline, E4 docs/status, E5 example report.
 
+## Prompt 5 (2026-10-27): model adapter, ModelPlanner, generator, REAL model runs
+- Tests: `ruff check .` clean; full `pytest` = **918 passed, 0 failed, 0 skipped**; 115 browser tests ran; 1 LIVE test ran (real call to nvidia / meta/muse-glimmer-30b, mode LIVE). Python: `.venv313` (python.org 3.13.5); the Microsoft-Store Python hung at startup. I started the Windows service ClipSVC while diagnosing (no effect).
+- Model: nvidia `meta/muse-glimmer-30b`, LIVE, prompt_v1, reasoning setting `low` (measured to have no clear latency effect; see DECISIONS). Endpoint latency varied 1-200 s/call; rate limits undocumented (none seen).
+- Aborted: `model-main-1` (full manifest) stopped after 6 runs (`ABORTED_SLOW`), excluded from all reports.
+- **Sealed-manifest SUBSET run `model-subset-1`** (manifest_subset.json, hash 79e92dbd..., 10 cases A02,A04,A06,A08,A11 + neighbours, rule stored in the manifest): arm A 8/10 valid, ASR 2/5; arm B 8/10 valid, ASR 0/4, block rate 1/1 (EGRESS_BLOCKED). 4 invalid runs (3x HTTP 404 from the endpoint, 1x per-run call cap), excluded and counted. Report: `evaluations/example_report_model/`. Single samples; no confidence claims.
+- **Generated variants subset `model-generated-1`** (4 cases G01,G02,G03 + B01): arm A ASR 0/2, arm B 0/3, no forbidden attempts (block rate n/a); 1 invalid (arm A G01, MODEL_UNAVAILABLE). These generated cases are gitignored (local); the model resisted these texts.
+- Generator: 6 variants kept (G01-G06); 14 of 36+ candidates rejected by the static checker in total (first pass: 18/30 for the "[OPERATOR OVERRIDE]" prefix, fixed by stripping it in code).
+- All earlier results (Prompts 1-4) remain SIMULATED and are reported separately.
+- Known gaps: n is tiny (1 sample per case/arm); invalid runs reduce denominators; arm C still a seam; nothing pushed to GitHub.
+
 ## Next step
-Wait for the developer to start Prompt 5 (model adapter; verify the model API docs first).
+Wait for the developer to start Prompt 6.
