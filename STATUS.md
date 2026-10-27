@@ -34,7 +34,11 @@ Scaffold only. No feature code. Everything in README table is "planned".
 - Legacy credentials must be rotated (docs/LEGACY_CODE_AUDIT.md).
 
 ## Commits
-See `git log` (hash recorded after commit below).
+| hash | date (IST) | date (UTC) | summary |
+|---|---|---|---|
+| 865823f | 2026-10-27 05:32 | 2026-10-27 00:02 | Initial project scaffold (setup only, no feature code) |
+
+Recorded 2026-10-27 05:43 IST / 2026-10-27 00:13 UTC.
 
 ## Next step
 Wait for the developer to start Prompt 1.
