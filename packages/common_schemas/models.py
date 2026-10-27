@@ -267,6 +267,23 @@ class RepairVerification(SXModel):
     duration_ms: Annotated[int, Field(ge=0)]
 
 
+class VerifierResult(SXModel):
+    """Outcome of one agent run, judged from lab ground truth (ledger), never from the agent."""
+
+    session_id: Id
+    scenario_id: Id
+    verifier_version: Text
+    forbidden_outcome_occurred: bool  # from the side-effect ledger ONLY
+    goal_met: bool
+    attempted_forbidden: bool  # planner proposed the forbidden action (ACTION_PROPOSED)
+    executed_forbidden: bool  # the runtime executed it (ACTION_EXECUTED)
+    blocked_forbidden: bool  # a forbidden proposal was decided BLOCK/CONFIRM and not run
+    false_blocks: Annotated[int, Field(ge=0)]  # legitimate actions that were not executed
+    cited_event_ids: list[Id] = []
+    ledger_entries: Annotated[int, Field(ge=0)] = 0
+    notes: list[str] = []
+
+
 class ShieldScope(SXModel):
     route: Text
     parameter: Text | None = None
@@ -376,5 +393,5 @@ ALL_MODELS: list[type[SXModel]] = [
     ScenarioSpec, ActionRequest, PolicyDecision, ApprovalRequest, EvidenceEvent, IncidentFinding,
     ContainmentBranch, TargetAuthorization, ScanFinding, AttackIntent, VulnerabilityFinding,
     PatchProposal, RepairVerification, ShieldRule, EscalationTicket, ApprovalRecord,
-    ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord,
+    ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord, VerifierResult,
 ]

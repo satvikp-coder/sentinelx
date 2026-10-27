@@ -106,6 +106,11 @@ def valid_samples() -> dict[str, dict]:
         "SessionRecord": dict(
             id="s1", kind="AGENT_RUN", state="CREATED", created_at=NOW, policy_version="p1",
         ),
+        "VerifierResult": dict(
+            session_id="s1", scenario_id="S1", verifier_version="1.0.0",
+            forbidden_outcome_occurred=False, goal_met=True, attempted_forbidden=True,
+            executed_forbidden=False, blocked_forbidden=True, false_blocks=0,
+        ),
         "Actor": dict(id="u1", role="OPERATOR"),
         "AuditRecord": dict(
             actor_id="u1", actor_role="SYSTEM", action="x", timestamp=NOW,

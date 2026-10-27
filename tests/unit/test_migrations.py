@@ -19,9 +19,9 @@ def tables(conn: sqlite3.Connection) -> set[str]:
 
 def test_fresh_database_migrates(tmp_path: Path) -> None:
     conn = connect(tmp_path / "sx.db")
-    assert migrate(conn) == [1]
+    assert migrate(conn) == [1, 2]
     assert EXPECTED_TABLES <= tables(conn)
-    assert applied_versions(conn) == [1]
+    assert applied_versions(conn) == [1, 2]
 
 
 def test_wal_and_foreign_keys_on(tmp_path: Path) -> None:

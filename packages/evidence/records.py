@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, TypeVar
 
@@ -26,6 +26,7 @@ from sentinelx.common_schemas import (
     SXModel,
     TargetAuthorization,
     UsageRecord,
+    VerifierResult,
     format_utc,
 )
 from sentinelx.policy.redaction import redact
@@ -38,7 +39,7 @@ class _Spec:
     table: str
     id_field: str | None  # None = autoincrement id
     columns: dict[str, str]  # extra column -> model attribute ("" = taken from insert kwargs)
-    body: bool = True
+    constants: dict[str, str] = field(default_factory=dict)
 
 
 _SPECS: dict[type[SXModel], _Spec] = {
@@ -51,7 +52,12 @@ _SPECS: dict[type[SXModel], _Spec] = {
     ),
     ScanFinding: _Spec("scan_findings", "id", {"target_id": "target_id"}),
     PatchProposal: _Spec("patches", "id", {"finding_id": "finding_id"}),
-    RepairVerification: _Spec("verifications", None, {"patch_id": "patch_id"}),
+    RepairVerification: _Spec(
+        "verifications", None, {"patch_id": "patch_id"}, {"kind": "REPAIR"}
+    ),
+    VerifierResult: _Spec(
+        "verifications", None, {"session_id": "session_id"}, {"kind": "RUN"}
+    ),
     ShieldRule: _Spec("shield_rules", "id", {"target_id": "target_id"}),
     EscalationTicket: _Spec("escalations", "id", {"finding_id": "finding_id"}),
     ApprovalRecord: _Spec(
@@ -96,6 +102,7 @@ class RecordStore:
             cols["id"] = body[spec.id_field]
         if spec.table in {"scenarios", "targets"}:
             cols["created_at"] = format_utc(_now())
+        cols.update(spec.constants)
         cols["body"] = json.dumps(body, sort_keys=True)
         names = ", ".join(cols)
         marks = ", ".join("?" for _ in cols)

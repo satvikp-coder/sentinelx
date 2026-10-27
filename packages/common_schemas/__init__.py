@@ -52,6 +52,7 @@ from .models import (
     TargetAuthorization,
     TargetScope,
     UsageRecord,
+    VerifierResult,
     VulnerabilityFinding,
 )
 
