@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "ShieldScope": {
+      "additionalProperties": false,
+      "properties": {
+        "client": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client"
+        },
+        "parameter": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameter"
+        },
+        "route": {
+          "minLength": 1,
+          "title": "Route",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route"
+      ],
+      "title": "ShieldScope",
+      "type": "object"
+    },
+    "ShieldStatus": {
+      "enum": [
+        "PROPOSED",
+        "ACTIVE",
+        "EXPIRED",
+        "REMOVED",
+        "REJECTED"
+      ],
+      "title": "ShieldStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "minLength": 1,
+      "title": "Action",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "intent_event_ids": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Intent Event Ids",
+      "type": "array"
+    },
+    "label": {
+      "const": "TEMPORARY SHIELD, NOT A FIX",
+      "default": "TEMPORARY SHIELD, NOT A FIX",
+      "title": "Label",
+      "type": "string"
+    },
+    "linked_finding_id": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Linked Finding Id"
+    },
+    "owner": {
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/ShieldScope"
+    },
+    "status": {
+      "$ref": "#/$defs/ShieldStatus"
+    },
+    "target_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Target Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "target_id",
+    "scope",
+    "action",
+    "reason",
+    "intent_event_ids",
+    "owner",
+    "created_at",
+    "expires_at",
+    "status"
+  ],
+  "title": "ShieldRule",
+  "type": "object"
+}

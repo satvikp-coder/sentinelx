@@ -25,6 +25,10 @@ browser = ["playwright>=1.48,<2"]
 package-dir = {"sentinelx" = "packages"}
 packages = ["sentinelx", "sentinelx.common_schemas", "sentinelx.agent_runtime", "sentinelx.model_clients", "sentinelx.adversarial", "sentinelx.policy", "sentinelx.evidence", "sentinelx.investigator", "sentinelx.containment", "sentinelx.verifier", "sentinelx.scanner", "sentinelx.fixer", "sentinelx.shield"]
 
+[tool.setuptools.package-data]
+"sentinelx.common_schemas" = ["schemas/*.json"]
+"sentinelx.evidence" = ["migrations/*.sql"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

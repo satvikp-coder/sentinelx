@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "ModelMode": {
+      "enum": [
+        "LIVE",
+        "RECORDED",
+        "UNAVAILABLE"
+      ],
+      "title": "ModelMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "added_actions": {
+      "minimum": 0,
+      "title": "Added Actions",
+      "type": "integer"
+    },
+    "branch_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Branch Id",
+      "type": "string"
+    },
+    "checkpoint_ref": {
+      "minLength": 1,
+      "title": "Checkpoint Ref",
+      "type": "string"
+    },
+    "cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Usd"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "executed_trace_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Executed Trace Id",
+      "type": "string"
+    },
+    "fixture_hash": {
+      "minLength": 1,
+      "title": "Fixture Hash",
+      "type": "string"
+    },
+    "mitigation_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Mitigation Id",
+      "type": "string"
+    },
+    "model_mode": {
+      "$ref": "#/$defs/ModelMode"
+    },
+    "new_seed": {
+      "title": "New Seed",
+      "type": "integer"
+    },
+    "parent_session_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Parent Session Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_completed": {
+      "title": "Task Completed",
+      "type": "boolean"
+    },
+    "unauthorized_executed": {
+      "title": "Unauthorized Executed",
+      "type": "boolean"
+    },
+    "verifier_version": {
+      "minLength": 1,
+      "title": "Verifier Version",
+      "type": "string"
+    },
+    "was_executed": {
+      "title": "Was Executed",
+      "type": "boolean"
+    },
+    "was_simulated": {
+      "title": "Was Simulated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "branch_id",
+    "parent_session_id",
+    "checkpoint_ref",
+    "mitigation_id",
+    "new_seed",
+    "executed_trace_id",
+    "unauthorized_executed",
+    "task_completed",
+    "added_actions",
+    "duration_ms",
+    "verifier_version",
+    "was_simulated",
+    "was_executed",
+    "model_mode",
+    "fixture_hash"
+  ],
+  "title": "ContainmentBranch",
+  "type": "object"
+}

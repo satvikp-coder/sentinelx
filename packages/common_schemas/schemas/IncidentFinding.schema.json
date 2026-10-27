@@ -1,0 +1,72 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "evidence_event_ids": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Event Ids",
+      "type": "array"
+    },
+    "finding": {
+      "minLength": 1,
+      "title": "Finding",
+      "type": "string"
+    },
+    "incident_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "inferred": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Inferred",
+      "type": "array"
+    },
+    "observed": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Observed",
+      "type": "array"
+    },
+    "recommended_mitigations": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Recommended Mitigations",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "finding",
+    "evidence_event_ids",
+    "confidence",
+    "observed",
+    "inferred",
+    "recommended_mitigations"
+  ],
+  "title": "IncidentFinding",
+  "type": "object"
+}

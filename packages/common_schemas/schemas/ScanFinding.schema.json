@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "FindingState": {
+      "enum": [
+        "confirmed",
+        "needs_validation",
+        "rejected"
+      ],
+      "title": "FindingState",
+      "type": "string"
+    },
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "endpoint": {
+      "minLength": 1,
+      "title": "Endpoint",
+      "type": "string"
+    },
+    "evidence_event_ids": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Event Ids",
+      "type": "array"
+    },
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "linked_code_location": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Linked Code Location"
+    },
+    "redacted_request_excerpt": {
+      "title": "Redacted Request Excerpt",
+      "type": "string"
+    },
+    "redacted_response_excerpt": {
+      "title": "Redacted Response Excerpt",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity"
+    },
+    "state": {
+      "$ref": "#/$defs/FindingState"
+    },
+    "suggested_fix_category": {
+      "minLength": 1,
+      "title": "Suggested Fix Category",
+      "type": "string"
+    },
+    "target_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Target Id",
+      "type": "string"
+    },
+    "vuln_class": {
+      "minLength": 1,
+      "title": "Vuln Class",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "target_id",
+    "vuln_class",
+    "endpoint",
+    "evidence_event_ids",
+    "redacted_request_excerpt",
+    "redacted_response_excerpt",
+    "severity",
+    "confidence",
+    "state",
+    "suggested_fix_category"
+  ],
+  "title": "ScanFinding",
+  "type": "object"
+}

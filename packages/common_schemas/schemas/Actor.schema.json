@@ -1,0 +1,36 @@
+{
+  "$defs": {
+    "ActorRole": {
+      "enum": [
+        "SYSTEM",
+        "OPERATOR",
+        "AGENT"
+      ],
+      "title": "ActorRole",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "role": {
+      "$ref": "#/$defs/ActorRole"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "role"
+  ],
+  "title": "Actor",
+  "type": "object"
+}

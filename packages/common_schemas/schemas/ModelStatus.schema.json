@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "ModelMode": {
+      "enum": [
+        "LIVE",
+        "RECORDED",
+        "UNAVAILABLE"
+      ],
+      "title": "ModelMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Which provider/model produced a result and in what mode (LIVE / RECORDED / UNAVAILABLE).",
+  "properties": {
+    "calls": {
+      "minimum": 0,
+      "title": "Calls",
+      "type": "integer"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "mode": {
+      "$ref": "#/$defs/ModelMode"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tokens": {
+      "minimum": 0,
+      "title": "Tokens",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "provider",
+    "model",
+    "mode",
+    "calls",
+    "tokens"
+  ],
+  "title": "ModelStatus",
+  "type": "object"
+}

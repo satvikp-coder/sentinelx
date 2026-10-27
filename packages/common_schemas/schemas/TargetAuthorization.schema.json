@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "TargetScope": {
+      "additionalProperties": false,
+      "properties": {
+        "hosts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Hosts",
+          "type": "array"
+        },
+        "ports": {
+          "items": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Ports",
+          "type": "array"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "schemes": {
+          "items": {
+            "enum": [
+              "http",
+              "https"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Schemes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemes",
+        "hosts",
+        "ports"
+      ],
+      "title": "TargetScope",
+      "type": "object"
+    },
+    "TargetStatus": {
+      "enum": [
+        "PENDING",
+        "VERIFIED",
+        "REVOKED"
+      ],
+      "title": "TargetStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "base_url": {
+      "minLength": 1,
+      "title": "Base Url",
+      "type": "string"
+    },
+    "lab": {
+      "title": "Lab",
+      "type": "boolean"
+    },
+    "ownership_method": {
+      "minLength": 1,
+      "title": "Ownership Method",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/TargetScope"
+    },
+    "status": {
+      "$ref": "#/$defs/TargetStatus"
+    },
+    "target_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Target Id",
+      "type": "string"
+    },
+    "verification_token_hash": {
+      "minLength": 1,
+      "title": "Verification Token Hash",
+      "type": "string"
+    },
+    "verified_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verified At"
+    }
+  },
+  "required": [
+    "target_id",
+    "base_url",
+    "scope",
+    "lab",
+    "ownership_method",
+    "verification_token_hash",
+    "status"
+  ],
+  "title": "TargetAuthorization",
+  "type": "object"
+}

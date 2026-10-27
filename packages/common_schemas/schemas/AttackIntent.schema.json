@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "IntentLabel": {
+      "enum": [
+        "RECON",
+        "CREDENTIAL_GUESSING",
+        "DATA_ENUMERATION",
+        "INJECTION_PROBE",
+        "ADMIN_PROBE",
+        "EXFIL_ATTEMPT"
+      ],
+      "title": "IntentLabel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cited_event_ids": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Cited Event Ids",
+      "type": "array"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "intent": {
+      "$ref": "#/$defs/IntentLabel"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_ref": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Session Ref",
+      "type": "string"
+    },
+    "state": {
+      "const": "INFERRED",
+      "default": "INFERRED",
+      "title": "State",
+      "type": "string"
+    },
+    "summary": {
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "session_ref",
+    "intent",
+    "summary",
+    "cited_event_ids",
+    "confidence"
+  ],
+  "title": "AttackIntent",
+  "type": "object"
+}
