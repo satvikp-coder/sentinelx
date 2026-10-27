@@ -1,6 +1,6 @@
 # Decisions Log
 
-## 2026-10-27 - Model API facts are unverified until Prompt 5
+## 2026-10-27 - Model API facts were unverified until Prompt 5 (now verified: see the next entry)
 All details of the NVIDIA-hosted Muse Glimmer 30B endpoint (model id, base URL, parameters, limits, terms) come from the developer's brief and are UNVERIFIED. Prompt 5 re-reads the docs before any model code is written. Do not guess parameters.
 
 ## 2026-10-27 - License choice pending
@@ -57,3 +57,25 @@ Added to `PolicyDecision`: `policy_mode`, `effective_action`, `would_have_decide
 - **Benign neighbors' forbidden outcome.** Where a benign task legitimately uses the attack's endpoint (cancel, upload) the benign case's forbidden outcome is the collector instead; the notes in each case say so.
 - **Wall-clock budget** still starts after the browser is up (Prompt 3 decision).
 - **Request bodies.** The page-request policy also scans request BODIES (first 4 KB, text) for secrets; added after noticing URL-only scanning left a POST-body hole to allowed hosts.
+
+## Model API facts (verified 2026-10-27)
+Sources read today: build.nvidia.com/meta/muse-glimmer-30b (model card + code samples), docs.api.nvidia.com/nim/reference/meta-muse-glimmer-30b (a model card, NOT an API reference), dev.meta.ai/docs/muse-glimmer, github.com/meta-models/meta-oss-cookbook (landing page, hosted/, recipes/reasoning-effort, recipes/structured-output). Plus a handful of tiny live calls with the key from `.env` (never printed).
+
+**CONFIRMED (documentation)**
+- Base URL `https://integrate.api.nvidia.com/v1`, endpoint `/chat/completions`, `Authorization: Bearer <NVIDIA API key>`, OpenAI-compatible client.
+- Context 131,072 tokens combined input+output ("131,072+"); output text only; knowledge cutoff Jan 4 2026; runtime vLLM.
+- Recommended sampling: temperature 1.0, top_p 0.95, top_k 64 (whether the hosted API accepts top_k is NOT stated; we do not send it).
+- Reasoning strengths low / medium / high / xhigh (cookbook calls the setting `reasoning_effort`). Reasoning tokens count as completion tokens against `max_tokens`; if the limit is hit mid-reasoning the answer can come back EMPTY.
+- Terms: NVIDIA API Trial Terms of Service (service), NVIDIA Open Model Agreement (model), Apache-2.0 (base model).
+- The NVIDIA model card lists "Structured Output" as NOT supported; function calling is listed as supported (schema not documented).
+
+**CONFIRMED (by live call, 2026-10-27)**
+- `GET /v1/models` lists `meta/muse-glimmer-30b` (85 models listed); that is the exact model id (the docs leave it blank).
+- Response message keys: `content`, `reasoning_content`, `role` (NOT `reasoning`, which the cookbook shows for vLLM + a parser); `finish_reason` and `usage` (`prompt_tokens`, `completion_tokens`, `total_tokens`) are present. Final answer is in `content`; reasoning arrives separately.
+- A tiny request takes roughly 3-12 s. Response headers carried only `nvcf-reqid` / `nvcf-status` (used as request id).
+- The API ACCEPTED `reasoning_effort: "low"` both as a top-level field and inside `chat_template_kwargs` without error, and completion tokens dropped (110 -> 57 / 55). One sample each, so this is suggestive, not proof that the parameter works. We send it top-level and treat the effect as unverified.
+- The API accepted `response_format: {"type": "json_object"}` and returned valid JSON once. The model card says structured output is unsupported, so we do NOT rely on it: we prompt for JSON, strip at most one code fence and validate strictly.
+
+**NOT CONFIRMED**
+- Rate limits / quotas / concurrency: not documented anywhere we could read; no rate-limit headers are returned; no 429 was seen in the few calls made. We therefore apply a conservative client-side limit (`MODEL_MAX_RPM`, default 20) and honour `Retry-After` if a 429 ever appears.
+- Maximum output tokens, pricing (so `estimated_cost` is always `None`), trial duration/credits, the `tools` request schema, top_k support, the exact effect of `reasoning_effort`.

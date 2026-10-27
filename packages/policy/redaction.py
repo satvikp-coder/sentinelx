@@ -60,6 +60,8 @@ _PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ),
 ]
 
+_SYNTHETIC_TOKEN = re.compile(r"synth_tok_[0-9a-f]{8,}")
+
 _SENSITIVE_KEYS = re.compile(
     r"(?i)^(password|passwd|pwd|secret|client_secret|api[_-]?key|apikey|token|access_token|"
     r"refresh_token|auth_token|authorization|proxy-authorization|cookie|set-cookie|"
@@ -73,17 +75,35 @@ class RedactionResult:
     count: int
 
 
-def _redact_str(text: str) -> tuple[str, int]:
+def _redact_str(text: str, skip: frozenset[str] = frozenset()) -> tuple[str, int]:
     total = 0
-    for _kind, pattern, repl in _PATTERNS:
+    for kind, pattern, repl in _PATTERNS:
+        if kind in skip:
+            continue
+        if kind == "kv_secret" and "synthetic_token" in skip:
+            # "Session token: synth_tok_..." must stay readable when the synthetic token is
+            # deliberately let through; every other key=value secret is still redacted.
+            changed = 0
+
+            def keep_synthetic(m: re.Match[str]) -> str:
+                nonlocal changed
+                value = m.group(0)[m.end(2) - m.start(0):]
+                if _SYNTHETIC_TOKEN.fullmatch(value):
+                    return m.group(0)
+                changed += 1
+                return f"{m.group(1)}{m.group(2)}[REDACTED:secret]"
+
+            text = pattern.sub(keep_synthetic, text)
+            total += changed
+            continue
         text, n = pattern.subn(repl, text)
         total += n
     return text, total
 
 
-def _walk(value: Any) -> tuple[Any, int]:
+def _walk(value: Any, skip: frozenset[str] = frozenset()) -> tuple[Any, int]:
     if isinstance(value, str):
-        return _redact_str(value)
+        return _redact_str(value, skip)
     if isinstance(value, dict):
         out: dict[Any, Any] = {}
         total = 0
@@ -95,20 +115,24 @@ def _walk(value: Any) -> tuple[Any, int]:
                     out[k] = "[REDACTED:field]"
                     total += 1
             else:
-                out[k], n = _walk(v)
+                out[k], n = _walk(v, skip)
                 total += n
         return out, total
     if isinstance(value, list | tuple):
         items, total = [], 0
         for v in value:
-            nv, n = _walk(v)
+            nv, n = _walk(v, skip)
             items.append(nv)
             total += n
         return (items if isinstance(value, list) else tuple(items)), total
     return value, 0
 
 
-def redact(value: Any) -> RedactionResult:
-    """Return a redacted deep copy of ``value`` (str / dict / list) and the number of redactions."""
-    new, count = _walk(value)
+def redact(value: Any, skip: frozenset[str] = frozenset()) -> RedactionResult:
+    """Return a redacted deep copy of ``value`` (str / dict / list) and the number of redactions.
+
+    ``skip`` names pattern kinds to leave alone. The only intended use is the lab's SYNTHETIC
+    token ({"synthetic_token"}) in model prompts, so a model can actually see (and be tempted
+    to leak) the fake secret. Nothing else should ever be skipped."""
+    new, count = _walk(value, skip)
     return RedactionResult(value=new, count=count)
