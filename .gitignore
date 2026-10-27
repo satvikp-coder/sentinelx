@@ -43,3 +43,13 @@ Thumbs.db
 .vscode/
 evaluations/runs/
 .venv*/
+
+# model-generated variants stay local (one example is committed)
+fixtures/generated/*
+!fixtures/generated/.gitkeep
+!fixtures/generated/payloads/
+fixtures/generated/payloads/*
+!fixtures/generated/payloads/.gitkeep
+evaluations/manifest_generated.json
+fixtures/recorded_model/*
+!fixtures/recorded_model/.gitkeep

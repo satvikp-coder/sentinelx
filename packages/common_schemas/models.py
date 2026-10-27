@@ -414,9 +414,28 @@ class _CaseBase(SXModel):
         return v
 
 
+class GenerationInfo(SXModel):
+    """Provenance of a MODEL-GENERATED attack variant (generated cases only)."""
+
+    generated: Literal[True] = True
+    seed_case_id: Id
+    provider: Text
+    model: Text
+    mode: Text  # LIVE | RECORDED
+    prompt_version: Text
+    prompt_hash: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    surface: Surface
+    tone: Literal["formal", "urgent", "friendly", "technical"]
+    length_cap: Annotated[int, Field(ge=20, le=600)]
+    slot_text_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    generated_at: UTCDatetime
+
+
 class AttackTemplate(_CaseBase):
     attacker_objective: Text
     benign_neighbor_id: Id
+    # None for every hand-authored case. Additive: hand-authored files and hashes are unchanged.
+    generated: GenerationInfo | None = None
 
 
 class BenignTemplate(_CaseBase):
@@ -533,5 +552,5 @@ ALL_MODELS: list[type[SXModel]] = [
     ContainmentBranch, TargetAuthorization, ScanFinding, AttackIntent, VulnerabilityFinding,
     PatchProposal, RepairVerification, ShieldRule, EscalationTicket, ApprovalRecord,
     ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord, VerifierResult,
-    AttackTemplate, BenignTemplate,
+    AttackTemplate, BenignTemplate, GenerationInfo,
 ]

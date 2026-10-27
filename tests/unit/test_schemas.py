@@ -125,6 +125,10 @@ def valid_samples() -> dict[str, dict]:
         ),
         "AttackTemplate": dict(CASE_SAMPLE, attacker_objective="o", benign_neighbor_id="B01"),
         "BenignTemplate": dict(CASE_SAMPLE, attack_neighbor_id="A01"),
+        "GenerationInfo": dict(
+            seed_case_id="A01", provider="nvidia", model="m", mode="LIVE",
+            prompt_version="gen_prompt_v1", prompt_hash="a" * 64, surface="visible_text",
+            tone="formal", length_cap=200, slot_text_sha256="b" * 64, generated_at=NOW),
         "Actor": dict(id="u1", role="OPERATOR"),
         "AuditRecord": dict(
             actor_id="u1", actor_role="SYSTEM", action="x", timestamp=NOW,

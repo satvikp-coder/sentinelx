@@ -70,6 +70,8 @@ class Manifest(SXModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     manifest_version: Literal["1"] = "1"
+    # "generated": includes MODEL-GENERATED attack cases (fixtures/generated); kept separate
+    source: Literal["hand_authored", "generated"] = "hand_authored"
     name: str
     order_seed: int  # fixed seed for the recorded run order (order effects are reproducible)
     arms: Annotated[list[Literal["A", "B"]], Field(min_length=1)]
@@ -84,6 +86,8 @@ class Manifest(SXModel):
 
 def canonical_bytes(m: Manifest) -> bytes:
     doc = m.model_dump(mode="json", exclude={"manifest_hash"})
+    if doc.get("source") == "hand_authored":  # default value: keep sealed hashes unchanged
+        doc.pop("source", None)
     return json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
@@ -98,9 +102,10 @@ def seal(m: Manifest) -> Manifest:
 def build_manifest(
     *, name: str, order_seed: int, case_ids: list[str] | None = None, arms: list[str] | None = None,
     repetitions: int = 1, policy_file: str = "configs/policy/lab.yaml",
-    budgets: Budgets | None = None, fixtures: Path = FIXTURES,
+    budgets: Budgets | None = None, fixtures: Path = FIXTURES, source: str = "hand_authored",
 ) -> Manifest:
-    cases = [c for c in load_all_cases(fixtures) if case_ids is None or c.id in case_ids]
+    cases = [c for c in load_all_cases(fixtures, include_generated=source == "generated")
+             if case_ids is None or c.id in case_ids]
     if case_ids is not None and {c.id for c in cases} != set(case_ids):
         raise ManifestError("unknown case id requested")
     policy = load_policy(REPO_ROOT / policy_file)
@@ -111,7 +116,8 @@ def build_manifest(
             label=c.label, surface=c.template.surface.value, case_hash=case_hash(c, fixtures))
         for c in cases
     ]
-    m = Manifest(name=name, order_seed=order_seed, arms=arms or ["A", "B"],  # type: ignore[arg-type]
+    m = Manifest(source=source,  # type: ignore[arg-type]
+                 name=name, order_seed=order_seed, arms=arms or ["A", "B"],  # type: ignore[arg-type]
                  repetitions=repetitions, policy_file=policy_file,
                  policy_version=policy.policy_version, budgets=budgets or Budgets(), cases=entries)
     return seal(m)
@@ -130,7 +136,7 @@ def load_manifest(path: str | Path, *, fixtures: Path = FIXTURES, check_fixtures
 
 
 def verify_fixtures(m: Manifest, fixtures: Path = FIXTURES) -> dict[str, Case]:
-    current = {c.id: c for c in load_all_cases(fixtures)}
+    current = {c.id: c for c in load_all_cases(fixtures, include_generated=m.source == "generated")}
     for entry in m.cases:
         case = current.get(entry.case_id)
         if case is None:

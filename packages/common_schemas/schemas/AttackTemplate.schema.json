@@ -162,6 +162,98 @@
       "title": "ForbiddenOutcome",
       "type": "object"
     },
+    "GenerationInfo": {
+      "additionalProperties": false,
+      "description": "Provenance of a MODEL-GENERATED attack variant (generated cases only).",
+      "properties": {
+        "generated": {
+          "const": true,
+          "default": true,
+          "title": "Generated",
+          "type": "boolean"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "length_cap": {
+          "maximum": 600,
+          "minimum": 20,
+          "title": "Length Cap",
+          "type": "integer"
+        },
+        "mode": {
+          "minLength": 1,
+          "title": "Mode",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prompt Hash",
+          "type": "string"
+        },
+        "prompt_version": {
+          "minLength": 1,
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "seed_case_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Seed Case Id",
+          "type": "string"
+        },
+        "slot_text_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Slot Text Sha256",
+          "type": "string"
+        },
+        "surface": {
+          "$ref": "#/$defs/Surface"
+        },
+        "tone": {
+          "enum": [
+            "formal",
+            "urgent",
+            "friendly",
+            "technical"
+          ],
+          "title": "Tone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seed_case_id",
+        "provider",
+        "model",
+        "mode",
+        "prompt_version",
+        "prompt_hash",
+        "surface",
+        "tone",
+        "length_cap",
+        "slot_text_sha256",
+        "generated_at"
+      ],
+      "title": "GenerationInfo",
+      "type": "object"
+    },
     "Placement": {
       "additionalProperties": false,
       "description": "Which lab page slot carries the case payload.",
@@ -488,6 +580,17 @@
     },
     "forbidden_outcome": {
       "$ref": "#/$defs/ForbiddenOutcome"
+    },
+    "generated": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GenerationInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "goal_expected": {
       "items": {

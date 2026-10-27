@@ -48,6 +48,8 @@ def scenario_from_template(t: AttackTemplate | BenignTemplate) -> ScenarioSpec:
 
 def _load_dir(root: Path, sub: str, model: type[AttackTemplate] | type[BenignTemplate],
               label: str) -> list[Case]:
+    if not (root / sub).is_dir():
+        return []
     cases = []
     for path in sorted((root / sub).glob("*.json")):
         template = model.model_validate_json(path.read_text(encoding="utf-8"))
@@ -57,9 +59,13 @@ def _load_dir(root: Path, sub: str, model: type[AttackTemplate] | type[BenignTem
     return cases
 
 
-def load_all_cases(root: Path = FIXTURES) -> list[Case]:
+def load_all_cases(root: Path = FIXTURES, include_generated: bool = False) -> list[Case]:
+    """The hand-authored cases; MODEL-GENERATED ones (fixtures/generated) only on request, so the
+    hand-authored manifest, its hash and its validation tests never see them."""
     cases = _load_dir(root, "attacks", AttackTemplate, "attack")
     cases += _load_dir(root, "benign", BenignTemplate, "benign")
+    if include_generated:
+        cases += _load_dir(root, "generated", AttackTemplate, "attack")
     ids = [c.id for c in cases]
     if len(set(ids)) != len(ids):
         raise ValueError("duplicate case ids")
@@ -68,24 +74,27 @@ def load_all_cases(root: Path = FIXTURES) -> list[Case]:
 
 def load_case(case_id: str, root: Path = FIXTURES) -> Case | None:
     """Return the case with this id, or None (ids are never used as paths)."""
-    for case in load_all_cases(root):
+    for case in load_all_cases(root, include_generated=True):
         if case.id == case_id:
             return case
     return None
 
 
 def payload_path(t: AttackTemplate | BenignTemplate, root: Path = FIXTURES) -> Path:
-    for ext in ("html", "json"):
-        p = root / "payloads" / f"{t.payload_id}.{ext}"
-        if p.is_file():
-            return p
+    for folder in ("payloads", "generated/payloads"):
+        for ext in ("html", "json"):
+            p = root / folder / f"{t.payload_id}.{ext}"
+            if p.is_file():
+                return p
     raise FileNotFoundError(f"payload {t.payload_id!r} for case {t.id}")
 
 
 def case_hash(case: Case, root: Path = FIXTURES) -> str:
     """SHA-256 over the case template (canonical JSON) and its payload bytes."""
     h = hashlib.sha256()
-    h.update(json.dumps(case.template.model_dump(mode="json"), sort_keys=True,
-                        separators=(",", ":")).encode())
+    doc = case.template.model_dump(mode="json")
+    if doc.get("generated") is None:  # keep every hand-authored case_hash exactly as sealed
+        doc.pop("generated", None)
+    h.update(json.dumps(doc, sort_keys=True, separators=(",", ":")).encode())
     h.update(payload_path(case.template, root).read_bytes().replace(b"\r\n", b"\n"))
     return h.hexdigest()

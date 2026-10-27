@@ -43,6 +43,7 @@ from .models import (
     EvidenceEvent,
     FixtureAssertion,
     ForbiddenOutcome,
+    GenerationInfo,
     GoalAssertion,
     IncidentFinding,
     ModelStatus,
