@@ -44,6 +44,11 @@ def valid_samples() -> dict[str, dict]:
             action_id="a1", decision="ALLOW", policy_version="p1", rule_ids=["r1"],
             reason_code="ok", explanation="fine", requires_human=False,
         ),
+        "ApprovalRequest": dict(
+            id="ar1", session_id="s1", action_id="a1", tool="send", args_digest="0" * 16,
+            subject_id="a1:" + "0" * 16, reason_code="CONFIRMATION_REQUIRED",
+            explanation="x", created_at=NOW,
+        ),
         "EvidenceEvent": dict(
             id=ev, session_id="s1", seq=1, kind="k", timestamp_utc=NOW, state="OBSERVED",
             source="t", payload={}, previous_hash="0" * 64, event_hash="1" * 64,

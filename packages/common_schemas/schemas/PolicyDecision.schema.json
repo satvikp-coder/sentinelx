@@ -8,9 +8,71 @@
       ],
       "title": "Decision",
       "type": "string"
+    },
+    "PolicyMode": {
+      "enum": [
+        "enforce",
+        "monitor"
+      ],
+      "title": "PolicyMode",
+      "type": "string"
+    },
+    "PolicySignal": {
+      "additionalProperties": false,
+      "description": "A hint found in untrusted text. Evidence only: it never changes allow/block.",
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/SignalKind"
+        },
+        "matched_text": {
+          "maxLength": 200,
+          "title": "Matched Text",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "source",
+        "matched_text",
+        "start",
+        "end"
+      ],
+      "title": "PolicySignal",
+      "type": "object"
+    },
+    "SignalKind": {
+      "description": "Evidence-only hints found in untrusted text. Never an authority.",
+      "enum": [
+        "INSTRUCTION_OVERRIDE",
+        "HIDDEN_TEXT",
+        "EXFIL_REQUEST"
+      ],
+      "title": "SignalKind",
+      "type": "string"
     }
   },
   "additionalProperties": false,
+  "description": "``decision`` is what the policy decided; ``effective_action`` is what the runtime does.\n\nThey differ only in monitor mode (effective ALLOW, ``would_have_decided`` = real decision).\nThe last four fields were added after 1.0 was first published; additive, defaults keep old\ndocuments valid (see docs/DECISIONS.md).",
   "properties": {
     "action_id": {
       "maxLength": 200,
@@ -21,10 +83,25 @@
     "decision": {
       "$ref": "#/$defs/Decision"
     },
+    "effective_action": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Decision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "explanation": {
       "minLength": 1,
       "title": "Explanation",
       "type": "string"
+    },
+    "policy_mode": {
+      "$ref": "#/$defs/PolicyMode",
+      "default": "enforce"
     },
     "policy_version": {
       "minLength": 1,
@@ -53,6 +130,25 @@
       "default": "1.0",
       "title": "Schema Version",
       "type": "string"
+    },
+    "signals": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PolicySignal"
+      },
+      "title": "Signals",
+      "type": "array"
+    },
+    "would_have_decided": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Decision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

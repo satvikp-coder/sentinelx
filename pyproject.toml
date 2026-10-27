@@ -12,12 +12,14 @@ dependencies = [
   "fastapi>=0.115,<1",
   "pydantic>=2.9,<3",
   "httpx>=0.27,<1",
+  "pyyaml>=6,<7",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8,<10",
   "ruff>=0.6",
+  "hypothesis==6.170.12",
 ]
 browser = ["playwright>=1.48,<2"]
 

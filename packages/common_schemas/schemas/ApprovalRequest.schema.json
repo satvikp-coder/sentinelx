@@ -1,0 +1,72 @@
+{
+  "additionalProperties": false,
+  "description": "Asks a human to approve one specific action (bound to its tool+arguments digest).\n\nIt authorises nothing by itself: approval is a separate ApprovalRecord and the gateway\nre-evaluates the full policy before honouring it.",
+  "properties": {
+    "action_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Action Id",
+      "type": "string"
+    },
+    "args_digest": {
+      "pattern": "^[0-9a-f]{16}$",
+      "title": "Args Digest",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "explanation": {
+      "minLength": 1,
+      "title": "Explanation",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "reason_code": {
+      "minLength": 1,
+      "title": "Reason Code",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "subject_id": {
+      "minLength": 1,
+      "title": "Subject Id",
+      "type": "string"
+    },
+    "tool": {
+      "minLength": 1,
+      "title": "Tool",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "session_id",
+    "action_id",
+    "tool",
+    "args_digest",
+    "subject_id",
+    "reason_code",
+    "explanation",
+    "created_at"
+  ],
+  "title": "ApprovalRequest",
+  "type": "object"
+}

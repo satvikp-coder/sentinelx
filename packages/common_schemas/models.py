@@ -17,10 +17,12 @@ from .enums import (
     FindingState,
     IntentLabel,
     ModelMode,
+    PolicyMode,
     SessionKind,
     SessionState,
     Severity,
     ShieldStatus,
+    SignalKind,
     TargetStatus,
     VerificationStatus,
 )
@@ -76,7 +78,24 @@ class ActionRequest(SXModel):
     intent_id: Id | None = None
 
 
+class PolicySignal(SXModel):
+    """A hint found in untrusted text. Evidence only: it never changes allow/block."""
+
+    kind: SignalKind
+    source: Text
+    matched_text: Annotated[str, Field(max_length=200)]
+    start: Annotated[int, Field(ge=0)]
+    end: Annotated[int, Field(ge=0)]
+
+
 class PolicyDecision(SXModel):
+    """``decision`` is what the policy decided; ``effective_action`` is what the runtime does.
+
+    They differ only in monitor mode (effective ALLOW, ``would_have_decided`` = real decision).
+    The last four fields were added after 1.0 was first published; additive, defaults keep old
+    documents valid (see docs/DECISIONS.md).
+    """
+
     action_id: Id
     decision: Decision
     policy_version: Text
@@ -84,6 +103,34 @@ class PolicyDecision(SXModel):
     reason_code: Text
     explanation: Text
     requires_human: bool
+    policy_mode: PolicyMode = PolicyMode.ENFORCE
+    effective_action: Decision | None = None
+    would_have_decided: Decision | None = None
+    signals: list[PolicySignal] = []
+
+    @model_validator(mode="after")
+    def _default_effective(self) -> PolicyDecision:
+        if self.effective_action is None:
+            self.effective_action = self.decision
+        return self
+
+
+class ApprovalRequest(SXModel):
+    """Asks a human to approve one specific action (bound to its tool+arguments digest).
+
+    It authorises nothing by itself: approval is a separate ApprovalRecord and the gateway
+    re-evaluates the full policy before honouring it.
+    """
+
+    id: Id
+    session_id: Id
+    action_id: Id
+    tool: Text
+    args_digest: Annotated[str, Field(pattern=r"^[0-9a-f]{16}$")]
+    subject_id: Text  # what the ApprovalRecord must reference: "<action_id>:<args_digest>"
+    reason_code: Text
+    explanation: Text
+    created_at: UTCDatetime
 
 
 # ---------------------------------------------------------------- evidence
@@ -326,7 +373,7 @@ class UsageRecord(SXModel):
 
 
 ALL_MODELS: list[type[SXModel]] = [
-    ScenarioSpec, ActionRequest, PolicyDecision, EvidenceEvent, IncidentFinding,
+    ScenarioSpec, ActionRequest, PolicyDecision, ApprovalRequest, EvidenceEvent, IncidentFinding,
     ContainmentBranch, TargetAuthorization, ScanFinding, AttackIntent, VulnerabilityFinding,
     PatchProposal, RepairVerification, ShieldRule, EscalationTicket, ApprovalRecord,
     ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord,

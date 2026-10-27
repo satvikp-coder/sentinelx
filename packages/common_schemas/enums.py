@@ -45,6 +45,19 @@ class Arm(StrEnum):
     PROTECTED = "PROTECTED"
 
 
+class PolicyMode(StrEnum):
+    ENFORCE = "enforce"
+    MONITOR = "monitor"
+
+
+class SignalKind(StrEnum):
+    """Evidence-only hints found in untrusted text. Never an authority."""
+
+    INSTRUCTION_OVERRIDE = "INSTRUCTION_OVERRIDE"
+    HIDDEN_TEXT = "HIDDEN_TEXT"
+    EXFIL_REQUEST = "EXFIL_REQUEST"
+
+
 class FindingState(StrEnum):
     CONFIRMED = "confirmed"
     NEEDS_VALIDATION = "needs_validation"
