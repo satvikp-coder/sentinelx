@@ -25,6 +25,12 @@
 - [ ] Demo video under three minutes
 - [ ] Bonus-prize entry method confirmed
 
-### Organizers' reply on early start (paste verbatim)
+## Organizer permission to start early
 
-_(empty)_
+Organizers' reply (verbatim):
+
+> **[NOT YET RECORDED: the reply text was not supplied in the prompt (the paste placeholder was left empty). The developer must paste it here exactly. Not invented.]**
+
+Timing note: the initial commit `865823f` is dated 2026-10-27 05:32 IST (2026-10-26 20:02 ET), which is before the official 2026-10-27 ET start. It contained scaffolding only (layout, docs, CI, placeholder tests). All feature work follows after it.
+
+The checklist item "Organizers' written permission to start before the official start recorded" stays UNCHECKED until the reply text above is filled in.
