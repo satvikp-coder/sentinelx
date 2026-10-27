@@ -1,0 +1,7 @@
+<?php
+// quick config - TODO move to env later (backup copy, forgot to delete)
+define('APP_NAME', 'Vibe Shop');
+define('DB_PATH', getenv('SHOP_DB') ?: '/data/shop.db');
+define('SEED', 20261027);
+define('APP_SECRET', 'labsecret_shop_FAKE_0f3a9c71d2e84b65');
+define('ADMIN_PASSWORD', 'labadmin_FAKE_pass_2026');

@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One hand-authored, deliberately planted weakness in a lab (independent of any model).\n\n``description`` says what is wrong; ``safe_confirmation_strategy`` says what a scanner can\nharmlessly OBSERVE to confirm it. Neither contains a ready-to-use attack payload.",
+  "properties": {
+    "description": {
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "endpoint": {
+      "minLength": 1,
+      "title": "Endpoint",
+      "type": "string"
+    },
+    "expected_fix_category": {
+      "enum": [
+        "PARAMETERIZE_QUERY",
+        "OUTPUT_ENCODING",
+        "ADD_OWNERSHIP_CHECK",
+        "REQUIRE_AUTHENTICATION",
+        "REMOVE_OR_PROTECT_DEBUG",
+        "SECRET_TO_ENV_AND_REMOVE_BACKUP",
+        "ADD_RATE_LIMIT",
+        "SET_HEADERS_AND_COOKIE_FLAGS",
+        "RESTRICT_CORS_ORIGINS",
+        "GENERIC_ERROR_RESPONSES",
+        "VALIDATE_UPLOAD_CONTENT"
+      ],
+      "title": "Expected Fix Category",
+      "type": "string"
+    },
+    "file": {
+      "minLength": 1,
+      "title": "File",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "line_end": {
+      "minimum": 1,
+      "title": "Line End",
+      "type": "integer"
+    },
+    "line_start": {
+      "minimum": 1,
+      "title": "Line Start",
+      "type": "integer"
+    },
+    "method": {
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "ANY"
+      ],
+      "title": "Method",
+      "type": "string"
+    },
+    "requires_human_decision": {
+      "title": "Requires Human Decision",
+      "type": "boolean"
+    },
+    "safe_confirmation_strategy": {
+      "minLength": 1,
+      "title": "Safe Confirmation Strategy",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity"
+    },
+    "vuln_class": {
+      "enum": [
+        "SQL_INJECTION",
+        "XSS_REFLECTED",
+        "XSS_STORED",
+        "BROKEN_OBJECT_AUTHORIZATION",
+        "MISSING_AUTHENTICATION",
+        "DEBUG_EXPOSURE",
+        "HARDCODED_SECRET",
+        "NO_RATE_LIMITING",
+        "INSECURE_HEADERS_COOKIES",
+        "PERMISSIVE_CORS",
+        "VERBOSE_ERRORS",
+        "WEAK_UPLOAD_VALIDATION"
+      ],
+      "title": "Vuln Class",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "vuln_class",
+    "severity",
+    "file",
+    "line_start",
+    "line_end",
+    "endpoint",
+    "method",
+    "description",
+    "safe_confirmation_strategy",
+    "expected_fix_category",
+    "requires_human_decision"
+  ],
+  "title": "PlantedWeakness",
+  "type": "object"
+}

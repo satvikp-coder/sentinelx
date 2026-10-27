@@ -131,6 +131,17 @@ def valid_samples() -> dict[str, dict]:
                       cited_event_ids=[ev],
                       assertion=dict(event_id=ev, field_path="decision.decision", op="equals",
                                      value="BLOCK")),
+        "PlantedWeakness": dict(
+            id="X-01", vuln_class="SQL_INJECTION", severity="high", file="app/a.php", line_start=1,
+            line_end=2, endpoint="/a.php", method="GET", description="d",
+            safe_confirmation_strategy="observe a response difference",
+            expected_fix_category="PARAMETERIZE_QUERY", requires_human_decision=False),
+        "PlantedManifest": dict(
+            lab="x", language="php", base_port=1, note="n", weaknesses=[dict(
+                id="X-01", vuln_class="SQL_INJECTION", severity="high", file="app/a.php",
+                line_start=1, line_end=2, endpoint="/a.php", method="GET", description="d",
+                safe_confirmation_strategy="observe", expected_fix_category="PARAMETERIZE_QUERY",
+                requires_human_decision=False)]),
         "GenerationInfo": dict(
             seed_case_id="A01", provider="nvidia", model="m", mode="LIVE",
             prompt_version="gen_prompt_v1", prompt_hash="a" * 64, surface="visible_text",

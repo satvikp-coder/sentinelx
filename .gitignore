@@ -54,3 +54,11 @@ evaluations/manifest_generated.json
 fixtures/recorded_model/*
 !fixtures/recorded_model/.gitkeep
 evaluations/manifest_generated_subset.json
+
+# Site Guard labs: runtime state
+labs/*/data/
+labs/*/node_modules/
+labs/*/lab.log
+labs/*/.lab.pid
+labs/*/app/uploads/*
+!labs/*/app/uploads/.gitkeep

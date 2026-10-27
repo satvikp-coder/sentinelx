@@ -52,6 +52,8 @@ from .models import (
     IncidentFinding,
     ModelStatus,
     PatchProposal,
+    PlantedManifest,
+    PlantedWeakness,
     Placement,
     PolicyDecision,
     PolicySignal,

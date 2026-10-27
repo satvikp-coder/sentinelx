@@ -10,6 +10,8 @@ import pytest
 
 BROWSER_COUNTS = {"passed": 0, "failed": 0, "skipped": 0}
 LIVE_SKIPPED: list[str] = []
+DOCKER_COUNTS = {"passed": 0, "failed": 0, "skipped": 0}
+DOCKER_SKIPPED: list[str] = []
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -29,6 +31,15 @@ def browser_ready() -> tuple[bool, str]:
     except Exception as exc:  # pragma: no cover - environment specific
         return False, f"Playwright could not start: {exc}"
     return False, "Chromium is not installed: run `python scripts/setup_browsers.py`"
+
+
+@cache
+def docker_ready() -> tuple[bool, str]:
+    from apps.labctl import docker_running
+
+    if docker_running():
+        return True, ""
+    return False, "the Docker daemon is not running (start Docker Desktop)"
 
 
 def live_model_configured() -> tuple[bool, str]:
@@ -51,6 +62,13 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         if not ok:
             LIVE_SKIPPED.append(item.nodeid)
             pytest.skip(f"LIVE MODEL TEST SKIPPED: {why}")
+    if item.get_closest_marker("docker") is not None:
+        ok, why = docker_ready()
+        if not ok:
+            if os.environ.get("SENTINELX_CI") == "1":
+                pytest.fail(f"DOCKER TESTS CANNOT RUN IN CI MODE: {why}", pytrace=False)
+            DOCKER_SKIPPED.append(item.nodeid)
+            pytest.skip(f"DOCKER TEST SKIPPED: {why}")
     if item.get_closest_marker("browser") is None:
         return
     ok, message = browser_ready()
@@ -62,6 +80,11 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if "docker" in report.keywords:
+        if report.when == "call":
+            DOCKER_COUNTS["passed" if report.passed else "failed"] += 1
+        elif report.when == "setup" and report.skipped:
+            DOCKER_COUNTS["skipped"] += 1
     if "browser" not in report.keywords:
         return
     if report.when == "call":
@@ -83,6 +106,17 @@ def pytest_terminal_summary(terminalreporter, config) -> None:
         terminalreporter.write_line("!! Nothing in this run exercised a real model.", red=True,
                                     bold=True)
         terminalreporter.write_line("!" * 78, red=True, bold=True)
+    if DOCKER_SKIPPED:
+        terminalreporter.write_line("")
+        terminalreporter.write_line("!" * 78, red=True, bold=True)
+        terminalreporter.write_line(
+            f"!! {len(DOCKER_SKIPPED)} DOCKER-DEPENDENT TEST(S) WERE SKIPPED: the Docker daemon is "
+            "not running.", red=True, bold=True)
+        terminalreporter.write_line("!" * 78, red=True, bold=True)
+    d = DOCKER_COUNTS
+    terminalreporter.write_line(
+        f"docker-dependent tests actually ran: {d['passed'] + d['failed']} "
+        f"({d['passed']} passed, {d['failed']} failed, {d['skipped']} skipped)")
     terminalreporter.write_line(
         f"browser tests actually ran: {c['passed'] + c['failed']} "
         f"({c['passed']} passed, {c['failed']} failed, {c['skipped']} skipped)"

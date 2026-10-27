@@ -39,6 +39,7 @@ addopts = "-q"
 filterwarnings = ["ignore:Using `httpx` with:Warning"]
 markers = [
   "browser: needs Playwright Chromium (fails loudly when SENTINELX_CI=1 and missing)",
+  "docker: needs a running Docker daemon (fails loudly when SENTINELX_CI=1 and it is down)",
   "live: makes ONE tiny real model call; skipped (loudly) when no MODEL_API_KEY is configured",
 ]
 

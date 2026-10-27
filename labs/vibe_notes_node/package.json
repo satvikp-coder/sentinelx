@@ -1,0 +1,10 @@
+{
+  "name": "vibe-notes-node",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deliberately vulnerable notes app (Sentinel X lab). Synthetic data only.",
+  "main": "server.js",
+  "engines": { "node": ">=22.5" },
+  "scripts": { "start": "node --no-warnings server.js" },
+  "dependencies": { "express": "4.21.2" }
+}

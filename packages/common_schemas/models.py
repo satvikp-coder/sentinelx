@@ -606,10 +606,57 @@ class UsageRecord(SXModel):
     timestamp: UTCDatetime
 
 
+# ---------------------------------------------------------------- Site Guard labs (ground truth)
+PlantedClass = Literal[
+    "SQL_INJECTION", "XSS_REFLECTED", "XSS_STORED", "BROKEN_OBJECT_AUTHORIZATION",
+    "MISSING_AUTHENTICATION", "DEBUG_EXPOSURE", "HARDCODED_SECRET", "NO_RATE_LIMITING",
+    "INSECURE_HEADERS_COOKIES", "PERMISSIVE_CORS", "VERBOSE_ERRORS", "WEAK_UPLOAD_VALIDATION"]
+FixCategory = Literal[
+    "PARAMETERIZE_QUERY", "OUTPUT_ENCODING", "ADD_OWNERSHIP_CHECK", "REQUIRE_AUTHENTICATION",
+    "REMOVE_OR_PROTECT_DEBUG", "SECRET_TO_ENV_AND_REMOVE_BACKUP", "ADD_RATE_LIMIT",
+    "SET_HEADERS_AND_COOKIE_FLAGS", "RESTRICT_CORS_ORIGINS", "GENERIC_ERROR_RESPONSES",
+    "VALIDATE_UPLOAD_CONTENT"]
+
+
+class PlantedWeakness(SXModel):
+    """One hand-authored, deliberately planted weakness in a lab (independent of any model).
+
+    ``description`` says what is wrong; ``safe_confirmation_strategy`` says what a scanner can
+    harmlessly OBSERVE to confirm it. Neither contains a ready-to-use attack payload."""
+
+    id: Id
+    vuln_class: PlantedClass
+    severity: Severity
+    file: Text  # relative to the lab directory
+    line_start: Annotated[int, Field(ge=1)]
+    line_end: Annotated[int, Field(ge=1)]
+    endpoint: Text
+    method: Literal["GET", "POST", "PUT", "DELETE", "ANY"]
+    description: Text
+    safe_confirmation_strategy: Text
+    expected_fix_category: FixCategory
+    requires_human_decision: bool
+
+    @model_validator(mode="after")
+    def _lines(self) -> PlantedWeakness:
+        if self.line_end < self.line_start:
+            raise ValueError("line_end must be >= line_start")
+        return self
+
+
+class PlantedManifest(SXModel):
+    lab: Id
+    language: Literal["php", "node"]
+    base_port: Annotated[int, Field(ge=1, le=65535)]
+    note: Text
+    weaknesses: Annotated[list[PlantedWeakness], Field(min_length=1)]
+
+
 ALL_MODELS: list[type[SXModel]] = [
     ScenarioSpec, ActionRequest, PolicyDecision, ApprovalRequest, EvidenceEvent, IncidentFinding,
     ContainmentBranch, TargetAuthorization, ScanFinding, AttackIntent, VulnerabilityFinding,
     PatchProposal, RepairVerification, ShieldRule, EscalationTicket, ApprovalRecord,
     ModelStatus, Actor, SessionRecord, AuditRecord, UsageRecord, VerifierResult,
-    AttackTemplate, BenignTemplate, GenerationInfo, ClaimAssertion, Claim,
+    AttackTemplate, BenignTemplate, GenerationInfo, ClaimAssertion, Claim, PlantedWeakness,
+    PlantedManifest,
 ]

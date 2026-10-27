@@ -1,0 +1,13 @@
+# Vibe Shop (deliberately vulnerable lab). The port is published on the loopback interface ONLY.
+services:
+  shop:
+    build: .
+    ports:
+      - "127.0.0.1:${SHOP_PORT:-18082}:80"
+    volumes:
+      - ./data:/data
+    environment:
+      SHOP_DB: /data/shop.db
+      APP_SECRET: labsecret_shop_ref_FAKE_5d1e8a30c7b94f12
+      ADMIN_PASSWORD: labadmin_FAKE_pass_2026
+    restart: "no"
