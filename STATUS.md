@@ -19,23 +19,23 @@ Last updated: 2026-10-27 (Prompt 0: project setup only; no feature code).
 
 No system packages were installed.
 
-## Verified results (Prompt 1, 2026-10-27)
+## Verified results (Prompt 2, 2026-10-27)
 - `ruff check .` -> All checks passed!
-- `pytest` -> 194 passed (schemas, migrations, records, redaction, evidence store, state machine, imports)
-- Fresh-venv check: `pip install -e .` then `import sentinelx.policy, sentinelx.evidence` works; plain `import policy` -> ModuleNotFoundError.
-- `scripts/demo_evidence_chain.py`: clean chain verifies OK; editing one stored row makes `verify_chain` report MODIFIED at that event.
-- CI was not re-run on GitHub for these commits (local commits not pushed).
+- `pytest` -> 443 passed, 0 skipped (adds policy table tests, ~60 URL cases, signal tests, hypothesis property tests with 1000 examples each, evidence integration, static purity checks).
+- `python scripts/demo_policy.py` prints decision / rule_ids / reason_code for 12 sample actions.
+- Local commits only; not pushed. CI not re-run on GitHub for these commits.
 
-## Implemented (Prompt 1; local only, no scanner/agent/model/UI code)
-- `sentinelx.common_schemas`: 20 strict versioned contracts + JSON Schemas in `packages/common_schemas/schemas/` (`python scripts/export_schemas.py`).
-- `sentinelx.evidence`: SQLite WAL + foreign keys, numbered migrations, RecordStore, append-only hash-chained EvidenceStore, citation checks, idempotent session creation, session state machine.
-- `sentinelx.policy.redaction`: best-effort secret redaction.
-- Everything else remains planned (see README table).
+## Implemented (Prompt 2; no model calls, browser or network anywhere in the policy package)
+- `sentinelx.policy`: frozen content-addressed policy config (`configs/policy/{default,strict,monitor}.yaml`), pure `evaluate()` pipeline, strict URL normaliser/matcher with `check_redirect`, evidence-only signal helpers (`configs/policy/signals.yaml`), `decide_and_record` evidence recorder (`sentinelx.policy.gateway`).
+- Additive schema fields for monitor mode, signals and `ApprovalRequest` (see docs/DECISIONS.md).
+- Still planned: agent runtime, fixtures, model client, scanner, shield, SDK, CLI, API, dashboard.
 
 ## Known gaps
-- Organizers' reply text not yet recorded in docs/RULES_COMPLIANCE.md (not supplied).
-- Tail truncation of a chain is only detectable with an external anchor hash.
-- Redaction is pattern-based and best effort.
+- Organizers' reply text still not recorded in docs/RULES_COMPLIANCE.md.
+- The gateway decides only; nothing executes or enforces it yet (no runtime exists). `SessionContext` counters (`steps_taken`, `last_step`, `requests_last_minute`) must be supplied by the future runtime.
+- Argument-level URL detection relies on the policy's `url_args`; a URL hidden in a non-URL argument is only caught by secret/egress rules and signals.
+- Redirect checking (`check_redirect`) exists but nothing calls it yet.
+- Tail truncation of an evidence chain still needs an external anchor hash.
 
 ## Blockers / open items
 - php missing; Docker daemon not running; Playwright browsers untested.
@@ -47,4 +47,4 @@ No system packages were installed.
 See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC); Prompt 1 commits follow it (A1-A5, contracts, persistence, evidence, state machine).
 
 ## Next step
-Wait for the developer to start Prompt 2.
+Wait for the developer to start Prompt 3.

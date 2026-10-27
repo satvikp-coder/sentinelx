@@ -17,3 +17,16 @@ Windows is the primary dev platform; scripts are Python; labs run in Docker (PHP
 
 ## 2026-10-27 - Lab hostnames
 Lab hostnames: do not edit the Windows hosts file; resolve *.lab.test inside our own code (browser host-resolver rules / proxy mapping) in a later prompt.
+
+## 2026-10-27 - Additive PolicyDecision fields (schema_version stays 1.0)
+Added to `PolicyDecision`: `policy_mode`, `effective_action`, `would_have_decided`, `signals` (list of `PolicySignal`). All have defaults (`effective_action` defaults to `decision`), so older 1.0 documents still validate. Also added the new `ApprovalRequest` model and the `PolicyMode` / `SignalKind` enums. No version bump; exported JSON Schemas regenerated.
+
+## 2026-10-27 - Policy gateway choices
+- `tool` is the action type: a tool absent from `tool_argument_rules` is "unknown tool / unknown action type" (UNKNOWN_TOOL).
+- Relative URLs resolve against `SessionContext.page_origin`, supplied by the trusted runtime, not by the (model-proposed) request arguments.
+- Trailing-dot hosts are REJECTED by default (`trailing_dot: reject`) so "orders.lab.test." cannot reach the allowed host; `normalize` is an explicit opt-in.
+- An allowlist entry without a port matches only the scheme's default port; IP literals match only in canonical form and only when listed.
+- Monitor mode keeps a few hard stops enforced (kill switch, session not RUNNING, session mismatch, malformed/invalid inputs). The prompt said monitor returns ALLOW; a kill switch that monitor mode could override would not be a kill switch.
+- `policy_version` hashes the canonical policy content (not raw file bytes), so comment/whitespace-only edits keep the same version; any semantic edit changes it. The signal phrase list is not part of the hash because signals cannot affect decisions.
+- Approvals are bound to `action_id` + a digest of the exact tool and arguments, so an approval for one set of arguments cannot be replayed for another.
+- Signal detectors and phrases are hints only (small, reviewed list in `configs/policy/signals.yaml`), not a defense.

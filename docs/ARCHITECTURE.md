@@ -59,3 +59,22 @@ A BLOCKED action is an evidence event, not a session state. Each real transition
 
 ## Redaction (`sentinelx.policy.redaction`)
 Applied inside `EvidenceStore.append` and `RecordStore.insert` (storage) and must be applied before any model call. Pattern-based, best effort.
+
+## Policy gateway decision order (`sentinelx.policy.evaluate`, implemented)
+
+`evaluate(action_request, scenario, policy, session_context) -> PolicyDecision` is a pure function (no I/O, clock, randomness, network, DNS or model calls) and the only authority for ALLOW / BLOCK / CONFIRM. It never raises: junk input or an internal error is a BLOCK (`MALFORMED_REQUEST`, `CONTEXT_INVALID`, `SCENARIO_INVALID`, `POLICY_INVALID`, `INTERNAL_ERROR`). Rules run in this order and the first match decides:
+
+1. **INFRASTRUCTURE_DENY**: kill switch; session not RUNNING; request for another session; step not strictly increasing; `max_steps` reached; per-minute rate limit; tool unknown to the policy.
+2. **USER_RESTRICTIONS**: user-forbidden tools/arguments; blocked destinations (policy + user, any port); **SECRET_EGRESS** (built-in secret detectors + configured `secret_patterns`, also on percent-decoded text) regardless of destination.
+3. **SCENARIO_PERMISSIONS**: tool must be in the scenario's `allowed_actions`; only allowed/required scalar arguments within `max_length`; every URL argument must pass the exact-host check (`DESTINATION_NOT_ALLOWED`, with a precise URL reason code such as `USERINFO_IN_URL`, `PORT_NOT_ALLOWED`, `NONCANONICAL_IP`).
+4. **HUMAN_CONFIRMATION**: high-impact tools return CONFIRM (or BLOCK if configured). CONFIRM never executes; a human records an `ApprovalRecord` whose `subject_id` is `"<action_id>:<args_digest>"` (bound to the exact tool + arguments). On re-evaluation the whole pipeline (rules 1-3) runs again before an approval is honoured; a matching rejection beats an approval.
+5. **SAFE_ALLOWLIST**: tools in `allowed_tools` with valid arguments and in-scope destinations are ALLOWed.
+6. **DEFAULT_DENY**: anything not explicitly allowed is BLOCKed.
+
+Signals (`sentinelx.policy.signals`: instruction-override phrases, hidden-text hints, exfil requests) are computed after the verdict and attached to the decision as evidence. They cannot change a decision.
+
+Monitor mode computes the real decision, returns `effective_action = ALLOW` and keeps the real decision in `decision` / `would_have_decided`; a small set of hard stops (kill switch, session not RUNNING, session mismatch, malformed/invalid inputs) stays enforced.
+
+`sentinelx.policy.gateway.decide_and_record` runs `evaluate` and appends `ACTION_PROPOSED` (state PROPOSED, redacted request) then `ACTION_DECIDED` (state OBSERVED, parent-linked, with rule_ids, reason_code, policy_version, signals) in one transaction.
+
+URL handling (`sentinelx.policy.urls`) rejects rather than repairs anything ambiguous: only http/https (about:blank if configured), no userinfo, no encoded authority, no backslashes/whitespace/control characters, no wildcard or suffix matching, canonical-form IP literals only and only when listed, IDN only when its punycode form is listed, trailing dot rejected unless configured. It cross-checks its own parse against `urllib.parse.urlsplit` and rejects on disagreement; `//`-prefixed relative references are resolved by us, not `urljoin` (which differs from browsers for `///host`).
