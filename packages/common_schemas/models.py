@@ -258,6 +258,9 @@ class TargetAuthorization(SXModel):
     verification_token_hash: Text
     verified_at: UTCDatetime | None = None
     status: TargetStatus
+    # additive (Site Guard authorization gate)
+    verification_expires_at: UTCDatetime | None = None
+    acknowledgement: Text | None = None  # the owner's recorded acknowledgement (non-lab only)
 
 
 class ScanFinding(SXModel):

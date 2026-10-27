@@ -60,6 +60,19 @@
   },
   "additionalProperties": false,
   "properties": {
+    "acknowledgement": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Acknowledgement"
+    },
     "base_url": {
       "minLength": 1,
       "title": "Base Url",
@@ -90,6 +103,19 @@
       "minLength": 1,
       "title": "Target Id",
       "type": "string"
+    },
+    "verification_expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verification Expires At"
     },
     "verification_token_hash": {
       "minLength": 1,
