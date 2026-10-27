@@ -31,8 +31,8 @@ from .sandbox import SandboxBoundary
 from .types import ActionOutcome
 
 EventCallback = Callable[[str, dict[str, Any]], None]
-# (url, resource_type, method, redirect source url | None) -> PolicyDecision-like object
-PagePolicy = Callable[[str, str, str, str | None], Any]
+# (url, resource_type, method, redirect source url | None, body sample | None) -> PolicyDecision
+PagePolicy = Callable[[str, str, str, str | None, str | None], Any]
 MAX_TEXT = 20_000
 MAX_HOPS = 5
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
@@ -172,7 +172,8 @@ class BrowserAdapter:
                 await route.abort("blockedbyclient")
                 return
             if self._page_policy is not None:
-                decision = self._page_policy(url, request.resource_type, method, source)
+                sample = None if body is None else body[:4096].decode("utf-8", errors="replace")
+                decision = self._page_policy(url, request.resource_type, method, source, sample)
                 if decision.effective_action is not Decision.ALLOW:
                     self._egress_blocked += 1
                     self._emit("EGRESS_BLOCKED", {
@@ -234,7 +235,7 @@ class BrowserAdapter:
                                            "resource_type": "websocket", "channel": "websocket",
                                            "boundary": "sandbox"})
         else:
-            decision = (self._page_policy(http_url, "websocket", "GET", None)
+            decision = (self._page_policy(http_url, "websocket", "GET", None, None)
                         if self._page_policy is not None else None)
             if decision is not None and decision.effective_action is not Decision.ALLOW:
                 self._egress_blocked += 1

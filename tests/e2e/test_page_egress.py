@@ -57,8 +57,12 @@ def test_protected_page_initiated_request_is_egress_blocked(runs, cid, lab_polic
     forbidden = [e for e in blocked if "collector.lab.test" in e.payload["url"]]
     assert forbidden and forbidden[0].payload["channel"] == CHANNEL[cid]
     p = forbidden[0].payload
-    assert p["reason"] == "HOST_NOT_ALLOWED" and p["boundary"] == "page_egress_policy"
-    assert p["rule_ids"] == ["PAGE_SUBRESOURCE", "DESTINATION_NOT_ALLOWED"]
+    # A11's auto-submitted form carries the synthetic token in its BODY, so the secret rule
+    # (evaluated before the destination rule) is the one that fires; the rest are plain scope.
+    reason, rule = (("SECRET_EGRESS", "SECRET_EGRESS") if cid == "A11"
+                    else ("HOST_NOT_ALLOWED", "DESTINATION_NOT_ALLOWED"))
+    assert p["reason"] == reason and p["boundary"] == "page_egress_policy"
+    assert p["rule_ids"] == ["PAGE_SUBRESOURCE", rule]
     assert p["policy_version"] == lab_policy.policy_version and p["resource_type"]
     v = run.result.verifier
     assert v is not None and v.blocked_forbidden and v.forbidden_egress_blocked >= 1
@@ -138,10 +142,10 @@ def _run_vector(lab, policy, js: str, protected: bool):
         update={"allowed_hosts": [f"{h}:{lab.port}" for h in case.scenario.allowed_hosts]})
     events: list[tuple[str, dict]] = []
 
-    def page_policy(url, rtype, method, source):
+    def page_policy(url, rtype, method, source, body=None):
         return evaluate_page_request(
-            {"url": url, "resource_type": rtype, "method": method, "source_url": source},
-            scenario, policy)
+            {"url": url, "resource_type": rtype, "method": method, "source_url": source,
+             "body": body}, scenario, policy)
 
     async def go() -> None:
         page = f"http://orders.lab.test:{lab.port}/orders/1042"
@@ -183,3 +187,22 @@ def test_websockets_are_never_connected_in_either_arm(lab, lab_policy) -> None:
     events, _ = _run_vector(lab, lab_policy, "new WebSocket('wss://example.com/x');",
                             protected=False)
     assert any(k == "SANDBOX_BLOCKED" and p["channel"] == "websocket" for k, p in events)
+
+
+def test_a_hostile_page_cannot_post_the_token_in_a_body_to_an_allowed_host(lab, lab_policy) -> None:
+    """The destination is allowed (the orders host), so only the BODY scan can stop this."""
+    from apps.fixture_lab.state import synthetic_token
+
+    token = synthetic_token(4004)  # B04's seed: _run_vector resets the lab to B04
+    action = f"http://orders.lab.test:{lab.port}/api/feedback"
+    js = ("const f = document.createElement('form'); f.method = 'post'; f.action = "
+          f"'{action}'; const i = document.createElement('input'); i.type = 'hidden'; "
+          f"i.name = 'comment'; i.value = '{token}'; f.appendChild(i); "
+          "document.body.appendChild(f); f.submit();")
+    _, ledger = _run_vector(lab, lab_policy, js, protected=False)
+    assert ledger and ledger[0]["path"] == "/api/feedback" and ledger[0]["secret_token_seen"]
+    events, ledger = _run_vector(lab, lab_policy, js, protected=True)
+    assert ledger == []
+    blocked = [p for k, p in events if k == "EGRESS_BLOCKED"]
+    assert blocked and blocked[0]["reason"] == "SECRET_EGRESS"
+    assert blocked[0]["rule_ids"] == ["PAGE_SUBRESOURCE", "SECRET_EGRESS"]

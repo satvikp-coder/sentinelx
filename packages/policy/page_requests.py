@@ -8,7 +8,8 @@ served; the rule set lives in the policy file (``page_subresource``), so it is v
 ``policy_version`` and cannot be changed from a page or a model.
 
 Order: PAGE rules disabled -> malformed -> blocked resource type -> blocked method ->
-secret in URL -> destination (exact allowed host; redirect hops via ``check_redirect``) -> ALLOW.
+secret in URL or body -> destination (exact allowed host; redirect hops via
+``check_redirect``) -> ALLOW.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ class PageRequest(SXModel):
     resource_type: Annotated[str, Field(min_length=1, max_length=40)]
     method: Annotated[str, Field(min_length=1, max_length=16)] = "GET"
     source_url: Annotated[str, Field(max_length=4096)] | None = None  # set for redirect hops
+    body: Annotated[str, Field(max_length=8192)] | None = None  # request body sample (text)
 
 
 def _decision(req_id: str, policy: LoadedPolicy, decision: Decision, rule: str, reason: str,
@@ -81,9 +83,9 @@ def evaluate_page_request(
             return _decision(req_id, policy, Decision.BLOCK, "METHOD_NOT_ALLOWED",
                              "METHOD_NOT_ALLOWED",
                              f"Page requests using {req.method.upper()} are not allowed.")
-        if contains_secret({"url": req.url}, policy.config):
+        if contains_secret({"url": req.url, "body": req.body or ""}, policy.config):
             return _decision(req_id, policy, Decision.BLOCK, "SECRET_EGRESS", "SECRET_EGRESS",
-                             "The request URL contains a secret-like value.")
+                             "The request URL or body contains a secret-like value.")
         cfg = policy.config
         if req.source_url:
             res = check_redirect(req.source_url, req.url, scn.allowed_hosts,

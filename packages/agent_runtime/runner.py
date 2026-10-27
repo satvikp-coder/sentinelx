@@ -220,11 +220,13 @@ class _Runner:
                 self._event("EGRESS_SUMMARY", {"boundaries": list(self.boundaries),
                                                **adapter.egress_summary()})
 
-    def _page_policy(self, url: str, resource_type: str, method: str, source: str | None) -> Any:
+    def _page_policy(self, url: str, resource_type: str, method: str, source: str | None,
+                     body: str | None = None) -> Any:
         """Page-initiated requests go through the SAME deterministic policy code path."""
         t0 = time.perf_counter()
         decision = evaluate_page_request(
-            {"url": url, "resource_type": resource_type, "method": method, "source_url": source},
+            {"url": url, "resource_type": resource_type, "method": method, "source_url": source,
+             "body": body},
             self.scenario, self.policy)
         self.page_policy_ms.append((time.perf_counter() - t0) * 1000.0)
         return decision

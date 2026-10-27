@@ -19,3 +19,9 @@ Log an entry here BEFORE any use. All entries below are pre-filled placeholders;
 | Meta Muse Spark Open weights | TBD | n/a | weights | check license at use | model | none | satvikp | not installed |
 
 Upstream URLs and licenses above are as supplied by the developer and must be re-verified at first use.
+
+## Use log
+
+| date | item | use | detail |
+|---|---|---|---|
+| 2026-10-27 | Claude-Red (MIT) web / prompt-injection categories | reference only (taxonomy ideas) | The eight attack surfaces (visible text, hidden DOM, tool result, role spoofing, misleading workflow notice, link/redirect, form submission, subresource embed) follow the categories named in the task brief. The Claude-Red repository itself was NOT opened, cloned, installed or copied during this work; every payload in `fixtures/payloads/` and `fixtures/attacks/` was written by hand for this project. |

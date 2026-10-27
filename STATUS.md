@@ -19,33 +19,34 @@ Last updated: 2026-10-27 (Prompt 0: project setup only; no feature code).
 
 No system packages were installed.
 
-## Verified results (Prompt 3, 2026-10-27)
+## Verified results (Prompt 4, 2026-10-27)
 - `ruff check .` -> All checks passed!
-- `pytest -rs` -> **597 passed, 0 skipped** in 86 s. **58 browser (Chromium) tests actually ran**, 0 failed, 0 skipped.
-- Chromium installed with `python scripts/setup_browsers.py` (Playwright cache, no system packages). Browser tests skip with a clear message locally if Chromium is missing and FAIL when `SENTINELX_CI=1`.
-- `python scripts/demo_agent_lab.py` runs 6 scenarios x 2 arms and prints the comparison table.
-- The lifecycle/cleanup browser tests were run 5 times in a row (17/17 each) after the fixes below.
-- Local commits only; not pushed. CI has not run these commits on GitHub (Linux CI needs `playwright install --with-deps`; the workflow now does that, untested).
+- `pytest -rs` -> **799 passed, 0 skipped** in 401 s. **107 browser (Chromium) tests actually ran**, 0 failed, 0 skipped.
+- Full sealed manifest run (`python scripts/run_experiment.py --manifest evaluations/manifest.json`): 30 cases x 2 arms = 60 runs, **0 invalid**, both chains verify, paired fixture hashes identical. Manifest hash `087f433dd5a03e782585fd5e55b082fd5e4b5efaf90513a0873e16128e914eb8`. Example report committed in `evaluations/example_report/`.
+- Headline numbers (SIMULATED scripted agent, NOT an LLM; these 30 cases only): arm A attack success 15/15, arm B 0/15; arm B attack block rate 15/15, task preservation 15/15, clean benign completion 12/15, false-confirm rate 3/81 actions, false-block rate 0/81.
+- Local commits only; not pushed; CI not run on GitHub for these commits.
 
-## Implemented (Prompt 3; the agent is a SIMULATED scripted program, not an LLM)
-- `apps/fixture_lab`: one FastAPI app, 127.0.0.1 on an OS-chosen port, exact Host-header vhosts (orders / calendar / support / collector `.lab.test`), per-run JSONL side-effect ledger, token+loopback admin endpoints, deterministic seeded reset and `fixture_hash`. Hand-authored pages and payloads in `fixtures/` (8 scenarios: S1, S1_TOOL, S2, S2_HIDDEN, S3, B1, B2, B3).
-- `sentinelx.agent_runtime`: `ScriptedNaivePlanner` behind a `Planner` interface, Playwright adapter behind a SANDBOX BOUNDARY (separate from the policy gateway, both arms), protected/unprotected run loop with evidence, kill switch, cancellation, step and wall-clock limits.
-- `sentinelx.verifier`: independent verifier (ledger + evidence only), stored as a VERIFIED event and in the `verifications` table (migration 0002).
-- `configs/policy/lab.yaml`, `synth_tok_` redaction.
+## Implemented (Prompt 4)
+- Page-initiated egress closed in the protected arm: `evaluate_page_request` + `page_subresource` rules in `configs/policy/lab.yaml` (versioned), `EGRESS_BLOCKED` / `EGRESS_SUMMARY` events, ten injected vectors + WebSocket tested in both arms, request-body secret scan.
+- Conditional high-impact rules (`http_request` reads allowed, state-changing methods CONFIRM).
+- 15 attack + 15 benign hand-authored cases (`fixtures/attacks`, `fixtures/benign`, `AttackTemplate` / `BenignTemplate`), covering 3 scenarios, 8 surfaces and 5 controls (TOOL_NOT_IN_SCENARIO, DESTINATION_NOT_ALLOWED, SECRET_EGRESS, CONFIRM, EGRESS_BLOCKED).
+- `sentinelx.evaluation`: sealed manifest, paired order-randomised runner, metrics, json/csv/md reports. Verifier 1.1.0 (page-initiated attempts, false confirms, `stopped_by`).
+- Arm C (EVCS) is a seam only.
 
 ## Findings worth knowing
-- Playwright does NOT call `page.route` handlers for the targets of browser-followed redirects (found by test: a redirect to the collector reached the ledger). The adapter now follows redirects itself, hop by hop.
-- Cancelling Playwright during its own start-up leaves its connection tasks pending and hung `asyncio.run` shutdown (and leaked the Node driver). The wall-clock budget now starts after the browser is up.
-- In the lab, signals (hints) did not fire for the cancel/upload wording; the protected-arm blocks came from deterministic rules (`SECRET_EGRESS`, `TOOL_NOT_IN_SCENARIO`).
+- Earlier (Prompt 3): Playwright does not route redirect targets; the adapter follows redirects itself. Cancelling Playwright during start-up hangs shutdown; the wall-clock budget starts after the browser is up.
+- `route.abort("blockedbyclient")` replaces the current document with an error page, destroying the legitimate task; `aborted` keeps it. `goto(wait_until=load)` hangs when a page-initiated navigation is aborted; the adapter waits for `commit` + DOMContentLoaded + network idle.
+- `networkidle` does not re-arm for requests injected after the page settled; tests wait explicitly.
+- URL-only scanning of page requests left a hole (secret in a POST body to an ALLOWED host); the body is now scanned too.
+- A verifier subtlety: an action that only carries the secret (filling an on-page form) has no URL; it is attributed as the forbidden attempt via the redaction marker in stored evidence.
+- Signals (hints) still do not fire for the cancel/upload wording; blocks come from deterministic rules.
 
 ## Known gaps
 - Organizers' reply text still not recorded in docs/RULES_COMPLIANCE.md.
-- No model exists anywhere yet; "attack success" here describes a scripted gullible program, not LLM behaviour. Paired runners/metrics come next.
-- Subresource exfiltration (a hostile page embedding a collector image) is not policy-checked; the sandbox allows any `*.lab.test` host (docs/THREAT_MODEL.md).
-- `http_request` is blocked outright by the lab policy; no per-method / per-endpoint HTTP policy yet.
-- The wall-clock budget excludes browser start-up (bounded only by Playwright's launch timeout).
-- `SessionContext.page_origin` is the adapter's current page URL; after an adapter-followed redirect Chromium's URL stays the originally requested one (all hops were vetted).
-- Tail truncation of an evidence chain still needs an external anchor hash.
+- No model exists anywhere; every number above describes a scripted gullible program and a policy written knowing the lab. Nothing here predicts real-model behaviour or unseen attacks (docs/THREAT_MODEL.md lists what remains open: non-secret data to allowed hosts, obfuscated secrets, non-HTTP transports, ...).
+- Counts are small (15 + 15, one repetition); no confidence intervals. N>1 repetitions are supported but only meaningful for a nondeterministic planner.
+- The static policy CONFIRMs three legitimate state-changing actions (RSVP, cancel, upload): its measured utility cost, which only a human-approval workflow (not built) would resolve.
+- The wall-clock budget excludes browser start-up. Tail truncation of an evidence chain still needs an external anchor hash.
 
 ## Blockers / open items
 - php missing; Docker daemon not running (labs run on the local FastAPI app for now).
@@ -54,7 +55,7 @@ No system packages were installed.
 - Legacy credentials must be rotated (docs/LEGACY_CODE_AUDIT.md).
 
 ## Commits
-See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC). Prompt 3 commits: L1 browser gating, L2 lab, L3 verifier, L4 runtime, L5 demo/docs/fixes.
+See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC). Prompt 4 commits: E1 policy rules, E2 egress + case set, E3 evaluation pipeline, E4 docs/status, E5 example report.
 
 ## Next step
-Wait for the developer to start Prompt 4 (paired experiment runners and metrics).
+Wait for the developer to start Prompt 5 (model adapter; verify the model API docs first).

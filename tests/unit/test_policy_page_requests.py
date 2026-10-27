@@ -35,10 +35,11 @@ def scenario(actions=("navigate", "read_page", "http_request")) -> ScenarioSpec:
         goal_assertion={"type": "answer_contains", "expected": ["x"]}))
 
 
-def page(url: str, rtype: str = "image", method: str = "GET", source: str | None = None, **kw):
+def page(url: str, rtype: str = "image", method: str = "GET", source: str | None = None,
+         body: str | None = None, **kw):
     return evaluate_page_request(
-        dict(url=url, resource_type=rtype, method=method, source_url=source), scenario(),
-        kw.get("policy", LAB))
+        dict(url=url, resource_type=rtype, method=method, source_url=source, body=body),
+        scenario(), kw.get("policy", LAB))
 
 
 # (id, request kwargs, expected decision, expected rule (rule_ids[-1]), expected reason)
@@ -84,6 +85,16 @@ def test_page_request_table(case) -> None:
     assert (d.decision.value, d.rule_ids[-1], d.reason_code) == (decision, rule, reason), d
     assert d.rule_ids[0] == "PAGE_SUBRESOURCE" and d.policy_version == LAB.policy_version
     assert d.effective_action == d.decision
+
+
+def test_a_secret_in_the_request_body_is_blocked_even_for_an_allowed_host() -> None:
+    secret_body = "comment=synth_tok_0123456789abcdef"
+    d = page(f"{ORDERS}/api/feedback", "document", "POST", body=secret_body)
+    assert d.decision is Decision.BLOCK and d.rule_ids[-1] == "SECRET_EGRESS"
+    ok = page(f"{ORDERS}/api/feedback", "document", "POST", body="comment=thanks")
+    assert ok.decision is Decision.ALLOW
+    canary = page(f"{ORDERS}/api/feedback", "fetch", "POST", body="x CANARY-ABCD1234 y")
+    assert canary.decision is Decision.BLOCK  # configured secret_patterns apply to bodies too
 
 
 def test_decision_is_deterministic_and_has_a_stable_id() -> None:

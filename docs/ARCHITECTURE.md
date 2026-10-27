@@ -108,3 +108,34 @@ URL handling (`sentinelx.policy.urls`) rejects rather than repairs anything ambi
 - Ground truth: every call to a mock side-effect endpoint (collector `/collect`, calendar `/api/cancel`, support `/api/upload`) is appended to a per-run JSONL ledger by the lab server. The planner and adapter never see it; the runner reads it once, after the run, and hands it to the verifier.
 - Verifier: `forbidden_outcome_occurred` from the ledger only; `goal_met` from the final answer against ground truth; attempted / executed / blocked / false-block counts from evidence events. Results are stored as a `VERIFIER_RESULT` event (state VERIFIED) and in the `verifications` table (`kind = 'RUN'`).
 - Arms: A = UNPROTECTED, B = PROTECTED (the `Arm` enum). Tool arguments are flat scalars: `tool_call(name, order_id)`, `submit_form(selector, field_name, field_value)`.
+
+## Page-initiated egress (implemented; closes the Prompt 3 gap)
+
+Requests a page makes by itself (img, script, iframe, link/prefetch, fetch, XHR, form posts, CSS `url()`, beacons, meta refresh, redirect hops, WebSocket) are treated as PROPOSED side effects of whatever the agent loaded.
+
+- Rule set: `page_subresource` in `configs/policy/lab.yaml` (enabled flag, blocked resource types, allowed methods). It is part of `policy_version`, so editing it changes the version.
+- Code path: `sentinelx.policy.evaluate_page_request` (pure, in the same package and purity tests as `evaluate`). Order: rules disabled -> malformed -> blocked resource type -> blocked method -> secret in URL **or body** -> exact allowed-host check (redirect hops via `check_redirect`) -> ALLOW.
+- Enforcement: the adapter serves every browser request itself (`route.fetch`, redirects followed hop by hop). Per hop: (1) the sandbox boundary (both arms), then (2) in the PROTECTED arm only, the page-request policy. A denial aborts the request and records `EGRESS_BLOCKED` (url, resource type, method, channel = main_frame / form_submission / iframe / subresource / redirect_hop / websocket, reason, rule ids, policy version, `boundary: page_egress_policy`). Policy-blocked navigations are aborted with `aborted`, which leaves the current document in place, so the legitimate task survives.
+- Allowed requests are not logged one by one; each run records ONE `EGRESS_SUMMARY` (counts by resource type and host, blocked counts) and `RUN_STARTED.boundaries` lists which boundaries applied: `["sandbox"]` for arm A, `["sandbox", "policy_gateway", "page_egress_policy"]` for arm B.
+- WebSockets are never connected in the lab: arm A records `SANDBOX_BLOCKED` (`WEBSOCKET_UNSUPPORTED_IN_LAB`), arm B records `EGRESS_BLOCKED`.
+- `http_request` is allowed for reads; state-changing methods (POST/PUT/PATCH/DELETE) are CONFIRM via a conditional `high_impact_actions` entry (`when: [{arg: method, values: [...]}]`).
+
+## Evaluation pipeline (implemented; the agent is SIMULATED)
+
+```
+fixtures/attacks/*.json  fixtures/benign/*.json  (hand-authored AttackTemplate / BenignTemplate)
+        |  sentinelx.evaluation.cases   (+ payloads/*, loaded by the lab per case id)
+        v
+evaluations/manifest.json  (sealed: manifest_hash over cases + case_hash + policy_version + budgets + order_seed)
+        |  sentinelx.evaluation.runner   (refuses on any hash/header/fixture/policy mismatch)
+        v
+for each (case, arm, rep) in a seeded-shuffled order:  reset lab (same seed => same fixture_hash)
+        arm A: sandbox only            arm B: sandbox + policy gateway + page-egress policy
+        -> run_session -> independent verifier (ledger + evidence) -> RunRecord (valid | invalid + reason)
+        v
+sentinelx.evaluation.metrics (rates only via rate(); zero/missing denominator raises)
+        v
+report.json / report.csv / report.md  (provenance + limitations; generation fails on an incomplete rate)
+```
+
+Why `sentinelx.evaluation` and not `sentinelx.verifier.experiments`: the verifier must stay independent of the planner and runtime (a test enforces it), while the runner necessarily drives both. Arm C (EVCS containment, Prompt 7) has a seam only (`ARM_REGISTRY`); it is not implemented.

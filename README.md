@@ -18,7 +18,9 @@ Two sides on one shared evidence and verification core:
 | Policy gateway | implemented (local; no model calls) |
 | Evidence store (SQLite WAL, tamper-evident) | implemented (local) |
 | Agent runtime + fixture lab | implemented for Scenario A with a SIMULATED scripted agent (no LLM yet) |
-| Adversarial scenario generation | planned |
+| Hand-authored attack + benign case set (15 + 15), sealed manifest | implemented |
+| Paired experiment runner, metrics, reports | implemented (scripted agent only; no model) |
+| Adversarial scenario generation (model-driven) | planned |
 | Verifier (independent assertions) | implemented for Scenario A (ledger-based) |
 | Investigator (evidence-cited) | planned |
 | IncidentTwin containment (EVCS) | planned |
