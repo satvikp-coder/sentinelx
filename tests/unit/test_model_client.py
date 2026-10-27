@@ -508,3 +508,49 @@ def test_circuit_breaker_unit() -> None:
     assert b.state == "open" and not b.allow()
     clock.now += 10
     assert b.state == "half_open" and b.allow()
+
+
+# ------------------------------------------------------------------ transient 404 (docs/AUDIT)
+def test_a_transient_404_is_retried_and_succeeds() -> None:
+    client, calls, clock = make(lambda r, n: httpx.Response(404, text="") if n == 1 else good(),
+                                max_retries=0)
+    res = run(client)
+    assert res.status is S.OK and res.retries == 1 and len(calls) == 2
+    assert res.retry_status_codes == [404] and len(clock.sleeps) == 1
+
+
+def test_a_persistent_404_is_model_unavailable_after_exactly_two_retries() -> None:
+    client, calls, _ = make(lambda r, n: httpx.Response(404, text=f"gone {FAKE_KEY}"),
+                            max_retries=5)
+    res = run(client)
+    assert res.status is S.MODEL_UNAVAILABLE and res.retries == 2 and len(calls) == 3
+    assert res.retry_status_codes == [404, 404, 404]
+    assert "HTTP 404" in res.error and FAKE_KEY not in res.error
+
+
+@pytest.mark.parametrize("code", [400, 401, 403, 422])
+def test_other_4xx_are_never_retried(code: int) -> None:
+    client, calls, _ = make(lambda r, n: httpx.Response(code, text="no"), max_retries=3)
+    res = run(client)
+    assert res.status is S.MODEL_UNAVAILABLE and res.retries == 0 and len(calls) == 1
+
+
+def test_404_retries_are_recorded_in_the_event_and_the_usage_row(tmp_path) -> None:
+    from sentinelx.common_schemas import Actor, ActorRole, SessionKind
+    from sentinelx.evidence.db import connect, migrate
+    from sentinelx.evidence.sessions import SessionService
+    from sentinelx.evidence.store import EvidenceStore
+    from sentinelx.model_clients import EvidenceRecorder
+
+    conn = connect(tmp_path / "r.db")
+    migrate(conn)
+    SessionService(conn).create(SessionKind.AGENT_RUN, "p1", Actor(id="s", role=ActorRole.SYSTEM),
+                                session_id="s1")
+    client, _, _ = make(lambda r, n: httpx.Response(404, text="") if n == 1 else good(),
+                        max_retries=0)
+    client.recorder = EvidenceRecorder(conn, "s1", "unit")
+    run(client)
+    event = next(e for e in EvidenceStore(conn).list_session("s1") if e.kind == "MODEL_CALL")
+    assert event.payload["http_status_codes"] == [404] and event.payload["retries"] == 1
+    usage = conn.execute("SELECT error FROM usage").fetchone()[0]
+    assert "404" in usage

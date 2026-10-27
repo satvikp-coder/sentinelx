@@ -203,7 +203,8 @@ class ModelClient:
                    "Content-Type": "application/json", "Accept": "application/json"}
         url = f"{cfg.base_url}/chat/completions"
         last_status, last_error, response = S.MODEL_UNAVAILABLE, "no attempt made", None
-        for attempt in range(cfg.max_retries + 1):
+        attempt = not_found = 0
+        while True:
             self.limiter.acquire()
             self.http_calls += 1
             result.http_calls += 1
@@ -224,6 +225,17 @@ class ModelClient:
                 if code == 200:
                     break
                 snippet = self._scrub(response.text)
+                result.retry_status_codes.append(code)  # every non-200, kept for the usage row
+                if code == 404 and not_found < cfg.not_found_retries:
+                    # the hosted endpoint returned transient empty-body 404s (docs/AUDIT): retry
+                    # at most `not_found_retries` times; a persistent 404 stays MODEL_UNAVAILABLE
+                    not_found += 1
+                    last_status, last_error = S.MODEL_UNAVAILABLE, f"HTTP 404: {snippet}"
+                    result.retries += 1
+                    self._sleep(min(cfg.backoff_cap_s, cfg.backoff_base_s * (2 ** (not_found - 1)))
+                                * (0.5 + self._rng() * 0.5))
+                    response = None
+                    continue
                 if code == 429:
                     result.rate_limit_hits += 1
                     self.rate_limit_hits += 1
@@ -238,10 +250,12 @@ class ModelClient:
                     self.last_error = result.error
                     return None
             response = None
-            if attempt < cfg.max_retries:
-                result.retries += 1
-                backoff = min(cfg.backoff_cap_s, cfg.backoff_base_s * (2 ** attempt))
-                self._sleep(max(wait, backoff * (0.5 + self._rng() * 0.5)))
+            if attempt >= cfg.max_retries:
+                break
+            result.retries += 1
+            backoff = min(cfg.backoff_cap_s, cfg.backoff_base_s * (2 ** attempt))
+            self._sleep(max(wait, backoff * (0.5 + self._rng() * 0.5)))
+            attempt += 1
         if response is None:
             self.breaker.record_failure()
             result.status, result.error = last_status, last_error

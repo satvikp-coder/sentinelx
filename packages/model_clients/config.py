@@ -35,6 +35,7 @@ class ModelConfig(BaseModel):
     backoff_cap_s: Annotated[float, Field(ge=0)] = 20.0
     retry_after_cap_s: Annotated[float, Field(ge=0)] = 60.0
     # budgets
+    not_found_retries: Annotated[int, Field(ge=0, le=5)] = 2  # transient endpoint 404s only
     run_call_cap: Annotated[int, Field(ge=1)] = 8
     experiment_call_ceiling: Annotated[int, Field(ge=1)] = 400
     experiment_token_ceiling: Annotated[int, Field(ge=1)] = 1_000_000

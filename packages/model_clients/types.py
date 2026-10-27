@@ -45,6 +45,7 @@ class ModelResult:
     request_id: str | None = None
     error: str | None = None  # redacted; never contains the key
     estimated_cost: float | None = None  # None: the provider publishes no price
+    retry_status_codes: list[int] = field(default_factory=list)  # every non-200 HTTP status seen
     reasoning_chars: int = 0  # reasoning text is NOT kept; only its length and hash
     reasoning_hash: str | None = None
     finish_reason: str | None = None

@@ -23,7 +23,9 @@ class EvidenceRecorder:
             session_id=self.session_id, provider=result.provider, model=result.model,
             tokens_in=result.tokens_in, tokens_out=result.tokens_out,
             latency_ms=int(result.latency_ms), estimated_cost=result.estimated_cost,
-            error=result.error, timestamp=datetime.now(UTC)))
+            error=result.error or (f"retried after HTTP {result.retry_status_codes}"
+                                   if result.retry_status_codes else None),
+            timestamp=datetime.now(UTC)))
         payload: dict[str, object] = {
             "task": result.task, "status": result.status.value, "provider": result.provider,
             "model": result.model, "mode": result.mode.value,
@@ -35,6 +37,7 @@ class EvidenceRecorder:
             "reasoning_chars": result.reasoning_chars, "reasoning_hash": result.reasoning_hash,
             "finish_reason": result.finish_reason, "error": result.error,
             "prompt_version": self.prompt_version,
+            "http_status_codes": result.retry_status_codes,
             "reasoning_effort": result.reasoning_effort,
         }
         if debug_messages is not None:
