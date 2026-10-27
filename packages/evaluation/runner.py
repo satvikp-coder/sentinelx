@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sentinelx.agent_runtime import RunConfig, ScriptedNaivePlanner, run_session_sync
+from sentinelx.agent_runtime import RunConfig, run_session_sync
 from sentinelx.common_schemas import Arm, SessionState
 from sentinelx.evidence.db import connect, migrate
 from sentinelx.evidence.store import EvidenceStore
@@ -43,7 +43,8 @@ from .manifest import (
     load_manifest,
     verify_fixtures,
 )
-from .records import PLANNER_LABEL, PlannerInfo, RunRecord, block_rules_from_events, to_jsonable
+from .planners import PlannerFactory, ScriptedPlannerFactory, planner_info
+from .records import RunRecord, block_rules_from_events, to_jsonable
 from .report import build_report, git_info, write_report
 
 # arm label -> runtime arm. Arm "C" (EVCS containment, Prompt 7) will register here.
@@ -78,12 +79,17 @@ def plan_runs(manifest: Manifest, repetitions: int | None = None) -> list[Planne
 
 # ------------------------------------------------------------------ run header
 def write_header(run_dir: Path, manifest: Manifest, run_id: str, order: list[PlannedRun],
-                 policy: LoadedPolicy, repetitions: int) -> dict[str, Any]:
+                 policy: LoadedPolicy, repetitions: int,
+                 factory: PlannerFactory | None = None,
+                 budget_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    info = (factory or ScriptedPlannerFactory()).describe()
     header = {
         "run_id": run_id, "manifest_hash": manifest.manifest_hash,
         "manifest_name": manifest.name, "policy_version": policy.policy_version,
         "verifier_version": VERIFIER_VERSION, "order_seed": manifest.order_seed,
-        "repetitions": repetitions, "planner": PLANNER_LABEL, "model": "none",
+        "repetitions": repetitions, "planner": info.label, "planner_info": info.model_dump(),
+        "model": info.model, "provider": info.provider, "mode": info.mode,
+        "budget_overrides": budget_overrides or {},
         "started_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "git": git_info(),
         "order": [[p.case_id, p.arm, p.rep] for p in order],
     }
@@ -124,18 +130,23 @@ def _children() -> set[int]:
 
 def execute_run(conn: Any, lab: Any, policy: LoadedPolicy, manifest: Manifest, case: Case,
                 planned: PlannedRun, run_id: str,
-                runner: Callable[..., Any] = run_session_sync) -> RunRecord:
+                runner: Callable[..., Any] = run_session_sync,
+                factory: PlannerFactory | None = None,
+                budget_overrides: dict[str, Any] | None = None) -> RunRecord:
     """Run one (case, arm, rep). Never raises; failures become an INVALID record."""
-    budgets = manifest.budgets
+    budgets = manifest.budgets.model_copy(update=budget_overrides or {})
+    factory = factory or ScriptedPlannerFactory()
     before = _children()
     retried, first_error = False, None
     attempt = 0
+    info = factory.describe()
     while True:
         attempt += 1
         started = datetime.now(UTC)
         result, error = None, None
         try:
-            planner = ScriptedNaivePlanner(case.id, lab.port, task=case.template.task)
+            planner = factory(case, lab)
+            info = planner_info(planner)
             config = RunConfig(arm=ARM_REGISTRY[planned.arm], seed=case.template.seed,
                                max_steps=budgets.max_steps,
                                wall_clock_seconds=budgets.wall_clock_seconds,
@@ -153,8 +164,8 @@ def execute_run(conn: Any, lab: Any, policy: LoadedPolicy, manifest: Manifest, c
         run_id=run_id, case_id=case.id, arm=planned.arm, rep=planned.rep, label=case.label,
         scenario=case.template.family, surface=case.template.surface.value,
         order_index=planned.order_index, seed=case.template.seed, retried=retried,
-        first_attempt_error=first_error,
-        planner=PlannerInfo(name=ScriptedNaivePlanner.name, kind=ScriptedNaivePlanner.kind),
+        first_attempt_error=first_error, planner=info, provider=info.provider, model=info.model,
+        mode=info.mode,
         started_at=started.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         ended_at=ended.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         leaked_processes=_leaked_processes(before),
@@ -170,8 +181,16 @@ def execute_run(conn: Any, lab: Any, policy: LoadedPolicy, manifest: Manifest, c
         reason = "verifier did not run"
     elif not chain_ok:
         reason = "evidence chain failed verification"
+    stats = result.planner_stats or {}
     return RunRecord(
         **base, session_id=result.session_id, valid=reason is None, invalid_reason=reason,
+        model_calls=int(stats.get("model_calls", 0)),
+        model_tokens_in=int(stats.get("tokens_in", 0)),
+        model_tokens_out=int(stats.get("tokens_out", 0)),
+        model_latency_ms=list(stats.get("latency_ms", [])),
+        model_rate_limit_hits=int(stats.get("rate_limit_hits", 0)),
+        model_retries=int(stats.get("retries", 0)),
+        model_invalid_outputs=int(stats.get("invalid_outputs", 0)),
         fixture_hash=result.fixture_hash, policy_version=result.policy_version,
         verifier_version=result.verifier.verifier_version if result.verifier else None,
         total_ms=result.total_ms, gateway_decision_ms=result.gateway_decision_ms,
@@ -186,7 +205,8 @@ def run_experiment(
     manifest_path: str | Path, out_root: str | Path, *, repetitions: int | None = None,
     run_id: str | None = None, run_dir: str | Path | None = None, expected_hash: str | None = None,
     fixtures: Path = FIXTURES, write: bool = True, progress: Callable[[str], None] | None = None,
-    runner: Callable[..., Any] = run_session_sync,
+    runner: Callable[..., Any] = run_session_sync, planner_factory: PlannerFactory | None = None,
+    budget_overrides: dict[str, Any] | None = None, only_cases: list[str] | None = None,
 ) -> ExperimentResult:
     from apps.fixture_lab.server import LabServer  # the lab is an app, imported lazily
 
@@ -199,6 +219,8 @@ def run_experiment(
     policy = load_policy(REPO_ROOT / manifest.policy_file)
     reps = repetitions or manifest.repetitions
     order = plan_runs(manifest, reps)
+    if only_cases is not None:  # a stratified SUBSET (declared in the header), never silent
+        order = [p for p in order if p.case_id in set(only_cases)]
 
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     rid = run_id or f"run-{stamp}-{manifest.manifest_hash[:8]}"
@@ -208,7 +230,12 @@ def run_experiment(
         if (d / "runs.jsonl").exists() and (d / "runs.jsonl").read_text(encoding="utf-8").strip():
             raise ManifestError(f"run directory {d} already holds results; use a new run id")
     d.mkdir(parents=True, exist_ok=True)
-    write_header(d, manifest, rid, order, policy, reps)
+    header = write_header(d, manifest, rid, order, policy, reps, planner_factory,
+                          budget_overrides)
+    if only_cases is not None:
+        header["subset_of_manifest"] = sorted(only_cases)
+        (d / "header.json").write_text(json.dumps(header, indent=2) + "\n", encoding="utf-8",
+                                       newline="\n")
 
     records: list[RunRecord] = []
     lab = LabServer(Path(tempfile.mkdtemp(prefix="sx-ledger-", dir=d)))
@@ -219,7 +246,7 @@ def run_experiment(
         with (d / "runs.jsonl").open("a", encoding="utf-8", newline="\n") as out:
             for planned in order:
                 record = execute_run(conn, lab, policy, manifest, cases[planned.case_id], planned,
-                                     rid, runner)
+                                     rid, runner, planner_factory, budget_overrides)
                 records.append(record)
                 out.write(json.dumps(to_jsonable(record), sort_keys=True) + "\n")
                 out.flush()

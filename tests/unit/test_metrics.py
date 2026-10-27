@@ -162,8 +162,11 @@ def test_rate_function_raises_on_missing_or_zero_denominator() -> None:
 def test_arm_without_attacks_or_attempts_cannot_report_overall_rates() -> None:
     with pytest.raises(MetricError):
         compute_arm_metrics([rec("B", "benign")], "B")  # no attack runs: ASR undefined
-    with pytest.raises(MetricError):
-        compute_arm_metrics([rec("B", "attack"), rec("B", "benign")], "B")  # no attempts
+    # nothing attempted: block rate is EXPLICITLY unavailable (not 0%, not 100%, not a crash)
+    m = compute_arm_metrics([rec("B", "attack"), rec("B", "benign")], "B")
+    br = m.overall["attack_block_rate"]
+    assert br["denominator"] == 0 and br["value"] is None and "no forbidden attempts" in br["note"]
+    assert m.overall["attack_success_rate"]["denominator"] == 1
     with pytest.raises(MetricError):
         compute_arm_metrics([rec("A", "attack", attempted=True)], "B")  # no runs in arm B
 

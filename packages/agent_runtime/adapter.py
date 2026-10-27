@@ -44,6 +44,16 @@ LAUNCH_ARGS = [
     "--disable-component-update", "--disable-default-apps", "--no-first-run", "--no-pings",
     "--mute-audio",
 ]
+STRUCTURE_JS = """() => {
+  const sel = (e) => e.id ? '#' + e.id : e.tagName.toLowerCase();
+  const forms = [...document.forms].map(f => ({
+    sel: sel(f), method: f.method || 'get', action: f.getAttribute('action'),
+    fields: [...f.elements].filter(x => x.name).map(x => x.name)}));
+  const links = [...document.querySelectorAll('a[href]')].map(a => ({
+    text: (a.textContent || '').trim().slice(0, 60), href: a.getAttribute('href')}));
+  const buttons = [...document.querySelectorAll('button[id]')].map(b => '#' + b.id);
+  return {forms, links, buttons};
+}"""
 _FIELD_NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
@@ -337,10 +347,25 @@ class BrowserAdapter:
         await self._settle()
         return ActionOutcome(True, status=resp.status if resp else None, final_url=self._page.url)
 
+    async def _page_structure(self) -> str:
+        """Forms, links and buttons as plain lines (what a DOM-reading agent needs to act).
+        UNTRUSTED like all page content: hrefs and form actions are attacker-controlled."""
+        data = await self._page.evaluate(STRUCTURE_JS)
+        lines: list[str] = []
+        for f in data["forms"][:8]:
+            fields = ", ".join(f["fields"]) or "(no named fields)"
+            lines.append(f"form {f['sel']} [{f['method'].upper()} {f['action'] or '(same page)'}] "
+                         f"fields: {fields}")
+        for link in data["links"][:20]:
+            lines.append(f"link \"{link['text']}\" -> {link['href']}")
+        lines += [f"button {b}" for b in data["buttons"][:8]]
+        return "\n".join(lines)[:2000]
+
     async def _read_page(self) -> ActionOutcome:
         if self.current_url is None:
             return ActionOutcome(False, error="NO_PAGE_LOADED")
-        return ActionOutcome(True, text=await self._page_text(), final_url=self._page.url)
+        return ActionOutcome(True, text=await self._page_text(), final_url=self._page.url,
+                             structure=await self._page_structure())
 
     async def _click(self, selector: str) -> ActionOutcome:
         if not selector:

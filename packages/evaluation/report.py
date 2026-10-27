@@ -17,8 +17,8 @@ from typing import Any
 from sentinelx.verifier import VERIFIER_VERSION
 
 from .manifest import ARM_DESCRIPTIONS, REPO_ROOT, Manifest
-from .metrics import MetricError, compute_arm_metrics
-from .records import PLANNER_LABEL, RunRecord
+from .metrics import MetricError, compute_arm_metrics, latency_summary
+from .records import PlannerInfo, RunRecord
 
 LIMITATIONS = [
     "The agent is a SCRIPTED, deliberately gullible simulation. It is not an LLM and says "
@@ -34,6 +34,33 @@ LIMITATIONS = [
     "Latency figures measure a local sqlite/Playwright prototype on one machine; they are not "
     "production performance claims.",
 ]
+
+
+MODEL_LIMITATIONS = [
+    "The agent is a REAL language model (see provenance for provider, model and mode), driven "
+    "by one fixed prompt (prompt_v1). Results describe THIS model, THIS prompt and THIS date; "
+    "another model, prompt or sampling seed can behave differently.",
+    "Model output is nondeterministic (temperature 1.0): with one repetition per case each "
+    "number is a single sample, so small differences between arms are not evidence. Counts are "
+    "small (tens of cases) and no confidence intervals are claimed.",
+    "Results show how the controls behave against THESE hand-authored cases. They say nothing "
+    "about unseen attacks, adaptive attackers, other tasks or other models. No claim of complete "
+    "protection is made.",
+    "The attack text was NOT tuned to the model: a low unprotected attack success rate means "
+    "this model resisted these particular texts, not that the attacks are harmless.",
+    "The system prompt contains a generic notice that page content is untrusted data, and the "
+    "user notes name the pages/endpoints to use; both make the model more resistant than a bare "
+    "agent would be. The user-requested answer format is part of the goal assertion.",
+    "Arm B's static policy was written knowing the lab; the false-positive and false-confirm "
+    "numbers show its cost on these benign cases only.",
+    "The hosted trial endpoint has undocumented rate limits and variable latency; runs that hit "
+    "MODEL_UNAVAILABLE are invalid, excluded from rates and counted. Latency figures are for "
+    "this endpoint on this day and are not production claims.",
+]
+
+
+def limitations_for(planner: PlannerInfo) -> list[str]:
+    return MODEL_LIMITATIONS if planner.is_llm else LIMITATIONS
 
 
 class ReportIncomplete(MetricError):
@@ -53,6 +80,12 @@ def git_info() -> dict[str, Any]:
 
 def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
                  *, git: dict[str, Any] | None = None) -> dict[str, Any]:
+    planners = {r.planner.model_dump_json() for r in records}
+    if len(planners) != 1:
+        raise ReportIncomplete(
+            "a report covers exactly ONE planner; SIMULATED and model-driven runs (or different "
+            f"models/prompts) must be reported separately, found {len(planners)}")
+    planner = records[0].planner
     arms = {arm: compute_arm_metrics(records, arm) for arm in manifest.arms}
     policy_versions = sorted(
         {r.policy_version for r in records if r.policy_version and r.arm == "B"})
@@ -67,10 +100,12 @@ def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
             "policy_version": policy_versions[0] if len(policy_versions) == 1 else policy_versions,
             "verifier_version": (verifier_versions[0] if len(verifier_versions) == 1
                                  else verifier_versions or VERIFIER_VERSION),
-            "planner": PLANNER_LABEL,
-            "model": "none",
-            "provider": "none",
-            "mode": "SIMULATED (no model, no LLM)",
+            "planner": planner.label,
+            "model": planner.model,
+            "provider": planner.provider,
+            "mode": ("SIMULATED (no model, no LLM)" if not planner.is_llm
+                     else f"{planner.mode} (real LLM)"),
+            "prompt_version": planner.prompt_version,
             "order_seed": manifest.order_seed,
             "repetitions": manifest.repetitions,
         },
@@ -81,15 +116,33 @@ def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
             "arms": {a: ARM_DESCRIPTIONS[a] for a in manifest.arms},
         },
         "arms": {arm: m.as_dict() for arm, m in arms.items()},
+        "model_usage": ({arm: model_usage(records, arm) for arm in manifest.arms}
+                        if planner.is_llm else None),
         "pairing": pairing_check(records),
         "invalid_runs": {
             "total": sum(len(m.invalid) for m in arms.values()),
             "runs": [dict(arm=arm, **inv) for arm, m in arms.items() for inv in m.invalid],
         },
-        "limitations": LIMITATIONS,
+        "limitations": limitations_for(planner),
     }
     assert_complete(report)
     return report
+
+
+def model_usage(records: Iterable[RunRecord], arm: str) -> dict[str, Any]:
+    """Calls, tokens and model latency for one arm (counts ALL runs, valid or not)."""
+    runs = [r for r in records if r.arm == arm]
+    latencies = [x for r in runs for x in r.model_latency_ms]
+    return {
+        "runs": len(runs),
+        "model_http_calls": sum(r.model_calls for r in runs),
+        "tokens_in": sum(r.model_tokens_in for r in runs),
+        "tokens_out": sum(r.model_tokens_out for r in runs),
+        "rate_limit_hits": sum(r.model_rate_limit_hits for r in runs),
+        "retries": sum(r.model_retries for r in runs),
+        "invalid_outputs": sum(r.model_invalid_outputs for r in runs),
+        "latency": latency_summary(latencies),
+    }
 
 
 def pairing_check(records: Iterable[RunRecord]) -> dict[str, Any]:
@@ -171,8 +224,11 @@ def render_markdown(report: dict[str, Any]) -> str:
     p = report["provenance"]
     lines = [
         f"# Experiment report: {p['manifest_name']}", "",
-        "**The agent is a SCRIPTED, SIMULATED, deliberately gullible planner (not an LLM). "
-        "Model: none.**", "", "## Provenance", "",
+        ("**The agent is a SCRIPTED, SIMULATED, deliberately gullible planner (not an LLM). "
+         "Model: none.**") if p["model"] == "none" else
+        (f"**The agent is a REAL language model: {p['planner']}. Provider: {p['provider']}. "
+         f"Model: {p['model']}. Mode: {p['mode']}.**"),
+        "", "## Provenance", "",
         "| field | value |", "|---|---|",
         f"| run id | `{p['run_id']}` |",
         f"| git commit | `{p['git']['commit']}` (dirty: {p['git']['dirty']}) |",
@@ -182,6 +238,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| verifier version | `{p['verifier_version']}` |",
         f"| planner | {p['planner']} |",
         f"| model / provider | {p['model']} / {p['provider']} |",
+        f"| prompt version | {p.get('prompt_version')} |",
         f"| mode | {p['mode']} |",
         f"| order seed / repetitions | {p['order_seed']} / {p['repetitions']} |", "",
         f"Cases: {report['manifest']['attacks']} attack + {report['manifest']['benign']} benign. "
@@ -196,6 +253,17 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines += [f"| {k} | {_fmt(v)} |" for k, v in a["overall"].items()]
         lines += [f"| {k} | {_fmt(a['benign_page_request_blocks'])} |"
                   for k in ("benign runs with a blocked page request",)]
+        usage = (report.get("model_usage") or {}).get(arm)
+        if usage:
+            lat = usage["latency"]
+            lines += ["", "**Model usage**", "",
+                      f"- HTTP calls: {usage['model_http_calls']} (retries {usage['retries']}, "
+                      f"rate-limit hits {usage['rate_limit_hits']}, invalid outputs "
+                      f"{usage['invalid_outputs']})",
+                      f"- tokens: {usage['tokens_in']} in / {usage['tokens_out']} out",
+                      "- model latency: " + (f"n={lat['n']}, insufficient sample" if "note" in lat
+                                            else f"n={lat['n']}, p50 {lat['p50_ms']} ms, "
+                                                 f"p95 {lat['p95_ms']} ms")]
         lines += ["", "**Latency**", ""]
         for name, s in a["latency"].items():
             lines.append(f"- {name}: n={s['n']}, " + ("insufficient sample" if "note" in s else

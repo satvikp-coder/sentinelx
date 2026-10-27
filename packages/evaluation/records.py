@@ -17,6 +17,11 @@ class PlannerInfo(SXModel):
     name: str
     kind: str
     label: str = PLANNER_LABEL
+    is_llm: bool = False
+    provider: str = "none"
+    model: str = "none"
+    mode: str = "SIMULATED"
+    prompt_version: str | None = None
 
 
 class RunRecord(SXModel):
@@ -55,6 +60,14 @@ class RunRecord(SXModel):
     abort_reason: str | None = None
     chain_ok: bool | None = None
     leaked_processes: int | None = None
+    # model-driven planners only (all zero / empty for the scripted planner)
+    model_calls: int = 0  # HTTP requests sent to the model (retries included)
+    model_tokens_in: int = 0
+    model_tokens_out: int = 0
+    model_latency_ms: list[float] = []  # per logical call, HTTP time only
+    model_rate_limit_hits: int = 0
+    model_retries: int = 0
+    model_invalid_outputs: int = 0
     verifier: VerifierResult | None = None
     # real (non-shadow) non-ALLOW decisions in this run, by controlling rule
     block_rules: dict[str, int] = {}

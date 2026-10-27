@@ -30,6 +30,7 @@ class Observation:
     blocked_reason: str | None = None  # e.g. "blocked by policy: SECRET_EGRESS"
     tool_result: dict[str, Any] | None = None  # untrusted JSON from a mock tool
     event_id: str | None = None  # evidence event that recorded this observation
+    structure: str = ""  # untrusted summary of forms / links / buttons on the page
 
 
 @dataclass(frozen=True)
@@ -56,12 +57,22 @@ class ActionOutcome:
     error: str | None = None
     tool_result: dict[str, Any] | None = None
     sandbox_blocked: bool = False
+    structure: str = ""  # forms / links / buttons (UNTRUSTED), returned by read_page
 
     def summary(self) -> dict[str, Any]:
         """Redaction-friendly summary stored in ACTION_EXECUTED (no page text)."""
         return {"ok": self.ok, "status": self.status, "final_url": self.final_url,
                 "text_length": len(self.text), "error": self.error,
                 "sandbox_blocked": self.sandbox_blocked}
+
+
+class PlannerError(Exception):
+    """A planner could not produce an action (e.g. the model is unavailable). The run ends
+    FAILED with ``abort_reason`` and is excluded from rates (but counted)."""
+
+    def __init__(self, abort_reason: str, detail: str = "") -> None:
+        self.abort_reason, self.detail = abort_reason, detail
+        super().__init__(f"{abort_reason}: {detail}" if detail else abort_reason)
 
 
 @runtime_checkable

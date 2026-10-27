@@ -59,6 +59,7 @@ from .types import (
     LabHandle,
     Observation,
     Planner,
+    PlannerError,
 )
 
 SYSTEM = Actor(id="agent_runtime", role=ActorRole.SYSTEM)
@@ -90,6 +91,7 @@ class RunResult:
     policy_version: str
     verifier: VerifierResult | None
     steps: int
+    planner_stats: dict[str, Any] = field(default_factory=dict)  # model usage, if any
     gateway_decision_ms: list[float] = field(default_factory=list)  # protected arm only
     page_policy_ms: list[float] = field(default_factory=list)  # protected arm only
     total_ms: float = 0.0
@@ -147,10 +149,14 @@ class _Runner:
             records.insert(spec)
         session, _ = self.svc.create(
             SessionKind.AGENT_RUN, self.policy.policy_version, SYSTEM, scenario_id=spec.id,
-            arm=cfg.arm, model=self.planner.name, provider=PROVIDER_LABEL,
+            arm=cfg.arm, model=getattr(self.planner, "model_label", self.planner.name),
+            provider=getattr(self.planner, "provider_label", PROVIDER_LABEL),
             fixture_version=spec.fixture_version,
         )
         self.session_id = session.id
+        hook = getattr(self.planner, "on_session_start", None)
+        if hook is not None:  # e.g. a model planner wires its call recording to this session
+            hook(self.conn, self.session_id)
         seed = spec.seed if cfg.seed is None else cfg.seed
         fixture_hash = self.lab.reset(spec.id, seed)
         self._event("RUN_STARTED", {
@@ -158,8 +164,7 @@ class _Runner:
             "attack_surface": spec.attack_surface, "fixture_hash": fixture_hash,
             "policy_version": self.policy.policy_version,
             "policy_mode": self.policy.config.mode.value,
-            "planner": {"name": self.planner.name, "kind": self.planner.kind,
-                        "is_llm": False, "label": "SIMULATED scripted agent, not an LLM"},
+            "planner": self._planner_info(),
             "protected": self.protected, "lab_port": self.lab.port, "max_steps": cfg.max_steps,
             "boundaries": list(self.boundaries),
         })
@@ -183,10 +188,28 @@ class _Runner:
         verifier = self._finalize(final_state)
         return RunResult(self.session_id, spec.id, cfg.arm, final_state, self.abort_reason,
                          self.final_answer, fixture_hash, self.policy.policy_version, verifier,
-                         len(self.history), list(self.gateway_ms), list(self.page_policy_ms),
-                         (time.perf_counter() - started) * 1000.0, self.boundaries)
+                         len(self.history), self._planner_stats(), list(self.gateway_ms),
+                         list(self.page_policy_ms), (time.perf_counter() - started) * 1000.0,
+                         self.boundaries)
+
+    def _planner_info(self) -> dict[str, Any]:
+        p = self.planner
+        is_llm = bool(getattr(p, "is_llm", False))
+        return {"name": p.name, "kind": p.kind, "is_llm": is_llm,
+                "label": getattr(p, "label", "SIMULATED scripted agent, not an LLM"),
+                "provider": getattr(p, "provider_label", "none"),
+                "model": getattr(p, "model_label", "none"),
+                "mode": getattr(p, "mode_label", "SIMULATED"),
+                "prompt_version": getattr(p, "prompt_version", None)}
+
+    def _planner_stats(self) -> dict[str, Any]:
+        stats = getattr(self.planner, "stats", None)
+        return dict(stats()) if callable(stats) else {}
 
     def _finalize(self, state: SessionState) -> VerifierResult | None:
+        end_hook = getattr(self.planner, "on_session_end", None)
+        if end_hook is not None:
+            end_hook()
         if self.abort_reason:
             self._event("RUN_ABORTED", {"reason": self.abort_reason})
         self._event("RUN_FINISHED", {"final_answer": self.final_answer,
@@ -243,7 +266,13 @@ class _Runner:
             if len(self.history) >= self.config.max_steps:
                 self.abort_reason = "MAX_STEPS"
                 return
-            planned = self.planner.next_action(obs, self.history)
+            try:
+                planned = self.planner.next_action(obs, self.history)
+            except PlannerError as exc:  # e.g. MODEL_UNAVAILABLE: end honestly, never guess
+                self.abort_reason = exc.abort_reason
+                self._event("PLANNER_FAILED", {"reason": exc.abort_reason,
+                                               "detail": exc.detail[:300]})
+                return
             if isinstance(planned, Finish):
                 self.final_answer = planned.answer
                 return
@@ -324,7 +353,7 @@ class _Runner:
         return Observation(self.session_id, step + 1, now, outcome.final_url or self._url(),
                            text=outcome.text if outcome.ok else "", outcome=status,
                            blocked_reason=outcome.error, tool_result=outcome.tool_result,
-                           event_id=event_id)
+                           event_id=event_id, structure=outcome.structure if outcome.ok else "")
 
     def _url(self) -> str | None:
         return self.adapter.current_url if self.adapter else None

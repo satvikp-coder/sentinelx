@@ -55,7 +55,8 @@ def main() -> None:
               f"invalid {len(a['invalid'])}")
         for key, label in SUMMARY:
             m = a["overall"][key]
-            print(f"  {label:38} {m['numerator']:>3}/{m['denominator']:<3} = {m['value']:.3f}")
+            shown = "n/a (" + m["note"] + ")" if m["value"] is None else f"{m['value']:.3f}"
+            print(f"  {label:38} {m['numerator']:>3}/{m['denominator']:<3} = {shown}")
     print()
     print(f"invalid runs: {report['invalid_runs']['total']}")
     print("report files: " + ", ".join(str(p) for p in result.report_paths))

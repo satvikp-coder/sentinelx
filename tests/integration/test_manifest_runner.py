@@ -241,7 +241,8 @@ def fake_result(svc: SessionService, state=SessionState.COMPLETED, abort=None, v
                        executed_forbidden=False, blocked_forbidden=True, false_blocks=0,
                        stopped_by=["TOOL_NOT_IN_SCENARIO"])
     return RunResult(s.id, "A01", Arm.PROTECTED, state, abort, "answer", "f" * 64, "lab@x",
-                     v if verifier else None, 3, [0.1, 0.2], [0.05], 12.0, ("sandbox",))
+                     v if verifier else None, 3, gateway_decision_ms=[0.1, 0.2],
+                     page_policy_ms=[0.05], total_ms=12.0, boundaries=("sandbox",))
 
 
 def test_a_crashed_run_is_recorded_invalid_after_one_flagged_retry(env) -> None:
