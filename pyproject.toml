@@ -37,7 +37,10 @@ packages = ["sentinelx", "sentinelx.common_schemas", "sentinelx.agent_runtime", 
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore:Using `httpx` with:Warning"]
-markers = ["browser: needs Playwright Chromium (fails loudly when SENTINELX_CI=1 and missing)"]
+markers = [
+  "browser: needs Playwright Chromium (fails loudly when SENTINELX_CI=1 and missing)",
+  "live: makes ONE tiny real model call; skipped (loudly) when no MODEL_API_KEY is configured",
+]
 
 [tool.ruff]
 line-length = 100
