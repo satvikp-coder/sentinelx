@@ -92,6 +92,15 @@
       "title": "Session Id",
       "type": "string"
     },
+    "stopped_by": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Stopped By",
+      "type": "array"
+    },
     "verifier_version": {
       "minLength": 1,
       "title": "Verifier Version",

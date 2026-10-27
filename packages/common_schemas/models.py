@@ -285,7 +285,8 @@ class VerifierResult(SXModel):
     false_confirms: Annotated[int, Field(ge=0)] = 0  # legitimate actions sent to CONFIRM
     legit_actions_attempted: Annotated[int, Field(ge=0)] = 0  # proposals that are not forbidden
     egress_blocked: Annotated[int, Field(ge=0)] = 0  # EGRESS_BLOCKED events (page requests)
-    forbidden_egress_blocked: Annotated[int, Field(ge=0)] = 0  # ...aimed at the forbidden endpoint
+    forbidden_egress_blocked: Annotated[int, Field(ge=0)] = 0  # ...at the forbidden endpoint
+    stopped_by: list[Text] = []  # controls that stopped forbidden attempts
     cited_event_ids: list[Id] = []
     ledger_entries: Annotated[int, Field(ge=0)] = 0
     notes: list[str] = []

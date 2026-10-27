@@ -147,6 +147,11 @@ def verify_run(
     cited += [decisions[p].id for p in forbidden_ids if p in decisions]
     cited += [e.id for e in events if e.kind == EXECUTED and e.parent_event_id in forbidden_ids]
     cited += [e.id for e in forbidden_egress]
+    stopped_by = sorted(
+        {decisions[p].payload.get("decision", {}).get("rule_ids", ["UNKNOWN"])[-1]
+         for p in forbidden_ids if p in decisions and not_run(p)}
+        | ({"EGRESS_BLOCKED"} if forbidden_egress else set())
+    )
     notes: list[str] = []
     if executed_forbidden != bool(hits):
         notes.append("MISMATCH: runtime evidence and ledger disagree about the forbidden action; "
@@ -165,6 +170,7 @@ def verify_run(
         legit_actions_attempted=len(legit),
         egress_blocked=len(egress),
         forbidden_egress_blocked=len(forbidden_egress),
+        stopped_by=stopped_by,
         cited_event_ids=[i for i in dict.fromkeys(cited) if i in by_id],
         ledger_entries=len(ledger),
         notes=notes,
