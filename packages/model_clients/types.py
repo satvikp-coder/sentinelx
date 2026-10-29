@@ -15,6 +15,7 @@ class ModelCallStatus(StrEnum):
     TIMEOUT = "TIMEOUT"
     RATE_LIMITED = "RATE_LIMITED"
     INVALID_OUTPUT = "INVALID_OUTPUT"
+    BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"  # a configured spend cap was reached; never a retry
 
 
 @dataclass(frozen=True)

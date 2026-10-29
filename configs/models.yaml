@@ -1,0 +1,57 @@
+# Model routing profiles. Verified facts and sources are recorded in docs/DECISIONS.md
+# ("Baseten Model API facts (verified 2026-10-29)") - this file must not drift from that record
+# without updating it there too. Prices are USD per 1,000,000 tokens.
+config_version: models-1
+
+profiles:
+  nvidia_glimmer:
+    provider: nvidia
+    base_url: https://integrate.api.nvidia.com/v1
+    model: meta/muse-glimmer-30b
+    api_key_env: MODEL_API_KEY
+    reasoning_effort: low
+    max_tokens: 2048
+    price_per_1m:
+      input_usd: 0.0        # free hosted endpoint (NVIDIA build.nvidia.com), no published price
+      cached_input_usd: 0.0
+      output_usd: 0.0
+      verified: false
+      note: "NVIDIA's free hosted tier has no published per-token price; treated as $0 for the
+        spend guard, which does not apply to this profile."
+
+  baseten_spark_open:
+    provider: baseten
+    base_url: https://inference.baseten.co/v1
+    # Baseten's own model-library page (2026-10-29) names the undated slug
+    # "meta-models/muse-spark-open", but that returned HTTP 403 "please check the api-key you
+    # provided" against this account's real key (a real model, just not one the key can call);
+    # "meta-models/muse-spark-open-1026" (CLAUDE.md's original value) is what the key actually
+    # works against - confirmed by one live call (see docs/DECISIONS.md). Baseten appears to
+    # keep both a dated, pinned slug and an undated one, and keys may be scoped to only one.
+    model: meta-models/muse-spark-open-1026
+    api_key_env: BASETEN_API_KEY
+    reasoning_effort: low
+    max_tokens: 4096
+    price_per_1m:
+      input_usd: 1.25
+      cached_input_usd: 0.15
+      output_usd: 4.25
+      verified: true
+      source: "https://www.baseten.co/library/muse-spark-open/ (fetched 2026-10-29)"
+
+# Which profile a task category prefers, and the ONE fallback if that profile is unavailable
+# (missing key, BUDGET_EXHAUSTED, or MODEL_UNAVAILABLE). A fallback is always labeled in the
+# evidence event that used it - never silent.
+routing:
+  patch_generation: {primary: baseten_spark_open, fallback: nvidia_glimmer}
+  diagnosis: {primary: baseten_spark_open, fallback: nvidia_glimmer}
+  investigation: {primary: baseten_spark_open, fallback: nvidia_glimmer}
+  scan_plan: {primary: nvidia_glimmer, fallback: baseten_spark_open}
+  scan_explain: {primary: nvidia_glimmer, fallback: baseten_spark_open}
+
+# Hard spend guard (baseten_spark_open only; nvidia_glimmer has no published price to guard).
+budget:
+  baseten_spark_open:
+    hard_cap_usd: 70.0
+    warning_usd: 50.0
+    reserved_usd: 30.0   # never spent by experiments; hard_cap - reserved is the usable ceiling

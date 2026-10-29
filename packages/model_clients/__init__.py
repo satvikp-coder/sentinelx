@@ -6,11 +6,25 @@ from .client import CallRecorder, ModelClient
 from .config import PROVIDERS, ModelConfig, load_config
 from .limits import CircuitBreaker, TokenBucket
 from .parsing import OutputError, parse_strict
+from .profiles import (
+    BudgetCheck,
+    ModelsConfig,
+    Profile,
+    RoutedProfile,
+    check_budget,
+    cumulative_spend,
+    estimate_cost,
+    load_models_config,
+    record_usage,
+    resolve_task,
+)
 from .recording import EvidenceRecorder
 from .types import ModelCallStatus, ModelOptions, ModelResult
 
 __all__ = [
-    "PROVIDERS", "CallRecorder", "CassetteMiss", "CassetteStore", "CircuitBreaker",
-    "EvidenceRecorder", "ModelCallStatus", "ModelClient", "ModelConfig", "ModelOptions",
-    "ModelResult", "OutputError", "TokenBucket", "load_config", "parse_strict",
+    "PROVIDERS", "BudgetCheck", "CallRecorder", "CassetteMiss", "CassetteStore",
+    "CircuitBreaker", "EvidenceRecorder", "ModelCallStatus", "ModelClient", "ModelConfig",
+    "ModelOptions", "ModelResult", "ModelsConfig", "OutputError", "Profile", "RoutedProfile",
+    "TokenBucket", "check_budget", "cumulative_spend", "estimate_cost", "load_config",
+    "load_models_config", "parse_strict", "record_usage", "resolve_task",
 ]
