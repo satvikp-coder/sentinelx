@@ -41,6 +41,7 @@ markers = [
   "browser: needs Playwright Chromium (fails loudly when SENTINELX_CI=1 and missing)",
   "docker: needs a running Docker daemon (fails loudly when SENTINELX_CI=1 and it is down)",
   "live: makes ONE tiny real model call; skipped (loudly) when no MODEL_API_KEY is configured",
+  "slow: automatically applied to every browser/docker/live test (see conftest.py); fast dev loop: pytest -m \"not slow\" - CI still runs everything, unmarked",
 ]
 
 [tool.ruff]

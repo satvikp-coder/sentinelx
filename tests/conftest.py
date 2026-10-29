@@ -18,6 +18,14 @@ def pytest_configure(config: pytest.Config) -> None:
     config.live_notes = []  # type: ignore[attr-defined]  # filled by live tests, printed below
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Every browser/docker/live test is also "slow" (no per-test edits needed): the fast dev
+    loop is `pytest -m "not slow"`; CI runs everything, unmarked, as before."""
+    for item in items:
+        if any(item.get_closest_marker(m) for m in ("browser", "docker", "live")):
+            item.add_marker(pytest.mark.slow)
+
+
 @cache
 def browser_ready() -> tuple[bool, str]:
     try:
