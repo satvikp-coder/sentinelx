@@ -78,6 +78,10 @@ def test_summary_counts_for_the_report() -> None:
 
 # ------------------------------------------------------------------ reference isolation
 def test_nothing_under_packages_references_the_reference_copies() -> None:
+    """No package may mention a *_reference copy, ever. `labs[/\\\\]` is the same blanket ban
+    EXCEPT in packages/fixer, which by design (Prompt 9 Part A) reads a lab's OWN source
+    directory from disk - its own, separate static test (test_fixer_safety.py) is what
+    actually proves it never reaches PLANTED.json or a *_reference copy."""
     offenders: list[str] = []
     for path in (ROOT / "packages").rglob("*"):
         if not path.is_file() or path.suffix in {".pyc", ".db"} or "__pycache__" in path.parts:
@@ -86,7 +90,12 @@ def test_nothing_under_packages_references_the_reference_copies() -> None:
             text = path.read_text("utf-8")
         except UnicodeDecodeError:
             continue
-        if re.search(r"_reference\b", text) or re.search(r"labs[/\\]", text):
+        if re.search(r"_reference\b", text):
+            offenders.append(str(path.relative_to(ROOT)))
+            continue
+        if "fixer" in path.parts:
+            continue
+        if re.search(r"labs[/\\]", text):
             offenders.append(str(path.relative_to(ROOT)))
     assert offenders == [], f"packages/ must not read lab or reference paths: {offenders}"
 

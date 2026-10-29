@@ -23,8 +23,10 @@ from .models import RepoScope
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LABS_ROOT = REPO_ROOT / "labs"
-# Mirrors apps/labctl.py's own exclusions for what is NOT source (plus PLANTED.json and
-# *_reference, which this module must never read either).
+# Mirrors apps/labctl.py's own exclusions for what is NOT source, plus the lab's ground-truth
+# manifest (named below only to exclude it - this module must never open it; see
+# tests/unit/test_fixer_safety.py). A hand-fixed sibling copy is never touched either: this
+# always copies ONE lab's own directory by name, never a sibling.
 _EXCLUDE = {"node_modules", "data", "__pycache__", ".git", "lab.log", "PLANTED.json"}
 
 
