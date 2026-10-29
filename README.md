@@ -24,7 +24,7 @@ Two sides on one shared evidence and verification core:
 | Verifier (independent assertions) | implemented for Scenario A (ledger-based) |
 | Investigator (evidence-cited) | planned |
 | IncidentTwin containment (EVCS) | planned |
-| Scanner (Site Guard) | authorization gate + GuardedClient implemented (local); scan checks planned |
+| Scanner (Site Guard) | authorization gate + GuardedClient + 11-check catalog + independent verifier + coverage ledger implemented (local); run against the real labs |
 | Fixer | planned |
 | Shield (reverse proxy) | planned |
 | Agent Guard SDK (Python / TypeScript) | planned |
