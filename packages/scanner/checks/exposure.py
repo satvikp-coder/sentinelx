@@ -10,11 +10,34 @@ None of these send a request beyond what `recon.discover()` / `recon.crawl()` al
 
 from __future__ import annotations
 
+import re
+
 from sentinelx.common_schemas import VulnClass
 
 from ..context import ScanContext
 from ..models import Candidate
 from .base import CheckSpec, candidate_id, excerpt, looks_like_a_secret, severity_for
+
+_EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[a-z]{2,}\b", re.IGNORECASE)
+_USER_IDENTIFIER_KEY_RE = re.compile(
+    r'(?i)"(?:user_?id|username|email|account_?id)"\s*:')
+
+
+def _looks_sensitive(ctx: ScanContext, body: str) -> bool:
+    """A generic bar for confirming missing_authentication: the response must look like it
+    carries something worth protecting (credentials/tokens/secrets, an email address, more than
+    one user's identifiers in a JSON-shaped body, or - for a plain HTML listing - two or more of
+    the scanner's OWN known persona usernames, which belong to different accounts), not just any
+    page that happens to sit at a conventional admin/settings-shaped path. A page returning only
+    site-wide, non-personal configuration (a theme name, a public announcement) is
+    reachable-without-login by design, not a finding."""
+    if looks_like_a_secret(body) or _EMAIL_RE.search(body):
+        return True
+    if len(_USER_IDENTIFIER_KEY_RE.findall(body)) >= 2:
+        return True
+    usernames = {p.credentials.username for p in ctx.personas_file.personas if p.credentials}
+    hits = sum(1 for u in usernames if re.search(rf"\b{re.escape(u)}\b", body, re.IGNORECASE))
+    return hits >= 2
 
 FILE_SPEC = CheckSpec(
     id="sensitive_file_exposure", vuln_class=VulnClass.SENSITIVE_FILE_EXPOSURE,
@@ -31,9 +54,12 @@ DEBUG_SPEC = CheckSpec(
 AUTH_SPEC = CheckSpec(
     id="missing_authentication", vuln_class=VulnClass.MISSING_AUTHENTICATION,
     owasp_category="A01:2021 Broken Access Control",
-    preconditions="an admin/settings-shaped conventional path returns real content",
+    preconditions="an admin/settings-shaped conventional path returns content that looks "
+                  "sensitive (a secret-shaped value, an email address, or more than one user's "
+                  "identifiers) with no login",
     safe_strategy="GET an admin/settings path as an anonymous visitor; a redirect to login or a "
-                  "denial is not flagged")
+                  "denial is not flagged, and neither is a page with only non-personal, "
+                  "site-wide content")
 FILE_HINTS = (".env", ".git", ".bak", ".old", "backup", "config")
 DEBUG_HINTS = ("debug", "info", "phpinfo", "server-status")
 
@@ -111,6 +137,6 @@ def run_missing_authentication(ctx: ScanContext) -> list[Candidate]:
     for path, entry in _hits(ctx):
         if any(hint in path.lower() for hint in (*FILE_HINTS, *DEBUG_HINTS)):
             continue
-        if path in ctx.paths.admin_paths:
+        if path in ctx.paths.admin_paths and _looks_sensitive(ctx, str(entry.get("body", ""))):
             out.append(_candidate(AUTH_SPEC, path, entry, None))
     return out

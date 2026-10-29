@@ -58,8 +58,12 @@ def test_node_scan_confirms_the_classes_our_checks_can_find(node_up, conn) -> No
     result = scan("vibe_notes_node", conn)
     assert result.stop_reason == "completed"
     confirmed = {cls for cls, _m, _e in confirmed_set(result)}
+    # missing_authentication is deliberately absent: the Node lab's only admin-shaped path
+    # (GET /api/settings) returns only non-personal site config, so missing_authentication's
+    # sensitivity bar (Prompt 9 Part 0.4) correctly does not confirm it - that path was always
+    # a false positive, not the lab's real (POST-only) planted bug.
     expected = {"sql_injection", "broken_object_authorization", "debug_exposure",
-               "sensitive_file_exposure", "missing_authentication", "permissive_cors",
+               "sensitive_file_exposure", "permissive_cors",
                "security_headers_and_cookies", "verbose_errors"}
     assert expected <= confirmed, expected - confirmed
     rate_limit = next(f for f in result.findings if f.candidate.check_id == "missing_rate_limit")

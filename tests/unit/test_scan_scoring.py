@@ -94,14 +94,28 @@ def test_clean_copy_check_matches_a_specific_planted_item_not_just_its_class() -
     findings_on_reference = [
         finding("sql_injection", sql.method, sql.endpoint, "confirmed", "leaked"),
         finding("reflected_xss", "GET", "/contact.php", "needs_validation", "nv"),
-        # same CLASS as a planted item (permissive_cors), but a DIFFERENT, unrelated endpoint:
-        # this must not count - it says nothing about whether that planted item was fixed
-        finding("permissive_cors", "GET", "/somewhere-not-in-planted", "confirmed", "other"),
+        # same CLASS as a planted item (broken_object_authorization, not application-wide), but
+        # a DIFFERENT, unrelated endpoint: this must not count - it says nothing about whether
+        # that specific planted item was fixed
+        finding("broken_object_authorization", "GET", "/somewhere-not-in-planted", "confirmed",
+               "other"),
     ]
     result = clean_copy_check("vibe_shop_php", findings_on_reference)
     assert result.false_findings_count == 1
     assert {f["finding_id"] for f in result.false_findings} == {"leaked"}
     assert result.false_findings[0]["planted_id"] == sql.id
+
+
+def test_application_wide_classes_match_regardless_of_endpoint() -> None:
+    """security_headers_and_cookies and permissive_cors are typically one piece of global
+    middleware/config in a real app: a confirmed instance anywhere counts, scoring-rule fix
+    from Prompt 9 Part 0.4 (see docs/DECISIONS.md)."""
+    manifest = load_planted("vibe_notes_node")
+    cors = next(w for w in manifest.weaknesses if w.vuln_class == "PERMISSIVE_CORS")
+    assert normalize_endpoint(cors.endpoint) != normalize_endpoint("/")
+    away = finding("permissive_cors", "GET", "/", "confirmed", "away")
+    assert score("vibe_notes_node", [away]).planted_found == [cors.id]
+    assert clean_copy_check("vibe_notes_node", [away]).false_findings_count == 1
 
 
 def test_clean_copy_check_is_zero_on_an_empty_result_set() -> None:

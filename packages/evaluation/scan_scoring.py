@@ -37,6 +37,15 @@ CLASS_MAP: dict[str, str] = {
 }
 _ID_SEGMENT = re.compile(r"/(?:\d+|:[A-Za-z_]+|\{[A-Za-z_]+\})(?=/|$)")
 
+# A small, fixed set of vuln classes whose real-world root cause is typically one piece of
+# global middleware/config, not a single endpoint (missing security headers, permissive CORS):
+# a confirmed instance ANYWHERE in the app is evidence of the same planted weakness, even if the
+# scanner happened to observe it at a different URL than PLANTED.json's one exemplar endpoint.
+# A scoring-side judgment call (see docs/DECISIONS.md), not something PLANTED.json declares.
+APPLICATION_WIDE_CLASSES: frozenset[str] = frozenset({
+    "security_headers_and_cookies", "permissive_cors",
+})
+
 
 def normalize_endpoint(path: str) -> str:
     """Strip the query string and trailing slash, lower-case, and fold any id-shaped segment
@@ -70,6 +79,18 @@ def _endpoints_match(candidate: dict[str, Any], want_endpoint: str, want_method:
     return any(normalize_endpoint(e) == want_endpoint for e in candidate["endpoints"])
 
 
+def _find_match(confirmed: list[dict[str, Any]], used: set[str], want_class: str,
+                want_endpoint: str, want_method: str) -> dict[str, Any] | None:
+    """A confirmed finding matching one planted weakness: by class + endpoint + method, except
+    for APPLICATION_WIDE_CLASSES, which match by class alone (see the constant's docstring)."""
+    if want_class in APPLICATION_WIDE_CLASSES:
+        return next((f for f in confirmed if f["candidate"]["id"] not in used
+                    and f["candidate"]["vuln_class"] == want_class), None)
+    return next((f for f in confirmed if f["candidate"]["id"] not in used
+                and f["candidate"]["vuln_class"] == want_class
+                and _endpoints_match(f["candidate"], want_endpoint, want_method)), None)
+
+
 def score(lab: str, findings: list[dict[str, Any]], labs_root: Path = LABS_ROOT) -> ScoreResult:
     """`findings` is `report["findings"]` from a scan report.json (list of serialized Finding)."""
     manifest = load_planted(lab, labs_root)
@@ -78,10 +99,7 @@ def score(lab: str, findings: list[dict[str, Any]], labs_root: Path = LABS_ROOT)
     used: set[str] = set()
     for w in manifest.weaknesses:
         want_class = CLASS_MAP[w.vuln_class]
-        want_endpoint = normalize_endpoint(w.endpoint)
-        hit = next((f for f in confirmed if f["candidate"]["id"] not in used
-                   and f["candidate"]["vuln_class"] == want_class
-                   and _endpoints_match(f["candidate"], want_endpoint, w.method)), None)
+        hit = _find_match(confirmed, used, want_class, normalize_endpoint(w.endpoint), w.method)
         if hit is not None:
             matched[w.id] = hit["candidate"]["id"]
             used.add(hit["candidate"]["id"])
@@ -130,10 +148,8 @@ def clean_copy_check(lab: str, findings_from_fixed_copy: list[dict[str, Any]],
     confirmed = [f for f in findings_from_fixed_copy if f["verification"]["state"] == "confirmed"]
     false_findings: list[dict[str, Any]] = []
     for w in manifest.weaknesses:
-        want_class, want_endpoint = CLASS_MAP[w.vuln_class], normalize_endpoint(w.endpoint)
-        hit = next((f for f in confirmed
-                   if f["candidate"]["vuln_class"] == want_class
-                   and _endpoints_match(f["candidate"], want_endpoint, w.method)), None)
+        want_class = CLASS_MAP[w.vuln_class]
+        hit = _find_match(confirmed, set(), want_class, normalize_endpoint(w.endpoint), w.method)
         if hit is not None:
             false_findings.append({"planted_id": w.id, "finding_id": hit["candidate"]["id"],
                                    "vuln_class": hit["candidate"]["vuln_class"],
