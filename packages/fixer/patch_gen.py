@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pydantic import BaseModel, ConfigDict, Field
 
 from sentinelx.model_clients import ModelClient, ModelOptions
+from sentinelx.policy.redaction import redact
 
 from .diff_validator import MAX_CHANGED_LINES_DEFAULT, ValidationResult, validate_diff
 from .models import DiagnosedLocation, FixCategory, RepoScope
@@ -58,10 +59,15 @@ class PatchGenResult:
 
 
 def _excerpt(scope: RepoScope, loc: DiagnosedLocation) -> tuple[str, int]:
+    """Redacted before it is ever interpolated into a prompt (CLAUDE.md rule 6). If the
+    diagnosed file itself holds a raw secret value (rare - usually a config file, not the
+    vulnerable endpoint), the model's diff may echo `[REDACTED:secret]` in a context line and
+    fail to apply; that is the correct trade-off (REJECTED/escalated, never silently unsafe)."""
     lines = scope.resolve_in_scope(loc.file).read_text(encoding="utf-8").splitlines()
     start = max(loc.line_start - 1 - EXCERPT_LINES_PAD, 0)
     end = min(loc.line_end + EXCERPT_LINES_PAD, len(lines))
-    return "\n".join(lines[start:end]), start + 1
+    text = str(redact("\n".join(lines[start:end])).value)
+    return text, start + 1
 
 
 def generate_patch(scope: RepoScope, loc: DiagnosedLocation, *, vuln_class: str, method: str,

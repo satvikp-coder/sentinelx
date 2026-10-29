@@ -15,6 +15,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 
 from sentinelx.model_clients import ModelClient, ModelOptions
+from sentinelx.policy.redaction import redact
 
 from .models import DiagnosedLocation, RepoScope
 
@@ -70,14 +71,17 @@ def route_to_file(scope: RepoScope, method: str, endpoint: str) -> str | None:
 
 
 def _excerpt_for_model(scope: RepoScope, file: str, hint_line: int | None) -> tuple[str, int]:
-    """(excerpt text, 1-based line number the excerpt starts at)."""
+    """(excerpt text, 1-based line number the excerpt starts at). Redacted before it is ever
+    interpolated into a prompt (CLAUDE.md rule 6) - a secret-shaped literal already in the
+    lab's own source must not reach the model just because it sits near a diagnosed line."""
     lines = scope.resolve_in_scope(file).read_text(encoding="utf-8").splitlines()
     if hint_line is None:
         start = 0
     else:
         start = max(hint_line - 5, 0)
     end = min(start + EXCERPT_LINES_CAP, len(lines))
-    return "\n".join(lines[start:end]), start + 1
+    text = str(redact("\n".join(lines[start:end])).value)
+    return text, start + 1
 
 
 def diagnose(scope: RepoScope, *, method: str, endpoint: str, param: str | None, summary: str,

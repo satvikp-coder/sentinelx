@@ -123,3 +123,16 @@ def test_quoted_secret_assignment_is_idempotent() -> None:
     once = redact(f"const SECRET = '{FAKE_NODE_SECRET}';").value
     again = redact(once)
     assert again.value == once and again.count == 0
+
+
+def test_quoted_secret_assignment_does_not_cross_into_the_next_array_entry() -> None:
+    """Regression test: a BARE (unquoted) reference to a secret-like constant, immediately
+    followed by `, '<next quoted string>'`, must not be treated as if the constant's name were
+    a quoted key assigning that next string - found via a live model response that echoed a
+    PHP array literal (`'App secret' => APP_SECRET, 'Admin password' => ADMIN_PASSWORD`) and
+    had unrelated entries wrongly redacted."""
+    line = ("'App secret' => APP_SECRET, 'Admin password' => ADMIN_PASSWORD, "
+           "'Session id' => session_id()")
+    res = redact(line)
+    assert res.value == line
+    assert res.count == 0

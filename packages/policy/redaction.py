@@ -64,13 +64,18 @@ _PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
         # `=`/`:`). No leading \b on the secret-like word so it still matches inside a longer
         # identifier such as APP_SECRET or ADMIN_PASSWORD; the trailing \b stops it from matching
         # inside an unrelated word such as SECRETARY. Needs the value under quotes - kv_secret
-        # above already covers the unquoted env-style KEY=value shape.
+        # above already covers the unquoted env-style KEY=value shape. The comma branch REQUIRES
+        # a quote right after the word (only true for a quoted key like 'APP_SECRET', before
+        # define()'s comma); without that requirement, a bare reference such as `=> APP_SECRET,
+        # 'Admin password' => ...` was wrongly treated as "APP_SECRET," assigning the NEXT,
+        # unrelated quoted string - fixed after that exact shape showed up in a live model
+        # response (see docs/DECISIONS.md).
         "quoted_secret_assignment",
         re.compile(
             r"(?i)(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|token)"
-            r"\b([\"']?)(\s*[:=,]\s*)([\"'])" + _NOT_YET + r"([^\"']{6,})\4"
+            r"\b((?:[\"']\s*,\s*|[\"']?\s*[:=]\s*))([\"'])" + _NOT_YET + r"([^\"']{6,})\3"
         ),
-        r"\1\2\3\4[REDACTED:secret]\4",
+        r"\1\2\3[REDACTED:secret]\3",
     ),
 ]
 
