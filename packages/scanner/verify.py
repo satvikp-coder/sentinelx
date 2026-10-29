@@ -25,10 +25,25 @@ _DB_ERROR_RE = re.compile(
     r"SQLSTATE|SQLite3?::|SQLITE_ERROR|no such column|no such table|unrecognized token|"
     r"syntax error(?: near| in)|PDOException|OperationalError|mysql_fetch|ORA-\d{5}|"
     r"org\.postgresql|You have an error in your SQL syntax", re.IGNORECASE)
+# intentionally re-declared here too, independently of packages/scanner/checks/base.py: the
+# shared redactor does not match a QUOTED value (e.g. source code `const SECRET = 'xxx'` or
+# PHP's `define('APP_SECRET', 'xxx')`). No leading `\b`: PHP's `'APP_SECRET'` must still match.
+_QUOTED_SECRET = re.compile(
+    r"(?i)(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|token)\b"
+    r"([\"']?)(\s*[:=,]\s*)([\"'])([^\"']{6,})\4")
+
+
+def _mask_quoted_secret(m: re.Match[str]) -> str:
+    return f"{m.group(1)}{m.group(2)}{m.group(3)}{m.group(4)}[REDACTED:secret]{m.group(4)}"
+
+
+def _looks_like_a_secret(text: str) -> bool:
+    return redact(text).count > 0 or bool(_QUOTED_SECRET.search(text))
 
 
 def _excerpt(text: str) -> str:
-    return str(redact(text[: EXCERPT_LIMIT * 4]).value)[:EXCERPT_LIMIT]
+    masked = _QUOTED_SECRET.sub(_mask_quoted_secret, text)
+    return str(redact(masked[: EXCERPT_LIMIT * 4]).value)[:EXCERPT_LIMIT]
 
 
 def _replace_query_param(path_and_query: str, name: str, value: str) -> str:
@@ -136,7 +151,7 @@ def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret
         return _v("needs_validation", "the re-check request was refused", True)
     if out.status != 200:
         return _v("rejected", f"re-check returned HTTP {out.status}, not 200", True)
-    if require_secret and redact(out.text).count == 0:
+    if require_secret and not _looks_like_a_secret(out.text):
         return _v("rejected", "no secret-shaped value on re-check", True,
                             excerpt=_excerpt(out.text))
     return _v("confirmed", "the path is still reachable on re-check", True,
@@ -144,9 +159,10 @@ def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret
 
 
 def _verify_static_secret(ctx: ScanContext, c: Candidate) -> Verification:
-    """Static findings (already-crawled script text) have no live endpoint to re-request;
-    re-derive the redaction independently from the stored excerpt instead."""
-    if redact(c.excerpt).count == 0:
+    """Static findings (already-crawled script text) have no live endpoint to re-request; check
+    the stored excerpt for a `[REDACTED:...]` marker - the excerpt is already redacted at
+    creation time, so that marker IS the proof a secret-shaped value was there."""
+    if "[REDACTED:" not in c.excerpt:
         return _v("needs_validation", "the stored excerpt no longer shows a "
                             "secret-shaped value (it may have been truncated)", fresh_session=True)
     return _v("confirmed", "a secret-shaped value is present in the static excerpt",

@@ -8,6 +8,7 @@ independent, minimal proof in a fresh session."""
 from __future__ import annotations
 
 import itertools
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -19,6 +20,25 @@ from ..context import ScanContext
 from ..models import Candidate, Endpoint
 
 EXCERPT_LIMIT = 300
+
+# sentinelx.policy.redaction's "kv_secret" pattern deliberately does not match a QUOTED value
+# (it stops at `"`/`'`), so it never sees source code like `const SECRET = 'xxx'`,
+# `define('APP_SECRET', 'xxx')` or `SECRET: "xxx"`. That module is shared and already tested
+# elsewhere; rather than widen it, this is a narrow, scanner-local supplement used only for
+# building our own excerpts. No leading `\b`: PHP's `'APP_SECRET'` must still match on "SECRET".
+_QUOTED_SECRET = re.compile(
+    r"(?i)(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|token)\b"
+    r"([\"']?)(\s*[:=,]\s*)([\"'])([^\"']{6,})\4")
+
+
+def _mask_quoted_secret(m: re.Match[str]) -> str:
+    return f"{m.group(1)}{m.group(2)}{m.group(3)}{m.group(4)}[REDACTED:secret]{m.group(4)}"
+
+
+def looks_like_a_secret(text: str) -> bool:
+    """True if the shared redactor would flag `text`, OR it contains a quoted
+    key="secret-shaped value" assignment the shared redactor is not tuned for."""
+    return redact(text).count > 0 or bool(_QUOTED_SECRET.search(text))
 
 # Fixed rule table: severity depends only on the vulnerability class, never on confidence, never
 # chosen by a model.
@@ -64,8 +84,10 @@ class Check:
 
 
 def excerpt(text: str, *, limit: int = EXCERPT_LIMIT) -> str:
-    """Redact secrets, then truncate. Safe to put in a report or an evidence payload."""
-    return str(redact(text[: limit * 4]).value)[:limit]
+    """Mask quoted secret-shaped assignments, redact everything else, then truncate. Safe to
+    put in a report or an evidence payload."""
+    masked = _QUOTED_SECRET.sub(_mask_quoted_secret, text)
+    return str(redact(masked[: limit * 4]).value)[:limit]
 
 
 _counter = itertools.count(1)

@@ -1,0 +1,137 @@
+{
+  "lab": "vibe_notes_node",
+  "planted_found": [
+    "NODE-01",
+    "NODE-03",
+    "NODE-05",
+    "NODE-06",
+    "NODE-08",
+    "NODE-10"
+  ],
+  "planted_missed": [
+    "NODE-02",
+    "NODE-04",
+    "NODE-07",
+    "NODE-09"
+  ],
+  "overall_recall": {
+    "name": "recall_overall",
+    "numerator": 6,
+    "denominator": 10,
+    "value": 0.6
+  },
+  "per_class_recall": {
+    "BROKEN_OBJECT_AUTHORIZATION": {
+      "name": "recall_BROKEN_OBJECT_AUTHORIZATION",
+      "numerator": 1,
+      "denominator": 1,
+      "value": 1.0
+    },
+    "DEBUG_EXPOSURE": {
+      "name": "recall_DEBUG_EXPOSURE",
+      "numerator": 1,
+      "denominator": 1,
+      "value": 1.0
+    },
+    "HARDCODED_SECRET": {
+      "name": "recall_HARDCODED_SECRET",
+      "numerator": 1,
+      "denominator": 1,
+      "value": 1.0
+    },
+    "INSECURE_HEADERS_COOKIES": {
+      "name": "recall_INSECURE_HEADERS_COOKIES",
+      "numerator": 1,
+      "denominator": 1,
+      "value": 1.0
+    },
+    "MISSING_AUTHENTICATION": {
+      "name": "recall_MISSING_AUTHENTICATION",
+      "numerator": 0,
+      "denominator": 1,
+      "value": 0.0
+    },
+    "NO_RATE_LIMITING": {
+      "name": "recall_NO_RATE_LIMITING",
+      "numerator": 0,
+      "denominator": 1,
+      "value": 0.0
+    },
+    "PERMISSIVE_CORS": {
+      "name": "recall_PERMISSIVE_CORS",
+      "numerator": 0,
+      "denominator": 1,
+      "value": 0.0
+    },
+    "SQL_INJECTION": {
+      "name": "recall_SQL_INJECTION",
+      "numerator": 1,
+      "denominator": 1,
+      "value": 1.0
+    },
+    "VERBOSE_ERRORS": {
+      "name": "recall_VERBOSE_ERRORS",
+      "numerator": 1,
+      "denominator": 1,
+      "value": 1.0
+    },
+    "XSS_STORED": {
+      "name": "recall_XSS_STORED",
+      "numerator": 0,
+      "denominator": 1,
+      "value": 0.0
+    }
+  },
+  "unmatched_confirmed_for_manual_review": [
+    {
+      "finding_id": "cand_security_headers_and_cookies_0001",
+      "vuln_class": "security_headers_and_cookies",
+      "method": "GET",
+      "endpoint": "/",
+      "summary": "Missing security headers: content-security-policy, x-content-type-options, x-frame-options."
+    },
+    {
+      "finding_id": "cand_missing_authentication_0006",
+      "vuln_class": "missing_authentication",
+      "method": "GET",
+      "endpoint": "/api/settings",
+      "summary": "/api/settings is reachable without authentication."
+    },
+    {
+      "finding_id": "cand_permissive_cors_0007",
+      "vuln_class": "permissive_cors",
+      "method": "GET",
+      "endpoint": "/",
+      "summary": "The synthetic probe origin was reflected in Access-Control-Allow-Origin together with Access-Control-Allow-Credentials: true."
+    },
+    {
+      "finding_id": "cand_broken_object_authorization_0011",
+      "vuln_class": "broken_object_authorization",
+      "method": "GET",
+      "endpoint": "/api/notes/{id}",
+      "summary": "Persona A received persona B's own content at '/api/notes/4' (no ownership check on the object id)."
+    },
+    {
+      "finding_id": "cand_broken_object_authorization_0012",
+      "vuln_class": "broken_object_authorization",
+      "method": "GET",
+      "endpoint": "/api/notes/{id}",
+      "summary": "Persona A received persona B's own content at '/api/notes/6' (no ownership check on the object id)."
+    }
+  ],
+  "needs_validation": 2,
+  "rejected": 0,
+  "coverage_percent": 97.3,
+  "requests_used": 123,
+  "request_budget": 500,
+  "requests_vs_budget": {
+    "name": "requests_vs_budget",
+    "numerator": 123,
+    "denominator": 500,
+    "value": 0.246
+  },
+  "duration_ms": 5063.8,
+  "stop_reason": "completed",
+  "clean_copy_false_findings_count": 0,
+  "clean_copy_false_findings": []
+}

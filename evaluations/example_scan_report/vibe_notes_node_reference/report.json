@@ -1,0 +1,439 @@
+{
+  "provenance": {
+    "git_commit": "fa56fce24f7dbff992ec9b99f9fa8465b931017b",
+    "date_utc": "2026-10-29T02:40:22Z",
+    "scanner_version": "scanner-1.0",
+    "profile_name": "lab_default",
+    "profile_version": "lab-default-1",
+    "profile_sha256": "2ac0367ed54103229ba12d6f085d73b3cb1f77fb8357d749283649c3c48a942a",
+    "target_id": "vibe_notes_node_reference",
+    "target_lab": true,
+    "authz_status": "VERIFIED",
+    "session_id": "ses_8d6ce1133b19435fabaa9815bf18dd7f",
+    "coverage_percent": 97.3,
+    "requests_used": 102,
+    "request_budget": 500,
+    "duration_ms": 4126.0,
+    "stop_reason": "completed",
+    "plan_prompt_version": null,
+    "explain_prompt_version": null,
+    "model": {
+      "provider": "none",
+      "model": "none",
+      "mode": "none"
+    }
+  },
+  "plan": {
+    "checks": [
+      "security_headers_and_cookies",
+      "sensitive_file_exposure",
+      "debug_exposure",
+      "missing_authentication",
+      "permissive_cors",
+      "verbose_errors",
+      "sql_injection",
+      "reflected_xss",
+      "broken_object_authorization",
+      "missing_rate_limit",
+      "weak_upload_validation"
+    ],
+    "used_model": false,
+    "note": "no model requested for the plan"
+  },
+  "explain": {
+    "used_model": false,
+    "note": "model not requested for explanations",
+    "count": 0
+  },
+  "skipped_checks": {},
+  "by_vuln_class": {
+    "sensitive_file_exposure": {
+      "needs_validation": 1
+    },
+    "missing_authentication": {
+      "confirmed": 1
+    }
+  },
+  "findings": [
+    {
+      "candidate": {
+        "id": "cand_sensitive_file_exposure_0001",
+        "check_id": "sensitive_file_exposure",
+        "vuln_class": "sensitive_file_exposure",
+        "severity": "high",
+        "confidence": "high",
+        "method": "GET",
+        "endpoint": "/app.js",
+        "endpoints": [
+          "/app.js"
+        ],
+        "param": null,
+        "persona": "anonymous",
+        "summary": "Crawled script/HTML text contains a secret-shaped value.",
+        "evidence_event_ids": [],
+        "excerpt": "// tiny front end: log in, list notes\nlet token = '';\ndocument.getElementById('login').addEventListener('submit', async (e) => {\n  e.preventDefault();\n  const f = new FormData(e.target);\n  const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },\n    body",
+        "proof": {
+          "path": "/app.js",
+          "secret_sha256_12": "5d9f75c44345",
+          "static": true
+        },
+        "behavioral": false
+      },
+      "verification": {
+        "state": "needs_validation",
+        "detail": "the stored excerpt no longer shows a secret-shaped value (it may have been truncated)",
+        "fresh_session": true,
+        "event_ids": [],
+        "excerpt": ""
+      },
+      "explanation": null,
+      "explanation_label": null
+    },
+    {
+      "candidate": {
+        "id": "cand_missing_authentication_0002",
+        "check_id": "missing_authentication",
+        "vuln_class": "missing_authentication",
+        "severity": "high",
+        "confidence": "high",
+        "method": "GET",
+        "endpoint": "/api/settings",
+        "endpoints": [
+          "/api/settings"
+        ],
+        "param": null,
+        "persona": "anonymous",
+        "summary": "/api/settings is reachable without authentication.",
+        "evidence_event_ids": [
+          "evt_b717815e7edf493cbc814b1b3353a562"
+        ],
+        "excerpt": "{\"theme\":\"light\",\"announcement\":\"Welcome to Vibe Notes\"}",
+        "proof": {
+          "path": "/api/settings"
+        },
+        "behavioral": false
+      },
+      "verification": {
+        "state": "confirmed",
+        "detail": "the path is still reachable on re-check",
+        "fresh_session": true,
+        "event_ids": [
+          "evt_8f456d1ae1204ad8b26b131b98bfca43"
+        ],
+        "excerpt": "{\"theme\":\"light\",\"announcement\":\"Welcome to Vibe Notes\"}"
+      },
+      "explanation": null,
+      "explanation_label": null
+    }
+  ],
+  "coverage_ledger": {
+    "rows": [
+      {
+        "check_id": "security_headers_and_cookies",
+        "endpoint": "/",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "security_headers_and_cookies",
+        "endpoint": "/api/login",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/.env",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/.git/HEAD",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/config.php.bak",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/config.php.old",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/config.bak",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/server.js.bak",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/backup/server.js.bak",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sensitive_file_exposure",
+        "endpoint": "/backup.zip",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "debug_exposure",
+        "endpoint": "/debug",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "debug_exposure",
+        "endpoint": "/debug.php",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "debug_exposure",
+        "endpoint": "/info",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "debug_exposure",
+        "endpoint": "/info.php",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "debug_exposure",
+        "endpoint": "/phpinfo.php",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "debug_exposure",
+        "endpoint": "/server-status",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "missing_authentication",
+        "endpoint": "/admin",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "missing_authentication",
+        "endpoint": "/admin.php",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "missing_authentication",
+        "endpoint": "/api/settings",
+        "exercised": true,
+        "persona": "anonymous",
+        "evidence_event_ids": [
+          "evt_b717815e7edf493cbc814b1b3353a562"
+        ],
+        "reason": null
+      },
+      {
+        "check_id": "missing_authentication",
+        "endpoint": "/api/users",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "missing_authentication",
+        "endpoint": "/settings",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "permissive_cors",
+        "endpoint": "/",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "permissive_cors",
+        "endpoint": "/api.php",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "permissive_cors",
+        "endpoint": "/api/notes",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "permissive_cors",
+        "endpoint": "/api/search",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "permissive_cors",
+        "endpoint": "/api/profile",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "permissive_cors",
+        "endpoint": "/search",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "verbose_errors",
+        "endpoint": "/api/login",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sql_injection",
+        "endpoint": "/",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sql_injection",
+        "endpoint": "/api/search",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "sql_injection",
+        "endpoint": "/search",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "reflected_xss",
+        "endpoint": "/",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "reflected_xss",
+        "endpoint": "/api/search",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "reflected_xss",
+        "endpoint": "/search",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "broken_object_authorization",
+        "endpoint": "/api/notes/{id}",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "missing_rate_limit",
+        "endpoint": "/api/login",
+        "exercised": true,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": null
+      },
+      {
+        "check_id": "weak_upload_validation",
+        "endpoint": "(none)",
+        "exercised": false,
+        "persona": null,
+        "evidence_event_ids": [],
+        "reason": "not applicable: no matching endpoint was found"
+      }
+    ]
+  },
+  "limitations": [
+    "Lab-only synthetic targets: non-lab scanning is disabled by the authorization gate.",
+    "The scanner and the labs were authored in the same project: recall measures how well this scanner finds weaknesses planted in OUR OWN labs, not its performance against real sites.",
+    "Behavioural findings (missing_rate_limit) are weaker evidence than a structural reproduction and never reach the 'confirmed' state; they stay 'needs_validation'.",
+    "A confirmed finding that matches no planted class/endpoint is reported separately for manual review; it may be a real, unplanted weakness and is never counted as a false positive automatically.",
+    "No claim of complete coverage is made; the coverage ledger lists every unexercised cell and why.",
+    "The model, when used, only orders/selects checks from the fixed catalog and writes explanations of already-confirmed findings; it never decides what is vulnerable."
+  ]
+}

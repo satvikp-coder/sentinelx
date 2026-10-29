@@ -164,3 +164,20 @@ def test_no_explanation_call_is_made_when_nothing_is_confirmed() -> None:
     client, seen = mock_model(lambda n: {"explanations": []})
     out = model_assist.explain_confirmed([], client)
     assert not out.used_model and seen == []
+
+
+def test_a_quoted_source_code_secret_is_redacted_in_the_excerpt() -> None:
+    """The shared redactor's kv_secret pattern stops at a quote character, so source code like
+    `const SECRET = 'xxx'` or PHP's `define('APP_SECRET', 'xxx')` slips through it unredacted;
+    the scanner must still mask it, without mangling the surrounding quotes."""
+    from sentinelx.scanner.checks.base import excerpt, looks_like_a_secret
+
+    js = "const SECRET = 'labsecret_notes_FAKE_7b21c9e4a05d3f68';"
+    php = "define('APP_SECRET', 'labsecret_shop_FAKE_0f3a9c71d2e84b65');"
+    php2 = "define('ADMIN_PASSWORD', 'labadmin_FAKE_pass_2026');"
+    assert looks_like_a_secret(js) and looks_like_a_secret(php) and looks_like_a_secret(php2)
+    assert excerpt(js) == "const SECRET = '[REDACTED:secret]';"
+    assert excerpt(php) == "define('APP_SECRET', '[REDACTED:secret]');"
+    assert excerpt(php2) == "define('ADMIN_PASSWORD', '[REDACTED:secret]');"
+    assert not looks_like_a_secret("const GREETING = 'hello there';")
+    assert not looks_like_a_secret("const SECRETARY = 'not a secret';")

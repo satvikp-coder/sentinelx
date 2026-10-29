@@ -11,11 +11,10 @@ None of these send a request beyond what `recon.discover()` / `recon.crawl()` al
 from __future__ import annotations
 
 from sentinelx.common_schemas import VulnClass
-from sentinelx.policy.redaction import redact
 
 from ..context import ScanContext
 from ..models import Candidate
-from .base import CheckSpec, candidate_id, excerpt, severity_for
+from .base import CheckSpec, candidate_id, excerpt, looks_like_a_secret, severity_for
 
 FILE_SPEC = CheckSpec(
     id="sensitive_file_exposure", vuln_class=VulnClass.SENSITIVE_FILE_EXPOSURE,
@@ -80,16 +79,14 @@ def run_sensitive_file_exposure(ctx: ScanContext) -> list[Candidate]:
         if not any(hint in path.lower() for hint in FILE_HINTS):
             continue
         body = str(entry.get("body", ""))
-        result = redact(body)
         secret_hash = None
-        if result.count > 0:
+        if looks_like_a_secret(body):
             import hashlib
 
             secret_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()[:12]
         out.append(_candidate(FILE_SPEC, path, entry, secret_hash))
     for url, body in ctx.scripts.items():
-        result = redact(body)
-        if result.count == 0:
+        if not looks_like_a_secret(body):
             continue
         import hashlib
 
