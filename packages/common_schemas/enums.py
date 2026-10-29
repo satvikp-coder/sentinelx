@@ -92,6 +92,22 @@ class Severity(StrEnum):
     CRITICAL = "critical"
 
 
+class VulnClass(StrEnum):
+    """Public OWASP-style names for what the scanner can find (not tied to any lab's files)."""
+
+    SQL_INJECTION = "sql_injection"
+    REFLECTED_XSS = "reflected_xss"
+    BROKEN_OBJECT_AUTHORIZATION = "broken_object_authorization"
+    MISSING_AUTHENTICATION = "missing_authentication"
+    SENSITIVE_FILE_EXPOSURE = "sensitive_file_exposure"
+    MISSING_RATE_LIMIT = "missing_rate_limit"
+    SECURITY_HEADERS_AND_COOKIES = "security_headers_and_cookies"
+    PERMISSIVE_CORS = "permissive_cors"
+    VERBOSE_ERRORS = "verbose_errors"
+    WEAK_UPLOAD_VALIDATION = "weak_upload_validation"
+    DEBUG_EXPOSURE = "debug_exposure"
+
+
 class Mitigation(StrEnum):
     """The ONLY mitigations an investigator may recommend (a catalog, never free text)."""
 

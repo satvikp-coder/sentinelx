@@ -1,0 +1,34 @@
+"""The fixed check catalog. Each entry is one plugin: an id, a `VulnClass`, an OWASP category, its
+preconditions, its safe strategy, and a `run(ctx) -> list[Candidate]` function. A model may only
+pick a subset of these ids (`sentinelx.scanner.model_assist`); it can never add a request, a URL,
+a header or a payload - every request in every check is written by this module's own code."""
+
+from __future__ import annotations
+
+from . import (
+    authz_object,
+    cors,
+    errors,
+    exposure,
+    headers_cookies,
+    injection,
+    rate_limit,
+    upload,
+)
+from .base import Check, CheckSpec
+
+CATALOG: dict[str, Check] = {
+    headers_cookies.SPEC.id: Check(headers_cookies.SPEC, headers_cookies.run),
+    exposure.FILE_SPEC.id: Check(exposure.FILE_SPEC, exposure.run_sensitive_file_exposure),
+    exposure.DEBUG_SPEC.id: Check(exposure.DEBUG_SPEC, exposure.run_debug_exposure),
+    exposure.AUTH_SPEC.id: Check(exposure.AUTH_SPEC, exposure.run_missing_authentication),
+    cors.SPEC.id: Check(cors.SPEC, cors.run),
+    errors.SPEC.id: Check(errors.SPEC, errors.run),
+    injection.SQL_SPEC.id: Check(injection.SQL_SPEC, injection.run_sql_injection),
+    injection.XSS_SPEC.id: Check(injection.XSS_SPEC, injection.run_reflected_xss),
+    authz_object.SPEC.id: Check(authz_object.SPEC, authz_object.run),
+    rate_limit.SPEC.id: Check(rate_limit.SPEC, rate_limit.run),
+    upload.SPEC.id: Check(upload.SPEC, upload.run),
+}
+
+__all__ = ["CATALOG", "Check", "CheckSpec"]

@@ -94,6 +94,8 @@ class Outcome:
     hops: int = 0
     event_id: str | None = None
     headers: dict[str, str] = field(default_factory=dict)
+    set_cookies: list[str] = field(default_factory=list)  # every Set-Cookie header, in order
+    elapsed_ms: float = 0.0
 
     @property
     def text(self) -> str:
@@ -294,7 +296,8 @@ class GuardedClient:
         eid = self._event("SCAN_REQUEST", payload)
         return Outcome(True, "ALLOWED", ALLOW.rule, status=response.status_code,
                        body=b"".join(chunks), truncated=truncated, final_url=url, event_id=eid,
-                       headers={k.lower(): v for k, v in response.headers.items()})
+                       headers={k.lower(): v for k, v in response.headers.items()},
+                       set_cookies=response.headers.get_list("set-cookie"), elapsed_ms=duration)
 
     # ------------------------------------------------------------------ ownership proof
     def fetch_verification_file(self, expected_hash: str) -> tuple[bool, Outcome]:

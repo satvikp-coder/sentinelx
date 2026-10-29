@@ -24,6 +24,7 @@ from .enums import (
     ShieldStatus,
     TargetStatus,
     VerificationStatus,
+    VulnClass,
 )
 from .export import render_schema_files, write_schema_files
 from .models import (

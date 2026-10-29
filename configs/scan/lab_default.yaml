@@ -1,0 +1,29 @@
+# Sentinel X scan profile for LAB targets. Versioned; its hash is recorded in the evidence.
+profile_version: lab-default-1
+name: lab_default
+checks:                          # ids from the fixed catalog (sentinelx.scanner.checks)
+  - security_headers_and_cookies
+  - sensitive_file_exposure
+  - debug_exposure
+  - missing_authentication
+  - permissive_cors
+  - verbose_errors
+  - sql_injection
+  - reflected_xss
+  - broken_object_authorization
+  - missing_rate_limit
+  - weak_upload_validation
+request_budget: 500
+requests_per_second: 25
+burst: 25
+max_depth: 3
+max_pages: 40
+login_burst: 15                  # hard cap for the failed-login behaviour check
+state_changing: true             # declared steps allowed on LAB targets only (see declared_steps)
+declared_steps:
+  - {method: POST, purpose: "persona login with a synthetic account"}
+  - {method: POST, purpose: "failed-login burst for a nonexistent synthetic username (capped)"}
+  - {method: POST, purpose: "inert test-file upload by a synthetic persona (lab only)"}
+  - {method: POST, purpose: "harmless probe value in a form field (sql_injection / reflected_xss checks)"}
+  - {method: POST, purpose: "malformed request to check for verbose error output"}
+personas: [anonymous, user_a, user_b, admin_guesser]

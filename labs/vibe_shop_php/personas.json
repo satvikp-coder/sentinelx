@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "note": "Synthetic lab accounts only. Persona credentials are refused for any non-lab target.",
+  "start_path": "/index.php",
+  "login": {"method": "POST", "path": "/login.php", "encoding": "form",
+            "username_field": "username", "password_field": "password", "token_key": null},
+  "failed_login_username": "ghost_nonexistent",
+  "personas": [
+    {"name": "anonymous", "role": "visitor", "credentials": null},
+    {"name": "user_a", "role": "user", "credentials": {"username": "alice", "password": "alicepass"}},
+    {"name": "user_b", "role": "user", "credentials": {"username": "bob", "password": "bobpass"}},
+    {"name": "admin_guesser", "role": "visitor who looks for admin and debug routes", "credentials": null}
+  ]
+}

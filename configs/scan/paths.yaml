@@ -1,0 +1,32 @@
+# Conventional paths looked at with GET only, as an ordinary visitor. Generic web conventions:
+# nothing here is taken from any lab's ground truth. Versioned with the scan profile.
+version: paths-1
+exposure_paths:          # sensitive-file / debug exposure candidates
+  - /.env
+  - /.git/HEAD
+  - /config.php.bak
+  - /config.php.old
+  - /config.bak
+  - /server.js.bak
+  - /backup/server.js.bak
+  - /backup.zip
+  - /debug
+  - /debug.php
+  - /info
+  - /info.php
+  - /phpinfo.php
+  - /server-status
+  - /robots.txt
+  - /sitemap.xml
+admin_paths:             # state-exposing routes that should need a login
+  - /admin
+  - /admin.php
+  - /api/settings
+  - /api/users
+  - /settings
+api_hints:               # common API/search entry points (GET) with their conventional parameter
+  - {path: /api.php, params: []}
+  - {path: /api/notes, params: []}
+  - {path: /api/search, params: [q]}
+  - {path: /api/profile, params: []}
+  - {path: /search, params: [q]}
