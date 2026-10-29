@@ -10,7 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sentinelx.common_schemas import CheckResult, VerificationStatus, VulnClass
-from sentinelx.model_clients import ModelClient
+from sentinelx.model_clients import (
+    ModelClient,
+    ModelsConfig,
+    check_budget,
+    estimate_cost,
+    record_usage,
+)
 
 from .apply import ApplyError, apply_diff
 from .diagnose import DiagnosedLocation, DiagnosisFailure, diagnose
@@ -54,7 +60,12 @@ def load_scope_record(patch_id: str) -> tuple[str, RepoScope]:
 
 
 def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPolicy,
-           original_findings: list[dict]) -> FixOutcome:
+           original_findings: list[dict], models_config: ModelsConfig | None = None,
+           profile_name: str | None = None) -> FixOutcome:
+    """`models_config`/`profile_name`, if given, make every model call's actual cost get
+    recorded into the `usage` ledger (sentinelx.model_clients.profiles) under that profile, so
+    the hard spend guard sees real fixer spend on the next finding/run - not just the one
+    smoke-test call resolve_task() itself might have budget-checked before this started."""
     candidate = finding["candidate"]
     finding_id, vuln_class = candidate["id"], candidate["vuln_class"]
     policy_entry = policy.for_class(VulnClass(vuln_class))
@@ -64,10 +75,11 @@ def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPo
     patch: PatchGenResult | None = None
     verification: VerificationReport | None = None
     retries = 0
+    model_results: list = []
     try:
         loc_or_fail = diagnose(scope, method=candidate["method"], endpoint=candidate["endpoint"],
                                param=candidate.get("param"), summary=candidate["summary"],
-                               vuln_class=vuln_class, client=client)
+                               vuln_class=vuln_class, client=client, usage_sink=model_results)
         if isinstance(loc_or_fail, DiagnosisFailure):
             ticket_id = escalate(
                 conn, finding_id=finding_id, evidence_event_ids=[],
@@ -83,9 +95,23 @@ def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPo
             text=True).stdout.strip()
 
         while True:
+            if models_config is not None and profile_name is not None:
+                budget = check_budget(conn, models_config, profile_name)
+                if budget.status == "BUDGET_EXHAUSTED":
+                    ticket_id = escalate(
+                        conn, finding_id=finding_id, evidence_event_ids=[],
+                        explanation=f"The {profile_name} budget is exhausted "
+                                   f"(${budget.spent_usd:.2f} >= ${budget.hard_cap_usd:.2f}) - "
+                                   "refused before another model call, not mid-call.",
+                        options=["Wait for the budget period to reset / raise the hard cap.",
+                                "Switch to a different, unexhausted model profile.",
+                                "Have a human write the fix directly."])
+                    return FixOutcome(finding_id, vuln_class, "ESCALATED", ticket_id=ticket_id,
+                                     diagnosis=diag, retries_used=retries)
             patch = generate_patch(scope, diag, vuln_class=vuln_class, method=candidate["method"],
                                    endpoint=candidate["endpoint"], summary=candidate["summary"],
-                                   client=client, allowed_files={diag.file})
+                                   client=client, allowed_files={diag.file},
+                                   usage_sink=model_results)
             verification = None
             if patch.status == "VALIDATED":
                 # each attempt starts from the unpatched baseline, never stacked on a
@@ -116,6 +142,15 @@ def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPo
     finally:
         if outcome is None or outcome.status != "AWAITING_APPROVAL":
             destroy_scope(scope)
+        if models_config is not None and profile_name is not None and model_results:
+            profile = models_config.profiles[profile_name]
+            tokens_in = sum(r.tokens_in for r in model_results)
+            tokens_out = sum(r.tokens_out for r in model_results)
+            cost = estimate_cost(profile, tokens_in, tokens_out)
+            record_usage(conn, session_id=None, profile_name=profile_name,
+                        provider=profile.provider, model=profile.model, tokens_in=tokens_in,
+                        tokens_out=tokens_out, latency_ms=sum(r.latency_ms for r in model_results),
+                        estimated_cost=cost if profile.price_per_1m.verified else None)
 
     if outcome.status == "AWAITING_APPROVAL" and outcome.patch_id and patch:
         _save_scope_record(outcome.patch_id, lab, scope, patch.diff)

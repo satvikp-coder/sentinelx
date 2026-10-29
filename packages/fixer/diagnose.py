@@ -81,7 +81,11 @@ def _excerpt_for_model(scope: RepoScope, file: str, hint_line: int | None) -> tu
 
 
 def diagnose(scope: RepoScope, *, method: str, endpoint: str, param: str | None, summary: str,
-            vuln_class: str, client: ModelClient) -> DiagnosedLocation | DiagnosisFailure:
+            vuln_class: str, client: ModelClient,
+            usage_sink: list | None = None) -> DiagnosedLocation | DiagnosisFailure:
+    """`usage_sink`, if given, gets the raw ModelResult appended - callers that track spend
+    (e.g. the orchestrator) read tokens_in/out off it; this function's own return type never
+    changes, so it is optional and backward compatible."""
     file = route_to_file(scope, method, endpoint)
     if file is None:
         return DiagnosisFailure(f"no file in scope matches {method} {endpoint}")
@@ -107,6 +111,8 @@ def diagnose(scope: RepoScope, *, method: str, endpoint: str, param: str | None,
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     result = client.complete("diagnosis", messages, DiagnoseOutput,
                              options=ModelOptions(max_tokens=512))
+    if usage_sink is not None:
+        usage_sink.append(result)
     total_lines = len(scope.resolve_in_scope(file).read_text(encoding="utf-8").splitlines())
     if not result.ok or result.parsed is None:
         # Fallback: the whole excerpt range, honestly labelled as a fallback, never silent.

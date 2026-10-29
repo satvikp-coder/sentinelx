@@ -69,7 +69,8 @@ def main() -> int:
         for f in confirmed:
             cand = f["candidate"]
             outcome = run_fix(f, lab=args.target, conn=conn, client=client, policy=policy,
-                             original_findings=findings)
+                             original_findings=findings, models_config=models_config,
+                             profile_name=routed.profile_name)
             print(f"{cand['id']} ({cand['vuln_class']}): {outcome.status} "
                  f"patch={outcome.patch_id} ticket={outcome.ticket_id} "
                  f"retries={outcome.retries_used}")

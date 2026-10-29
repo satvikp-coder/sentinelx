@@ -66,7 +66,10 @@ def _excerpt(scope: RepoScope, loc: DiagnosedLocation) -> tuple[str, int]:
 
 def generate_patch(scope: RepoScope, loc: DiagnosedLocation, *, vuln_class: str, method: str,
                    endpoint: str, summary: str, client: ModelClient,
-                   allowed_files: set[str] | None = None) -> PatchGenResult:
+                   allowed_files: set[str] | None = None,
+                   usage_sink: list | None = None) -> PatchGenResult:
+    """`usage_sink`, if given, gets each attempt's raw ModelResult appended (see
+    diagnose.diagnose's docstring for why)."""
     allowed = allowed_files or {loc.file}
     excerpt, excerpt_start = _excerpt(scope, loc)
     feedback = ""
@@ -83,6 +86,8 @@ def generate_patch(scope: RepoScope, loc: DiagnosedLocation, *, vuln_class: str,
                    {"role": "user", "content": user}]
         result = client.complete("patch_generation", messages, PatchGenOutput,
                                  options=ModelOptions(max_tokens=2048))
+        if usage_sink is not None:
+            usage_sink.append(result)
         if not result.ok or result.parsed is None:
             return PatchGenResult("MODEL_UNAVAILABLE", retries_used=attempt,
                                  reasons=[f"{result.status.value}: {result.error or ''}"])
