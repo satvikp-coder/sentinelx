@@ -14,14 +14,24 @@ from sentinelx.common_schemas import VulnClass
 from ..context import ScanContext
 from ..http import Outcome
 from ..models import Candidate, Endpoint
-from .base import CheckSpec, candidate_id, excerpt, pick_sample, set_query_param, severity_for
+from .base import (
+    CheckSpec,
+    candidate_id,
+    excerpt,
+    get_query_param,
+    pick_sample,
+    set_query_param,
+    severity_for,
+)
 
 SQL_SPEC = CheckSpec(
     id="sql_injection", vuln_class=VulnClass.SQL_INJECTION,
     owasp_category="A03:2021 Injection",
     preconditions="a GET parameter or a non-login POST form field is reachable",
     safe_strategy="compare the response to an ordinary value against the response to the same "
-                  "value with one trailing single quote; flag only a database-error signature")
+                  "value with one trailing single quote; flag a database-error signature, or "
+                  "(when the app suppresses error text) the page stopping mid-render where the "
+                  "ordinary value's page completed normally")
 XSS_SPEC = CheckSpec(
     id="reflected_xss", vuln_class=VulnClass.REFLECTED_XSS,
     owasp_category="A03:2021 Injection",
@@ -36,6 +46,16 @@ DB_ERROR_RE = re.compile(
     r"syntax error(?: near| in)|PDOException|OperationalError|mysql_fetch|ORA-\d{5}|"
     r"org\.postgresql|You have an error in your SQL syntax", re.IGNORECASE)
 LOGIN_FIELD_HINTS = ("password",)
+
+
+def _response_incomplete(baseline_text: str, probe_text: str) -> bool:
+    """A safe secondary signal for apps that suppress error text (no DB_ERROR_RE match is
+    possible there): the probe's page stopped rendering before the closing </html> tag that the
+    ordinary value's page reached, and came back shorter overall - consistent with a server-side
+    error being thrown and swallowed partway through the page, not with an ordinary response."""
+    base_lower, probe_lower = baseline_text.lower(), probe_text.lower()
+    return ("</html>" in base_lower and "</html>" not in probe_lower
+            and len(probe_text) < len(baseline_text))
 
 
 def _marker() -> str:
@@ -94,21 +114,31 @@ def run_sql_injection(ctx: ScanContext) -> list[Candidate]:
     out: list[Candidate] = []
     for persona, sample, ep in _get_targets(ctx):
         for param in ep.params:
-            baseline = ctx.get(persona, set_query_param(sample, param, BASELINE_VALUE))
-            probe = ctx.get(persona, set_query_param(sample, param, BASELINE_VALUE + PROBE_SUFFIX))
+            # prefer the value already seen for this param (e.g. a real product id from a
+            # crawled link) over the fixed synthetic BASELINE_VALUE: a param that only accepts
+            # one shape (numeric ids, for example) would otherwise see the synthetic baseline
+            # break in the same way as the probe, hiding the difference between them.
+            base_value = get_query_param(sample, param) or BASELINE_VALUE
+            baseline = ctx.get(persona, set_query_param(sample, param, base_value))
+            probe = ctx.get(persona, set_query_param(sample, param, base_value + PROBE_SUFFIX))
             if not (baseline.allowed and probe.allowed):
                 continue
-            if DB_ERROR_RE.search(probe.text) and not DB_ERROR_RE.search(baseline.text):
+            db_error = DB_ERROR_RE.search(probe.text) and not DB_ERROR_RE.search(baseline.text)
+            incomplete = _response_incomplete(baseline.text, probe.text)
+            if db_error or incomplete:
+                reason = ("produced a database-error signature" if db_error else
+                          "left the page rendering incomplete (it finished normally for the "
+                          "ordinary value)")
                 out.append(Candidate(
                     id=candidate_id(SQL_SPEC.id), check_id=SQL_SPEC.id,
                     vuln_class=SQL_SPEC.vuln_class, severity=severity_for(SQL_SPEC.vuln_class),
                     confidence="medium", method="GET", endpoint=ep.template,
                     endpoints=[ep.template], param=param, persona=persona,
-                    summary=f"Parameter {param!r} of {ep.template} produced a database-error "
-                            "signature when given a value ending in a single quote.",
+                    summary=f"Parameter {param!r} of {ep.template}: a value ending in a single "
+                            f"quote {reason}.",
                     evidence_event_ids=[e for e in [baseline.event_id, probe.event_id] if e],
                     excerpt=excerpt(probe.text),
-                    proof={"sample": sample, "param": param, "baseline": BASELINE_VALUE,
+                    proof={"sample": sample, "param": param, "baseline": base_value,
                           "probe_suffix": PROBE_SUFFIX, "persona": persona}))
     for template, ep in _post_form_targets(ctx):
         for field in ep.params:

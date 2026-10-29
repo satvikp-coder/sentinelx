@@ -97,6 +97,11 @@ def _node_exe() -> str:
 def up(name: str, timeout: float = 90.0) -> Lab:
     lab = get(name)
     if lab.kind == "docker":
+        # the image symlinks its upload directory to /data/uploads, and ./data is bind-mounted
+        # over /data at container start; without this, a fresh/reset ./data has no "uploads"
+        # subfolder yet, so the symlink inside the container points nowhere and Apache serves
+        # every path under it as 403 Forbidden instead of actually storing/serving a file.
+        (lab.data_dir / "uploads").mkdir(parents=True, exist_ok=True)
         r = _run(["docker", "compose", "-p", lab.project, "up", "-d", "--build"], lab.dir,
                  {"SHOP_PORT": str(lab.port)})
         if r.returncode != 0:
