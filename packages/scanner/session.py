@@ -20,6 +20,11 @@ class PersonaCredentialError(PermissionError):
 class PersonaSession:
     persona: Persona
     cookies: dict[str, str] = field(default_factory=dict)
+    # the FULL raw Set-Cookie string last seen per cookie name (flags intact: HttpOnly,
+    # SameSite, ...). `cookies` above is name->value only, for building the Cookie header; it
+    # cannot answer "did this cookie have HttpOnly", so checks that care about flags must use
+    # this instead of reconstructing a fake "name=value" string.
+    raw_set_cookies: dict[str, str] = field(default_factory=dict)
     token: str | None = None
     logged_in: bool = False
 
@@ -39,13 +44,16 @@ class PersonaSession:
         for raw in out.set_cookies:
             pair = raw.split(";", 1)[0]
             name, _, value = pair.partition("=")
-            if not name.strip():
+            name = name.strip()
+            if not name:
                 continue
             low = raw.lower()
             if value == "" or "max-age=0" in low or "expires=thu, 01 jan 1970" in low:
-                self.cookies.pop(name.strip(), None)
+                self.cookies.pop(name, None)
+                self.raw_set_cookies.pop(name, None)
             else:
-                self.cookies[name.strip()] = value
+                self.cookies[name] = value
+                self.raw_set_cookies[name] = raw
 
 
 def new_session(target: TargetAuthorization, persona: Persona) -> PersonaSession:

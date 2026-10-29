@@ -62,7 +62,7 @@ def run(ctx: ScanContext) -> list[Candidate]:
     creds_persona = next((p.name for p in ctx.personas_file.personas if p.credentials), None)
     if creds_persona:
         session = ctx.ensure_persona(creds_persona, fresh=True)  # logging in makes a fresh session
-        problems = _cookie_problems([f"{k}={v}" for k, v in session.cookies.items()])
+        problems = _cookie_problems(list(session.raw_set_cookies.values()))
         if problems:
             out.append(Candidate(
                 id=candidate_id(SPEC.id), check_id=SPEC.id, vuln_class=SPEC.vuln_class,

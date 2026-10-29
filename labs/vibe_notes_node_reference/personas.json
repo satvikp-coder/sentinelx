@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "note": "Synthetic lab accounts only. Persona credentials are refused for any non-lab target.",
+  "start_path": "/",
+  "login": {"method": "POST", "path": "/api/login", "encoding": "json",
+            "username_field": "username", "password_field": "password", "token_key": "token"},
+  "failed_login_username": "ghost_nonexistent",
+  "personas": [
+    {"name": "anonymous", "role": "visitor", "credentials": null},
+    {"name": "user_a", "role": "user", "credentials": {"username": "carol", "password": "carolpass"}},
+    {"name": "user_b", "role": "user", "credentials": {"username": "dave", "password": "davepass"}},
+    {"name": "admin_guesser", "role": "visitor who looks for admin and debug routes", "credentials": null}
+  ]
+}

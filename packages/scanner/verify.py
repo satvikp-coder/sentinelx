@@ -238,11 +238,9 @@ def _verify_headers_cookies(ctx: ScanContext, c: Candidate) -> Verification:
         return _v("rejected", "the headers are present on re-check", True)
     persona = str(c.proof["persona"])
     session = ctx.ensure_persona(persona, fresh=True)
-    cookies = [f"{k}={v}" for k, v in session.cookies.items()]
     hints = ("session", "sid", "phpsessid", "token", "auth")
     still: dict[str, list[str]] = {}
-    for raw in cookies:
-        name = raw.split("=", 1)[0]
+    for name, raw in session.raw_set_cookies.items():
         if not any(h in name.lower() for h in hints):
             continue
         low = raw.lower()

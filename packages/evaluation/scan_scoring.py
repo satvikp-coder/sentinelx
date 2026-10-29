@@ -119,17 +119,27 @@ class CleanCopyResult:
 
 def clean_copy_check(lab: str, findings_from_fixed_copy: list[dict[str, Any]],
                      labs_root: Path = LABS_ROOT) -> CleanCopyResult:
-    """How many CONFIRMED findings of the lab's own planted classes still show up on the
-    hand-fixed reference copy. Should be 0; any hit is reported, not silently dropped."""
+    """Which SPECIFIC planted weaknesses (same vuln_class, endpoint and method as a planted
+    item - the same rule `score()` uses) still reproduce, CONFIRMED, on the hand-fixed reference
+    copy. Should be 0; any hit is reported, not silently dropped.
+
+    This matches each finding to a specific planted item, not merely to its class: a confirmed
+    finding of the same class at an UNRELATED endpoint (e.g. a page that was always meant to be
+    public) is not itself evidence that a fix failed, and is not counted here."""
     manifest = load_planted(lab, labs_root)
-    planted_classes = {CLASS_MAP[w.vuln_class] for w in manifest.weaknesses}
-    false_findings = [
-        {"finding_id": f["candidate"]["id"], "vuln_class": f["candidate"]["vuln_class"],
-         "method": f["candidate"]["method"], "endpoint": f["candidate"]["endpoint"],
-         "summary": f["candidate"]["summary"]}
-        for f in findings_from_fixed_copy
-        if f["verification"]["state"] == "confirmed"
-        and f["candidate"]["vuln_class"] in planted_classes]
+    confirmed = [f for f in findings_from_fixed_copy if f["verification"]["state"] == "confirmed"]
+    false_findings: list[dict[str, Any]] = []
+    for w in manifest.weaknesses:
+        want_class, want_endpoint = CLASS_MAP[w.vuln_class], normalize_endpoint(w.endpoint)
+        hit = next((f for f in confirmed
+                   if f["candidate"]["vuln_class"] == want_class
+                   and _endpoints_match(f["candidate"], want_endpoint, w.method)), None)
+        if hit is not None:
+            false_findings.append({"planted_id": w.id, "finding_id": hit["candidate"]["id"],
+                                   "vuln_class": hit["candidate"]["vuln_class"],
+                                   "method": hit["candidate"]["method"],
+                                   "endpoint": hit["candidate"]["endpoint"],
+                                   "summary": hit["candidate"]["summary"]})
     return CleanCopyResult(lab=lab, false_findings=false_findings)
 
 

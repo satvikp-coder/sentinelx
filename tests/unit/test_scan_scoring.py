@@ -88,15 +88,20 @@ def test_an_any_method_planted_item_matches_either_method(tmp_path) -> None:
     assert get_hit.planted_found == ["F-01"] and post_hit.planted_found == ["F-01"]
 
 
-def test_clean_copy_check_counts_only_the_labs_own_planted_classes() -> None:
+def test_clean_copy_check_matches_a_specific_planted_item_not_just_its_class() -> None:
+    manifest = load_planted("vibe_shop_php")
+    sql = next(w for w in manifest.weaknesses if w.vuln_class == "SQL_INJECTION")
     findings_on_reference = [
-        finding("sql_injection", "GET", "/product.php", "confirmed", "leaked"),
+        finding("sql_injection", sql.method, sql.endpoint, "confirmed", "leaked"),
         finding("reflected_xss", "GET", "/contact.php", "needs_validation", "nv"),
+        # same CLASS as a planted item (permissive_cors), but a DIFFERENT, unrelated endpoint:
+        # this must not count - it says nothing about whether that planted item was fixed
         finding("permissive_cors", "GET", "/somewhere-not-in-planted", "confirmed", "other"),
     ]
     result = clean_copy_check("vibe_shop_php", findings_on_reference)
-    assert result.false_findings_count == 2
-    assert {f["finding_id"] for f in result.false_findings} == {"leaked", "other"}
+    assert result.false_findings_count == 1
+    assert {f["finding_id"] for f in result.false_findings} == {"leaked"}
+    assert result.false_findings[0]["planted_id"] == sql.id
 
 
 def test_clean_copy_check_is_zero_on_an_empty_result_set() -> None:
