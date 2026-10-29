@@ -21,7 +21,7 @@ from .coverage import CoverageLedger, build_ledger
 from .http import GuardedClient, start_scan_session
 from .model_assist import ExplainOutcome, PlanOutcome, explain_confirmed, suggest_plan
 from .models import Candidate, Finding, SiteScanProfile, Verification, load_paths, load_personas
-from .recon import crawl, discover
+from .recon import crawl, discover, probe_api_hints
 from .verify import verify_candidate
 
 FINDING_CANDIDATE_EVENT = "SCAN_FINDING_CANDIDATE"
@@ -81,6 +81,10 @@ def run_scan(target: TargetAuthorization, profile: SiteScanProfile, labs_root: P
         crawl(ctx, persona.name)
         if persona.name == "anonymous":
             discover(ctx, persona.name)
+        elif persona.credentials is not None:
+            # a logged-in persona gets a real, usable sample for the conventional API paths too -
+            # an anonymous-only probe would see nothing but "login required" for most of them
+            probe_api_hints(ctx, persona.name)
 
     plan = (suggest_plan(ctx, profile.checks, client, session_id) if use_model_for_plan
             else PlanOutcome(list(profile.checks), False, "no model requested for the plan"))

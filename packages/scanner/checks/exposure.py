@@ -40,7 +40,7 @@ DEBUG_HINTS = ("debug", "info", "phpinfo", "server-status")
 
 
 def _hits(ctx: ScanContext) -> list[tuple[str, dict[str, object]]]:
-    return [(path, entry["anonymous"]) for path, by_persona in ctx.discovery.items()
+    return [(path, entry) for path, by_persona in ctx.discovery.items()
             if (entry := by_persona.get("anonymous")) and entry.get("real_hit")
             and entry.get("status") == 200]
 

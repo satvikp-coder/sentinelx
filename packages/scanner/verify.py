@@ -38,6 +38,14 @@ def _replace_query_param(path_and_query: str, name: str, value: str) -> str:
     return urlunsplit(("", "", parts.path, urlencode(pairs), ""))
 
 
+def _v(state: str, detail: str, fresh_session: bool, *, event_ids: list[str] | None = None,
+       excerpt: str = "") -> Verification:
+    """`Verification` is a Pydantic model (keyword-only); this lets every verifier below build
+    one with the same short, positional-looking call it would have with a plain dataclass."""
+    return Verification(state=state, detail=detail, fresh_session=fresh_session,  # type: ignore[arg-type]
+                        event_ids=event_ids or [], excerpt=excerpt)
+
+
 def _verify_sql_injection(ctx: ScanContext, c: Candidate) -> Verification:
     proof = c.proof
     if "sample" in proof:
@@ -62,13 +70,13 @@ def _verify_sql_injection(ctx: ScanContext, c: Candidate) -> Verification:
                                headers=headers, reason="independent verification re-check",
                                account=ctx.personas_file.failed_login_username)
     if not (base.allowed and probe.allowed):
-        return Verification("needs_validation", "the re-check request was refused or failed",
+        return _v("needs_validation", "the re-check request was refused or failed",
                             fresh_session=True)
     if _DB_ERROR_RE.search(probe.text) and not _DB_ERROR_RE.search(base.text):
-        return Verification("confirmed", "the database-error signature reproduced", True,
+        return _v("confirmed", "the database-error signature reproduced", True,
                             event_ids=[e for e in [base.event_id, probe.event_id] if e],
                             excerpt=_excerpt(probe.text))
-    return Verification("rejected", "the database-error signature did not reproduce", True,
+    return _v("rejected", "the database-error signature did not reproduce", True,
                         excerpt=_excerpt(probe.text))
 
 
@@ -87,13 +95,13 @@ def _verify_reflected_xss(ctx: ScanContext, c: Candidate) -> Verification:
                                reason="independent verification re-check",
                                account=ctx.personas_file.failed_login_username)
     if not probe.allowed:
-        return Verification("needs_validation", "the re-check request was refused", True)
+        return _v("needs_validation", "the re-check request was refused", True)
     marker = str(proof["marker"])
     if marker in probe.text:
-        return Verification("confirmed", "the marker reflected unencoded again", True,
+        return _v("confirmed", "the marker reflected unencoded again", True,
                             event_ids=[e for e in [probe.event_id] if e],
                             excerpt=_excerpt(probe.text))
-    return Verification("rejected", "the marker was encoded (or absent) on re-check", True,
+    return _v("rejected", "the marker was encoded (or absent) on re-check", True,
                         excerpt=_excerpt(probe.text))
 
 
@@ -108,15 +116,15 @@ def _verify_bola(ctx: ScanContext, c: Candidate) -> Verification:
     b_session = ctx.ensure_persona("user_b", fresh=True)
     b_out = ctx.request_in(b_session, "GET", url)
     if not b_out.allowed or b_out.status != 200:
-        return Verification("needs_validation", "the victim's own re-fetch failed", True)
+        return _v("needs_validation", "the victim's own re-fetch failed", True)
     b_slice = _content_slice(b_out.text)
     a_session = ctx.ensure_persona("user_a", fresh=True)
     a_out = ctx.request_in(a_session, "GET", url)
     if a_out.allowed and a_out.status == 200 and _content_slice(a_out.text) == b_slice:
-        return Verification("confirmed", "persona A still received persona B's content", True,
+        return _v("confirmed", "persona A still received persona B's content", True,
                             event_ids=[e for e in [b_out.event_id, a_out.event_id] if e],
                             excerpt=_excerpt(a_out.text))
-    return Verification("rejected", "persona A no longer receives persona B's content", True)
+    return _v("rejected", "persona A no longer receives persona B's content", True)
 
 
 def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret: bool
@@ -125,13 +133,13 @@ def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret
     session = ctx.ensure_persona("anonymous", fresh=True)
     out = ctx.request_in(session, "GET", path)
     if not out.allowed:
-        return Verification("needs_validation", "the re-check request was refused", True)
+        return _v("needs_validation", "the re-check request was refused", True)
     if out.status != 200:
-        return Verification("rejected", f"re-check returned HTTP {out.status}, not 200", True)
+        return _v("rejected", f"re-check returned HTTP {out.status}, not 200", True)
     if require_secret and redact(out.text).count == 0:
-        return Verification("rejected", "no secret-shaped value on re-check", True,
+        return _v("rejected", "no secret-shaped value on re-check", True,
                             excerpt=_excerpt(out.text))
-    return Verification("confirmed", "the path is still reachable on re-check", True,
+    return _v("confirmed", "the path is still reachable on re-check", True,
                         event_ids=[e for e in [out.event_id] if e], excerpt=_excerpt(out.text))
 
 
@@ -139,9 +147,9 @@ def _verify_static_secret(ctx: ScanContext, c: Candidate) -> Verification:
     """Static findings (already-crawled script text) have no live endpoint to re-request;
     re-derive the redaction independently from the stored excerpt instead."""
     if redact(c.excerpt).count == 0:
-        return Verification("needs_validation", "the stored excerpt no longer shows a "
+        return _v("needs_validation", "the stored excerpt no longer shows a "
                             "secret-shaped value (it may have been truncated)", fresh_session=True)
-    return Verification("confirmed", "a secret-shaped value is present in the static excerpt",
+    return _v("confirmed", "a secret-shaped value is present in the static excerpt",
                         fresh_session=True, excerpt=_excerpt(c.excerpt))
 
 
@@ -190,12 +198,12 @@ def _verify_rate_limit(ctx: ScanContext, c: Candidate) -> Verification:
         if out.event_id:
             event_ids.append(out.event_id)
     if len(statuses) < 2:
-        return Verification("needs_validation", "the re-check burst was refused or too short",
+        return _v("needs_validation", "the re-check burst was refused or too short",
                             True)
     if len({*statuses}) > 1 or any(s in {429, 423} for s in statuses):
-        return Verification("rejected", f"the fresh burst was throttled ({statuses})", True,
+        return _v("rejected", f"the fresh burst was throttled ({statuses})", True,
                             event_ids=event_ids)
-    return Verification("needs_validation",
+    return _v("needs_validation",
                         f"the fresh, capped burst ({len(statuses)} attempts) again showed no "
                         "throttling; this remains behavioural evidence, not a structural proof",
                         True, event_ids=event_ids)
@@ -208,13 +216,13 @@ def _verify_cors(ctx: ScanContext, c: Candidate) -> Verification:
     session = ctx.ensure_persona("anonymous", fresh=True)
     out = ctx.request_in(session, "GET", path, headers={"Origin": PROBE_ORIGIN})
     if not out.allowed:
-        return Verification("needs_validation", "the re-check request was refused", True)
+        return _v("needs_validation", "the re-check request was refused", True)
     allow_origin = out.headers.get("access-control-allow-origin")
     allow_creds = out.headers.get("access-control-allow-credentials", "").lower()
     if allow_origin == PROBE_ORIGIN and allow_creds == "true":
-        return Verification("confirmed", "the probe origin was reflected with credentials again",
+        return _v("confirmed", "the probe origin was reflected with credentials again",
                             True, event_ids=[e for e in [out.event_id] if e])
-    return Verification("rejected", "the probe origin was not reflected on re-check", True)
+    return _v("rejected", "the probe origin was not reflected on re-check", True)
 
 
 def _verify_headers_cookies(ctx: ScanContext, c: Candidate) -> Verification:
@@ -222,12 +230,12 @@ def _verify_headers_cookies(ctx: ScanContext, c: Candidate) -> Verification:
         session = ctx.ensure_persona("anonymous", fresh=True)
         out = ctx.request_in(session, "GET", str(c.proof["path"]))
         if not out.allowed:
-            return Verification("needs_validation", "the re-check request was refused", True)
+            return _v("needs_validation", "the re-check request was refused", True)
         still_missing = [h for h in c.proof["missing_headers"] if h not in out.headers]
         if still_missing:
-            return Verification("confirmed", f"still missing: {still_missing}", True,
+            return _v("confirmed", f"still missing: {still_missing}", True,
                                 event_ids=[e for e in [out.event_id] if e])
-        return Verification("rejected", "the headers are present on re-check", True)
+        return _v("rejected", "the headers are present on re-check", True)
     persona = str(c.proof["persona"])
     session = ctx.ensure_persona(persona, fresh=True)
     cookies = [f"{k}={v}" for k, v in session.cookies.items()]
@@ -242,8 +250,8 @@ def _verify_headers_cookies(ctx: ScanContext, c: Candidate) -> Verification:
         if missing:
             still[name] = missing
     if still:
-        return Verification("confirmed", f"cookie flags still missing: {still}", True)
-    return Verification("rejected", "the cookie flags are present on re-check", True)
+        return _v("confirmed", f"cookie flags still missing: {still}", True)
+    return _v("rejected", "the cookie flags are present on re-check", True)
 
 
 _TRACE_RE = re.compile(
@@ -266,11 +274,11 @@ def _verify_verbose_errors(ctx: ScanContext, c: Candidate) -> Verification:
             reason="independent verification re-check",
             account=ctx.personas_file.failed_login_username)
     if not out.allowed:
-        return Verification("needs_validation", "the re-check request was refused", True)
+        return _v("needs_validation", "the re-check request was refused", True)
     if _TRACE_RE.search(out.text):
-        return Verification("confirmed", "a stack trace or internal path reproduced", True,
+        return _v("confirmed", "a stack trace or internal path reproduced", True,
                             event_ids=[e for e in [out.event_id] if e], excerpt=_excerpt(out.text))
-    return Verification("rejected", "no stack trace or internal path on re-check", True)
+    return _v("rejected", "no stack trace or internal path on re-check", True)
 
 
 def _verify_upload(ctx: ScanContext, c: Candidate) -> Verification:
@@ -280,11 +288,11 @@ def _verify_upload(ctx: ScanContext, c: Candidate) -> Verification:
     session = ctx.ensure_persona("anonymous", fresh=True)
     out = ctx.request_in(session, "GET", served_at)
     if not out.allowed:
-        return Verification("needs_validation", "the re-check request was refused", True)
+        return _v("needs_validation", "the re-check request was refused", True)
     if out.status == 200:
-        return Verification("confirmed", "the uploaded file is still reachable without "
+        return _v("confirmed", "the uploaded file is still reachable without "
                             "authentication", True, event_ids=[e for e in [out.event_id] if e])
-    return Verification("rejected", f"re-check returned HTTP {out.status}, not 200", True)
+    return _v("rejected", f"re-check returned HTTP {out.status}, not 200", True)
 
 
 _VERIFIERS: dict[VulnClass, Callable[[ScanContext, Candidate], Verification]] = {
@@ -305,9 +313,9 @@ _VERIFIERS: dict[VulnClass, Callable[[ScanContext, Candidate], Verification]] = 
 def verify_candidate(ctx: ScanContext, candidate: Candidate) -> Verification:
     fn = _VERIFIERS.get(candidate.vuln_class)
     if fn is None:
-        return Verification("needs_validation", f"no verifier for {candidate.vuln_class}", True)
+        return _v("needs_validation", f"no verifier for {candidate.vuln_class}", True)
     try:
         return fn(ctx, candidate)
     except Exception as exc:  # noqa: BLE001 - a verifier failure is honestly needs_validation
-        return Verification("needs_validation", f"verifier raised {type(exc).__name__}: {exc}",
+        return _v("needs_validation", f"verifier raised {type(exc).__name__}: {exc}",
                             True)

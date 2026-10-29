@@ -1,0 +1,332 @@
+{
+  "rows": [
+    {
+      "check_id": "security_headers_and_cookies",
+      "endpoint": "/",
+      "exercised": true,
+      "persona": "anonymous",
+      "evidence_event_ids": [
+        "evt_6cb302a7ccc8493b9788fafb4e2d2c38"
+      ],
+      "reason": null
+    },
+    {
+      "check_id": "security_headers_and_cookies",
+      "endpoint": "/api/login",
+      "exercised": true,
+      "persona": "user_a",
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/.env",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/.git/HEAD",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/config.php.bak",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/config.php.old",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/config.bak",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/server.js.bak",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/backup/server.js.bak",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sensitive_file_exposure",
+      "endpoint": "/backup.zip",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "debug_exposure",
+      "endpoint": "/debug",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "debug_exposure",
+      "endpoint": "/debug.php",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "debug_exposure",
+      "endpoint": "/info",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "debug_exposure",
+      "endpoint": "/info.php",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "debug_exposure",
+      "endpoint": "/phpinfo.php",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "debug_exposure",
+      "endpoint": "/server-status",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "missing_authentication",
+      "endpoint": "/admin",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "missing_authentication",
+      "endpoint": "/admin.php",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "missing_authentication",
+      "endpoint": "/api/settings",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "missing_authentication",
+      "endpoint": "/api/users",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "missing_authentication",
+      "endpoint": "/settings",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "permissive_cors",
+      "endpoint": "/",
+      "exercised": true,
+      "persona": "anonymous",
+      "evidence_event_ids": [
+        "evt_7cbdcacd2e164cd9988d1cf355b0c13f"
+      ],
+      "reason": null
+    },
+    {
+      "check_id": "permissive_cors",
+      "endpoint": "/api.php",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "permissive_cors",
+      "endpoint": "/api/notes",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "permissive_cors",
+      "endpoint": "/api/search",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "permissive_cors",
+      "endpoint": "/api/profile",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "permissive_cors",
+      "endpoint": "/search",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "verbose_errors",
+      "endpoint": "/api/login",
+      "exercised": true,
+      "persona": "anonymous",
+      "evidence_event_ids": [
+        "evt_bc7e866e7f19437a8a13a5e07bb5069b"
+      ],
+      "reason": null
+    },
+    {
+      "check_id": "sql_injection",
+      "endpoint": "/",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "sql_injection",
+      "endpoint": "/api/search",
+      "exercised": true,
+      "persona": "user_a",
+      "evidence_event_ids": [
+        "evt_a6fd6e22687e49ad851125f9981ab574",
+        "evt_64e863765d524958973027939d869a6e"
+      ],
+      "reason": null
+    },
+    {
+      "check_id": "sql_injection",
+      "endpoint": "/search",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "reflected_xss",
+      "endpoint": "/",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "reflected_xss",
+      "endpoint": "/api/search",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "reflected_xss",
+      "endpoint": "/search",
+      "exercised": true,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": null
+    },
+    {
+      "check_id": "broken_object_authorization",
+      "endpoint": "/api/notes/{id}",
+      "exercised": true,
+      "persona": "user_a",
+      "evidence_event_ids": [
+        "evt_db4b5b59713242d68bd3d81d30a24b74",
+        "evt_9e04c25935c644f792079b3c91f05a3b",
+        "evt_ce4859745e7642a0b6975e3755d22aec",
+        "evt_6133a7d39df74efe8cbf6092bfc0d6bb",
+        "evt_95ef41e125724dfca362052c3a7fee21",
+        "evt_3759b77f04cb4acb8c22f2e1b68d8705"
+      ],
+      "reason": null
+    },
+    {
+      "check_id": "missing_rate_limit",
+      "endpoint": "/api/login",
+      "exercised": true,
+      "persona": "anonymous",
+      "evidence_event_ids": [
+        "evt_8d74eeb8ff0646959af9266491f01f96",
+        "evt_1a9d8e0cf2c64d769d28904e4c6af401",
+        "evt_6332aa7ed57346969a74c8b1ed99ab8c",
+        "evt_066cdc0ca9c4480999688e35cb02b367",
+        "evt_a103c92cddb8416f97e5d2d2cf8a8099",
+        "evt_9e9a5282577e45a4bce4c5565fa178ef",
+        "evt_15eb47cb8fe5459ebc7e68146f943a19",
+        "evt_a469a55b3f824baa91ba5ad71dfaf6e5",
+        "evt_480e811e40a74f59a0fc498bd759d67b",
+        "evt_9f33eaece40a4160b870686ad891d5cc",
+        "evt_0f02a20420f944659db91735751716cc",
+        "evt_3b381987a2414d73b4d40cddc20349e4",
+        "evt_205eb72e45bf47cca4a13c58b738e41a",
+        "evt_c363bbd77e624e2ea439c4fae33262e0",
+        "evt_a513dbbea19a4fc3a4df5598a733d061"
+      ],
+      "reason": null
+    },
+    {
+      "check_id": "weak_upload_validation",
+      "endpoint": "(none)",
+      "exercised": false,
+      "persona": null,
+      "evidence_event_ids": [],
+      "reason": "not applicable: no matching endpoint was found"
+    }
+  ]
+}

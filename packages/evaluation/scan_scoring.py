@@ -117,7 +117,7 @@ class CleanCopyResult:
         return len(self.false_findings)
 
 
-def clean_copy_check(lab: str, findings_on_reference: list[dict[str, Any]],
+def clean_copy_check(lab: str, findings_from_fixed_copy: list[dict[str, Any]],
                      labs_root: Path = LABS_ROOT) -> CleanCopyResult:
     """How many CONFIRMED findings of the lab's own planted classes still show up on the
     hand-fixed reference copy. Should be 0; any hit is reported, not silently dropped."""
@@ -127,7 +127,7 @@ def clean_copy_check(lab: str, findings_on_reference: list[dict[str, Any]],
         {"finding_id": f["candidate"]["id"], "vuln_class": f["candidate"]["vuln_class"],
          "method": f["candidate"]["method"], "endpoint": f["candidate"]["endpoint"],
          "summary": f["candidate"]["summary"]}
-        for f in findings_on_reference
+        for f in findings_from_fixed_copy
         if f["verification"]["state"] == "confirmed"
         and f["candidate"]["vuln_class"] in planted_classes]
     return CleanCopyResult(lab=lab, false_findings=false_findings)

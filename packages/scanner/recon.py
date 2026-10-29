@@ -125,16 +125,28 @@ def crawl(ctx: ScanContext, persona: str) -> int:
                     forms=[f])
         if "json" in ctype:
             expand_collections(ctx, persona, urlsplit(path).path, out.text)
-        scripts = list(parser.scripts)
-        for src in scripts:
+        literals: list[str] = []
+        for src in parser.scripts:
             s_out = ctx.get(persona, urljoin(path, src))
             if s_out.allowed and s_out.status == 200:
                 ctx.scripts[urljoin(path, src)] = s_out.text
-                for lit in API_LITERAL.findall(s_out.text):
-                    _record(ctx, persona, "GET", ctx.base_url + lit, 0, "")
+                literals += API_LITERAL.findall(s_out.text)
         for code in parser.inline_scripts:
-            for lit in API_LITERAL.findall(code):
-                _record(ctx, persona, "GET", ctx.base_url + lit, 0, "")
+            literals += API_LITERAL.findall(code)
+        for lit in dict.fromkeys(literals):
+            if lit in seen:
+                continue
+            seen.add(lit)
+            fetched += 1
+            if fetched >= ctx.profile.max_pages:
+                break
+            lit_out = ctx.get(persona, lit)  # actually fetch it: a literal with no real
+            if not lit_out.allowed:          # request behind it would give checks no sample
+                continue
+            lit_ctype = lit_out.headers.get("content-type", "").split(";")[0]
+            _record(ctx, persona, "GET", ctx.base_url + lit, lit_out.status or 0, lit_ctype)
+            if "json" in lit_ctype:
+                expand_collections(ctx, persona, lit, lit_out.text)
         if depth < ctx.profile.max_depth:
             for href in parser.links:
                 target = urljoin(path, href)
@@ -160,6 +172,13 @@ def discover(ctx: ScanContext, persona: str) -> None:
                 "event_id": out.event_id, "real_hit": hit, "body": out.text[:2000]}
             if hit and out.status == 200:
                 _record(ctx, persona, "GET", ctx.base_url + path, 200, ctype)
+    probe_api_hints(ctx, persona)
+
+
+def probe_api_hints(ctx: ScanContext, persona: str) -> None:
+    """Seed the inventory with the conventional API endpoints from paths.yaml, AS `persona` -
+    an authenticated persona gets a real, usable sample even where an anonymous visitor would
+    just see a login-required response."""
     for hint in ctx.paths.api_hints:
         _hint(ctx, persona, hint)
 
@@ -167,10 +186,11 @@ def discover(ctx: ScanContext, persona: str) -> None:
 def _hint(ctx: ScanContext, persona: str, hint: PathHint) -> None:
     url = hint.path + ("?" + "&".join(f"{p}=test" for p in hint.params) if hint.params else "")
     out = ctx.get(persona, url)
-    if out.allowed and out.status == 200:
+    if out.allowed:  # record it even on e.g. 401: other checks still need the parameter shape
         ctype = out.headers.get("content-type", "").split(";")[0]
-        _record(ctx, persona, "GET", ctx.base_url + url, 200, ctype, params=hint.params)
-        if "json" in ctype:
+        _record(ctx, persona, "GET", ctx.base_url + url, out.status or 0, ctype,
+                params=hint.params)
+        if out.status == 200 and "json" in ctype:
             expand_collections(ctx, persona, hint.path, out.text)
 
 

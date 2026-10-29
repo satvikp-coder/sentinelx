@@ -1,5 +1,6 @@
-"""Scan report: report.json, report.md, coverage-ledger.json. No PLANTED.json / ground truth
-here - scoring against it happens afterwards, in `sentinelx.evaluation.scan_scoring`."""
+"""Scan report: report.json, report.md, coverage-ledger.json. No ground-truth file is read here
+- scoring against a lab's hand-authored weaknesses happens afterwards, and only in
+`sentinelx.evaluation.scan_scoring`, never inside this package."""
 
 from __future__ import annotations
 
