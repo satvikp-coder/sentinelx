@@ -4,8 +4,8 @@
 
 | field | value |
 |---|---|
-| git_commit | fa56fce24f7dbff992ec9b99f9fa8465b931017b |
-| date_utc | 2026-10-29T02:40:22Z |
+| git_commit | 08ab94d3511d5a436f4377b691f833b54f41d52d |
+| date_utc | 2026-10-29T06:40:25Z |
 | scanner_version | scanner-1.0 |
 | profile_name | lab_default |
 | profile_version | lab-default-1 |
@@ -13,11 +13,11 @@
 | target_id | vibe_notes_node_reference |
 | target_lab | True |
 | authz_status | VERIFIED |
-| session_id | ses_8d6ce1133b19435fabaa9815bf18dd7f |
+| session_id | ses_37e1faa77bae4dbaa9c2aa2b6569ea8c |
 | coverage_percent | 97.3 |
 | requests_used | 102 |
 | request_budget | 500 |
-| duration_ms | 4126.0 |
+| duration_ms | 3447.4 |
 | stop_reason | completed |
 | plan_prompt_version | None |
 | explain_prompt_version | None |
