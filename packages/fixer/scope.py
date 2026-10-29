@@ -1,6 +1,6 @@
 """The fixer's repo scope: a disposable, git-initialized copy of ONE lab's own source
 directory. The fixer works ONLY inside this copy; the original lab directory is never written
-to. Never reads labs/*/PLANTED.json or any *_reference directory (see
+to. Never reads the lab's ground-truth manifest or any hand-fixed sibling copy (see
 tests/unit/test_fixer_safety.py for the static check that enforces this)."""
 
 from __future__ import annotations

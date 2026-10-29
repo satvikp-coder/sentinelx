@@ -65,3 +65,8 @@ labs/*/app/uploads/*
 
 # Site Guard scan runs (local; the example report is committed separately)
 evaluations/scan_runs/
+
+# Fix engine runs: scope records point at local temp directories and a local sqlite ledger;
+# the example fix report is committed separately
+evaluations/fix_runs/
+labs_applied/

@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sentinelx.common_schemas import (
+    Actor,
+    ActorRole,
     ApprovalDecision,
     ApprovalRecord,
     EscalationStatus,
@@ -29,7 +31,7 @@ from .verify import VerificationReport
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APPLIED_ROOT = REPO_ROOT / "labs_applied"
-FIXER_ACTOR = "fixer-1"
+FIXER_ACTOR = Actor(id="site_guard_fixer", role=ActorRole.SYSTEM)
 
 
 def start_fix_session(conn, finding_id: str) -> str:
