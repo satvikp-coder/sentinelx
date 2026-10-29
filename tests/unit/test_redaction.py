@@ -80,3 +80,46 @@ def test_idempotent() -> None:
     once = redact(f"x {FAKE_JWT} y password=abc12345").value
     again = redact(once)
     assert again.value == once and again.count == 0
+
+
+FAKE_NODE_SECRET = "labsecret_notes_FAKE_7b21c9e4a05d3f68"
+FAKE_PHP_SECRET = "labsecret_shop_FAKE_abc123456"
+FAKE_ADMIN_PASSWORD = "labadmin_FAKE_pass_2026"
+
+
+@pytest.mark.parametrize(
+    ("source", "secret"),
+    [
+        (f"const SECRET = '{FAKE_NODE_SECRET}';", FAKE_NODE_SECRET),
+        (f'const SECRET = "{FAKE_NODE_SECRET}";', FAKE_NODE_SECRET),
+        (f"let apiKey = '{FAKE_NODE_SECRET}';", FAKE_NODE_SECRET),
+        (f"define('APP_SECRET', '{FAKE_PHP_SECRET}');", FAKE_PHP_SECRET),
+        (f"define('ADMIN_PASSWORD', '{FAKE_ADMIN_PASSWORD}');", FAKE_ADMIN_PASSWORD),
+        (f'{{"password": "{FAKE_NODE_SECRET}"}}', FAKE_NODE_SECRET),
+        (f"token: '{FAKE_NODE_SECRET}'", FAKE_NODE_SECRET),
+    ],
+    ids=["const-single", "const-double", "camelcase-key", "php-define-secret",
+         "php-define-password", "json-password", "object-literal-token"],
+)
+def test_quoted_source_code_assignment_removed(source: str, secret: str) -> None:
+    res = redact(source)
+    assert secret not in res.value
+    assert "[REDACTED:secret]" in res.value
+    assert res.count == 1
+
+
+def test_quoted_secret_assignment_keeps_surrounding_syntax() -> None:
+    res = redact(f"define('APP_SECRET', '{FAKE_PHP_SECRET}');")
+    assert res.value == "define('APP_SECRET', '[REDACTED:secret]');"
+
+
+def test_quoted_secret_assignment_does_not_false_positive_on_secretary() -> None:
+    res = redact('{"role": "secretary", "note": "hello there"}')
+    assert res.value == '{"role": "secretary", "note": "hello there"}'
+    assert res.count == 0
+
+
+def test_quoted_secret_assignment_is_idempotent() -> None:
+    once = redact(f"const SECRET = '{FAKE_NODE_SECRET}';").value
+    again = redact(once)
+    assert again.value == once and again.count == 0

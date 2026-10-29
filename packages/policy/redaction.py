@@ -58,6 +58,20 @@ _PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
         ),
         r"\1\2[REDACTED:secret]",
     ),
+    (
+        # Quoted source-code assignments: const/let/var NAME = "value", object-literal or JSON
+        # key: "value", and PHP define('NAME', 'value') (the separator is `,` there instead of
+        # `=`/`:`). No leading \b on the secret-like word so it still matches inside a longer
+        # identifier such as APP_SECRET or ADMIN_PASSWORD; the trailing \b stops it from matching
+        # inside an unrelated word such as SECRETARY. Needs the value under quotes - kv_secret
+        # above already covers the unquoted env-style KEY=value shape.
+        "quoted_secret_assignment",
+        re.compile(
+            r"(?i)(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|token)"
+            r"\b([\"']?)(\s*[:=,]\s*)([\"'])" + _NOT_YET + r"([^\"']{6,})\4"
+        ),
+        r"\1\2\3\4[REDACTED:secret]\4",
+    ),
 ]
 
 _SYNTHETIC_TOKEN = re.compile(r"synth_tok_[0-9a-f]{8,}")

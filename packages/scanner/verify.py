@@ -25,25 +25,40 @@ _DB_ERROR_RE = re.compile(
     r"SQLSTATE|SQLite3?::|SQLITE_ERROR|no such column|no such table|unrecognized token|"
     r"syntax error(?: near| in)|PDOException|OperationalError|mysql_fetch|ORA-\d{5}|"
     r"org\.postgresql|You have an error in your SQL syntax", re.IGNORECASE)
-# intentionally re-declared here too, independently of packages/scanner/checks/base.py: the
-# shared redactor does not match a QUOTED value (e.g. source code `const SECRET = 'xxx'` or
-# PHP's `define('APP_SECRET', 'xxx')`). No leading `\b`: PHP's `'APP_SECRET'` must still match.
-_QUOTED_SECRET = re.compile(
-    r"(?i)(password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|token)\b"
-    r"([\"']?)(\s*[:=,]\s*)([\"'])([^\"']{6,})\4")
 
 
-def _mask_quoted_secret(m: re.Match[str]) -> str:
-    return f"{m.group(1)}{m.group(2)}{m.group(3)}{m.group(4)}[REDACTED:secret]{m.group(4)}"
+def _response_incomplete(baseline_text: str, probe_text: str) -> bool:
+    # intentionally re-declared here too, independently of the same-named helper in
+    # packages/scanner/checks/injection.py
+    base_lower, probe_lower = baseline_text.lower(), probe_text.lower()
+    return ("</html>" in base_lower and "</html>" not in probe_lower
+            and len(probe_text) < len(baseline_text))
 
 
+# intentionally re-declared here too, independently of _looks_sensitive in
+# packages/scanner/checks/exposure.py
+_EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[a-z]{2,}\b", re.IGNORECASE)
+_USER_IDENTIFIER_KEY_RE = re.compile(r'(?i)"(?:user_?id|username|email|account_?id)"\s*:')
+
+
+def _looks_sensitive(ctx: ScanContext, body: str) -> bool:
+    if _looks_like_a_secret(body) or _EMAIL_RE.search(body):
+        return True
+    if len(_USER_IDENTIFIER_KEY_RE.findall(body)) >= 2:
+        return True
+    usernames = {p.credentials.username for p in ctx.personas_file.personas if p.credentials}
+    hits = sum(1 for u in usernames if re.search(rf"\b{re.escape(u)}\b", body, re.IGNORECASE))
+    return hits >= 2
+# Redaction (unlike the DB-error regex above) is a cross-cutting safety rule, not check logic,
+# so it is deliberately NOT re-declared here: both this module and sentinelx.scanner.checks.base
+# call the one shared sentinelx.policy.redaction.redact, which also masks quoted source-code
+# assignments (`const SECRET = 'xxx'`, PHP's `define('APP_SECRET', 'xxx')`).
 def _looks_like_a_secret(text: str) -> bool:
-    return redact(text).count > 0 or bool(_QUOTED_SECRET.search(text))
+    return redact(text).count > 0
 
 
 def _excerpt(text: str) -> str:
-    masked = _QUOTED_SECRET.sub(_mask_quoted_secret, text)
-    return str(redact(masked[: EXCERPT_LIMIT * 4]).value)[:EXCERPT_LIMIT]
+    return str(redact(text[: EXCERPT_LIMIT * 4]).value)[:EXCERPT_LIMIT]
 
 
 def _replace_query_param(path_and_query: str, name: str, value: str) -> str:
@@ -91,8 +106,14 @@ def _verify_sql_injection(ctx: ScanContext, c: Candidate) -> Verification:
         return _v("confirmed", "the database-error signature reproduced", True,
                             event_ids=[e for e in [base.event_id, probe.event_id] if e],
                             excerpt=_excerpt(probe.text))
-    return _v("rejected", "the database-error signature did not reproduce", True,
-                        excerpt=_excerpt(probe.text))
+    if _response_incomplete(base.text, probe.text):
+        return _v("confirmed",
+                            "the page again stopped rendering before completing, unlike the "
+                            "ordinary value's page", True,
+                            event_ids=[e for e in [base.event_id, probe.event_id] if e],
+                            excerpt=_excerpt(probe.text))
+    return _v("rejected", "neither a database-error signature nor an incomplete page "
+                        "reproduced", True, excerpt=_excerpt(probe.text))
 
 
 def _verify_reflected_xss(ctx: ScanContext, c: Candidate) -> Verification:
@@ -142,8 +163,8 @@ def _verify_bola(ctx: ScanContext, c: Candidate) -> Verification:
     return _v("rejected", "persona A no longer receives persona B's content", True)
 
 
-def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret: bool
-                               ) -> Verification:
+def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret: bool,
+                               require_sensitive: bool = False) -> Verification:
     path = str(c.proof["path"])
     session = ctx.ensure_persona("anonymous", fresh=True)
     out = ctx.request_in(session, "GET", path)
@@ -153,6 +174,10 @@ def _verify_path_still_exposed(ctx: ScanContext, c: Candidate, *, require_secret
         return _v("rejected", f"re-check returned HTTP {out.status}, not 200", True)
     if require_secret and not _looks_like_a_secret(out.text):
         return _v("rejected", "no secret-shaped value on re-check", True,
+                            excerpt=_excerpt(out.text))
+    if require_sensitive and not _looks_sensitive(ctx, out.text):
+        return _v("rejected", "the re-check response does not look sensitive (no secret, "
+                            "email address, or multiple user identifiers)", True,
                             excerpt=_excerpt(out.text))
     return _v("confirmed", "the path is still reachable on re-check", True,
                         event_ids=[e for e in [out.event_id] if e], excerpt=_excerpt(out.text))
@@ -170,7 +195,7 @@ def _verify_static_secret(ctx: ScanContext, c: Candidate) -> Verification:
 
 
 def _verify_missing_auth(ctx: ScanContext, c: Candidate) -> Verification:
-    return _verify_path_still_exposed(ctx, c, require_secret=False)
+    return _verify_path_still_exposed(ctx, c, require_secret=False, require_sensitive=True)
 
 
 def _verify_sensitive_file(ctx: ScanContext, c: Candidate) -> Verification:
