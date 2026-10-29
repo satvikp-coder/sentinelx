@@ -37,6 +37,13 @@ def _cookie_problems(set_cookies: list[str]) -> dict[str, list[str]]:
     return problems
 
 
+def applicable(ctx: ScanContext) -> list[str]:
+    out = [ctx.personas_file.start_path]
+    if any(p.credentials for p in ctx.personas_file.personas):
+        out.append(ctx.personas_file.login.path)
+    return out
+
+
 def run(ctx: ScanContext) -> list[Candidate]:
     out: list[Candidate] = []
     home = ctx.get("anonymous", ctx.personas_file.start_path)

@@ -76,6 +76,20 @@ def _probe_post(ctx: ScanContext, template: str, field: str, value: str) -> Outc
                           "checks)", account=account)
 
 
+def _applicable(ctx: ScanContext) -> list[str]:
+    get_templates = [ep.template for _persona, _sample, ep in _get_targets(ctx)]
+    post_templates = [template for template, _ep in _post_form_targets(ctx)]
+    return list(dict.fromkeys([*get_templates, *post_templates]))
+
+
+def applicable_sql_injection(ctx: ScanContext) -> list[str]:
+    return _applicable(ctx)
+
+
+def applicable_reflected_xss(ctx: ScanContext) -> list[str]:
+    return _applicable(ctx)
+
+
 def run_sql_injection(ctx: ScanContext) -> list[Candidate]:
     out: list[Candidate] = []
     for persona, sample, ep in _get_targets(ctx):

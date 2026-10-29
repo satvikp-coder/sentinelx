@@ -62,6 +62,18 @@ def _candidate(spec: CheckSpec, path: str, entry: dict[str, object], secret_hash
         excerpt=excerpt(body), proof=proof)
 
 
+def applicable_sensitive_file_exposure(ctx: ScanContext) -> list[str]:
+    return [p for p in ctx.paths.exposure_paths if any(h in p.lower() for h in FILE_HINTS)]
+
+
+def applicable_debug_exposure(ctx: ScanContext) -> list[str]:
+    return [p for p in ctx.paths.exposure_paths if any(h in p.lower() for h in DEBUG_HINTS)]
+
+
+def applicable_missing_authentication(ctx: ScanContext) -> list[str]:
+    return list(ctx.paths.admin_paths)
+
+
 def run_sensitive_file_exposure(ctx: ScanContext) -> list[Candidate]:
     out: list[Candidate] = []
     for path, entry in _hits(ctx):

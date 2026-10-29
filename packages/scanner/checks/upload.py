@@ -12,7 +12,7 @@ import re
 from sentinelx.common_schemas import VulnClass
 
 from ..context import ScanContext
-from ..models import Candidate
+from ..models import Candidate, FormInfo
 from .base import CheckSpec, candidate_id, excerpt, severity_for
 
 SPEC = CheckSpec(
@@ -38,11 +38,19 @@ def _multipart(file_field: str, filename: str, content: bytes, content_type: str
     return head + content + tail, f"multipart/form-data; boundary={boundary}"
 
 
+def _upload_forms(ctx: ScanContext) -> list[tuple[str, FormInfo]]:
+    return [(template, form) for (method, template), ep in ctx.inventory.items()
+           if method == "POST" for form in ep.forms if form.has_file]
+
+
+def applicable(ctx: ScanContext) -> list[str]:
+    return list(dict.fromkeys(template for template, _form in _upload_forms(ctx)))
+
+
 def run(ctx: ScanContext) -> list[Candidate]:
     if not (ctx.profile.state_changing and ctx.target.lab):
         return []
-    forms = [(template, form) for (method, template), ep in ctx.inventory.items()
-             if method == "POST" for form in ep.forms if form.has_file]
+    forms = _upload_forms(ctx)
     if not forms:
         return []
     account_persona = next((p for p in ctx.personas_file.personas if p.credentials), None)

@@ -35,6 +35,11 @@ def _content_slice(text: str) -> str:
     return re.sub(r"\s+", " ", body).strip()
 
 
+def applicable(ctx: ScanContext) -> list[str]:
+    return [ep.template for (method, _t), ep in ctx.inventory.items()
+           if method == "GET" and _applies(ep) and ep.samples.get("user_b")]
+
+
 def run(ctx: ScanContext) -> list[Candidate]:
     out: list[Candidate] = []
     for (method, _template), ep in ctx.inventory.items():

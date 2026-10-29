@@ -25,6 +25,14 @@ ID_PARAMS = {"id", "order_id", "product_id", "note_id"}
 MALFORMED_ID = "][()"
 
 
+def applicable(ctx: ScanContext) -> list[str]:
+    out = [ep.template for (method, _t), ep in ctx.inventory.items()
+          if method == "GET" and ID_PARAMS & set(ep.params)]
+    if ctx.personas_file.login.encoding == "json":
+        out.append(ctx.personas_file.login.path)
+    return list(dict.fromkeys(out))
+
+
 def run(ctx: ScanContext) -> list[Candidate]:
     out: list[Candidate] = []
     for (method, _template), ep in ctx.inventory.items():

@@ -51,12 +51,16 @@ class CheckSpec:
 
 
 CheckFn = Callable[[ScanContext], list["Candidate"]]
+ApplicableFn = Callable[[ScanContext], list[str]]
 
 
 @dataclass(frozen=True)
 class Check:
     spec: CheckSpec
     run: CheckFn
+    # endpoint templates (or fixed paths) this check WOULD examine, used only to build the
+    # coverage ledger; it must not make any request of its own
+    applicable: ApplicableFn
 
 
 def excerpt(text: str, *, limit: int = EXCERPT_LIMIT) -> str:

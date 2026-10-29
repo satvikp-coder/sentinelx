@@ -20,12 +20,15 @@ SPEC = CheckSpec(
 PROBE_ORIGIN = "http://sentinelx-cors-probe.invalid"
 
 
+def applicable(ctx: ScanContext) -> list[str]:
+    return list(dict.fromkeys([ctx.personas_file.start_path,
+                              *(h.path for h in ctx.paths.api_hints if h.path in
+                                {t for _, t in ctx.inventory})]))
+
+
 def run(ctx: ScanContext) -> list[Candidate]:
-    candidates = [ctx.personas_file.start_path,
-                 *(h.path for h in ctx.paths.api_hints if h.path in
-                   {t for _, t in ctx.inventory})]
     out: list[Candidate] = []
-    for path in dict.fromkeys(candidates):
+    for path in applicable(ctx):
         probe = ctx.get("anonymous", path, headers={"Origin": PROBE_ORIGIN})
         if not probe.allowed:
             continue

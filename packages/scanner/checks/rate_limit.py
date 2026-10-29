@@ -42,6 +42,10 @@ def _attempt(ctx: ScanContext, username: str, n: int) -> dict[str, object] | Non
     return {"status": out.status, "elapsed_ms": out.elapsed_ms, "event_id": out.event_id}
 
 
+def applicable(ctx: ScanContext) -> list[str]:
+    return [ctx.personas_file.login.path]
+
+
 def run(ctx: ScanContext) -> list[Candidate]:
     username = ctx.personas_file.failed_login_username
     cap = min(HARD_CAP, ctx.profile.login_burst)
