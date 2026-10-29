@@ -62,3 +62,6 @@ labs/*/lab.log
 labs/*/.lab.pid
 labs/*/app/uploads/*
 !labs/*/app/uploads/.gitkeep
+
+# Site Guard scan runs (local; the example report is committed separately)
+evaluations/scan_runs/
