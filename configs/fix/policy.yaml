@@ -1,0 +1,45 @@
+# Fix policy: per scanner vuln_class, the allowed fix_category and whether a deterministic fix
+# is reasonable to AUTO-apply (after independent verification) or whether the right fix depends
+# on a business decision (NEEDS_HUMAN - produces a patch PROPOSAL plus an EscalationTicket,
+# never auto-applied). Written from general, standard security remediation practice; this file
+# must not be derived from, or aligned to, any lab's PLANTED.json (the fixer never reads it).
+policy_version: fix-policy-1
+
+entries:
+  sql_injection:
+    fix_category: parameterized_query
+    decision: AUTO
+  reflected_xss:
+    fix_category: output_encoding
+    decision: AUTO
+  broken_object_authorization:
+    fix_category: ownership_check
+    decision: AUTO
+  missing_authentication:
+    # which roles may call an endpoint is a business decision (could legitimately be public)
+    fix_category: require_auth
+    decision: NEEDS_HUMAN
+  sensitive_file_exposure:
+    fix_category: remove_exposed_file
+    decision: AUTO
+  missing_rate_limit:
+    # the right threshold/window is a business decision, not a deterministic fix
+    fix_category: rate_limit_middleware
+    decision: NEEDS_HUMAN
+  security_headers_and_cookies:
+    fix_category: security_headers
+    decision: AUTO
+  permissive_cors:
+    # which origins are allowed is a business decision
+    fix_category: cors_config
+    decision: NEEDS_HUMAN
+  verbose_errors:
+    fix_category: safe_error_handling
+    decision: AUTO
+  weak_upload_validation:
+    # upload policy (allowed types, size, storage location) is a business decision
+    fix_category: upload_validation
+    decision: NEEDS_HUMAN
+  debug_exposure:
+    fix_category: disable_debug
+    decision: AUTO
