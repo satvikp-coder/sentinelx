@@ -96,3 +96,34 @@ def test_reference_copies_are_not_importable_as_packages_data() -> None:
     assert "_reference" not in pyproject and "labs" not in pyproject.split("[tool.ruff")[0].split(
         "[tool.setuptools")[-1]
     assert json.loads(json.dumps({"ok": True}))["ok"]
+
+
+# ------------------------------------------------------------------ fake secret leakage
+# The exact fake-secret literals planted in the lab source (never real credentials - the
+# strings themselves say "FAKE"). A committed evaluation report containing one of these
+# unredacted means the shared redactor missed a shape; this test exists so that regresses
+# loudly instead of needing a human to notice it in a diff.
+FAKE_SECRET_MARKERS = (
+    "labsecret_shop_FAKE_0f3a9c71d2e84b65",
+    "labsecret_notes_FAKE_7b21c9e4a05d3f68",
+    "labadmin_FAKE_pass_2026",
+)
+
+
+def test_no_committed_evaluation_report_leaks_a_fake_secret_unredacted() -> None:
+    import subprocess
+
+    tracked = subprocess.run(["git", "ls-files", "evaluations"], cwd=ROOT, check=True,
+                             capture_output=True, text=True).stdout.splitlines()
+    offenders: list[str] = []
+    for rel in tracked:
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if any(marker in text for marker in FAKE_SECRET_MARKERS):
+            offenders.append(rel)
+    assert offenders == [], f"unredacted fake secret in committed evaluation report(s): {offenders}"
