@@ -77,9 +77,16 @@ class ScanContext:
         session = self.ensure_persona(persona)
         return request_as(self.client, session, "GET", self.base_url + path, **kwargs)
 
-    def call(self, persona: str, method: str, path: str, *, fresh: bool = False,
-             **kwargs: Any) -> Outcome:
-        session = self.ensure_persona(persona, fresh=fresh)
+    def call(self, persona: str, method: str, path: str, **kwargs: Any) -> Outcome:
+        session = self.ensure_persona(persona)
+        return request_as(self.client, session, method, self.base_url + path, **kwargs)
+
+    def request_in(self, session: PersonaSession, method: str, path: str, **kwargs: Any
+                   ) -> Outcome:
+        """Send one request inside an ALREADY-OPEN session (e.g. one made with
+        `ensure_persona(..., fresh=True)`), without touching the cache. This is how the
+        independent verifier keeps a handful of requests inside the same fresh session instead
+        of logging in again for every single request."""
         return request_as(self.client, session, method, self.base_url + path, **kwargs)
 
     def count_login_failure(self, username: str) -> int:
