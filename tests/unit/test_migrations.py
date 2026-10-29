@@ -8,7 +8,7 @@ from sentinelx.evidence.db import applied_versions, connect, migrate
 EXPECTED_TABLES = {
     "scenarios", "sessions", "actions", "events", "incidents", "branches", "verifications",
     "usage", "audit", "targets", "scan_findings", "patches", "shield_rules", "escalations",
-    "approvals", "schema_migrations",
+    "approvals", "schema_migrations", "budgets",
 }
 
 
@@ -19,9 +19,9 @@ def tables(conn: sqlite3.Connection) -> set[str]:
 
 def test_fresh_database_migrates(tmp_path: Path) -> None:
     conn = connect(tmp_path / "sx.db")
-    assert migrate(conn) == [1, 2]
+    assert migrate(conn) == [1, 2, 3]
     assert EXPECTED_TABLES <= tables(conn)
-    assert applied_versions(conn) == [1, 2]
+    assert applied_versions(conn) == [1, 2, 3]
 
 
 def test_wal_and_foreign_keys_on(tmp_path: Path) -> None:
