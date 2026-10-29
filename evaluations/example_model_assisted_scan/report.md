@@ -4,8 +4,8 @@
 
 | field | value |
 |---|---|
-| git_commit | fa56fce24f7dbff992ec9b99f9fa8465b931017b |
-| date_utc | 2026-10-29T02:39:12Z |
+| git_commit | 385dae6aa0c7c812ba6f9ab056a25288ed22b53c |
+| date_utc | 2026-10-29T08:31:08Z |
 | scanner_version | scanner-1.0 |
 | profile_name | lab_default |
 | profile_version | lab-default-1 |
@@ -13,11 +13,11 @@
 | target_id | vibe_notes_node |
 | target_lab | True |
 | authz_status | VERIFIED |
-| session_id | ses_e174a1a1313346a3aea76bf053e8af53 |
+| session_id | ses_83e7cf10a24c4e13bb2069b9d47f9782 |
 | coverage_percent | 97.3 |
 | requests_used | 123 |
 | request_budget | 500 |
-| duration_ms | 25347.5 |
+| duration_ms | 133680.2 |
 | stop_reason | completed |
 | plan_prompt_version | scan_prompt_v1 |
 | explain_prompt_version | explain_prompt_v1 |
@@ -32,10 +32,10 @@
 | debug_exposure | 1 | 0 | 0 |
 | missing_authentication | 1 | 0 | 0 |
 | broken_object_authorization | 3 | 0 | 0 |
-| missing_rate_limit | 0 | 1 | 0 |
 | permissive_cors | 1 | 0 | 0 |
-| sql_injection | 1 | 0 | 0 |
 | verbose_errors | 1 | 0 | 0 |
+| missing_rate_limit | 0 | 1 | 0 |
+| sql_injection | 1 | 0 | 0 |
 
 ## Coverage: 97.3%
 

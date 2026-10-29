@@ -1,7 +1,7 @@
 {
   "provenance": {
-    "git_commit": "fa56fce24f7dbff992ec9b99f9fa8465b931017b",
-    "date_utc": "2026-10-29T02:39:12Z",
+    "git_commit": "385dae6aa0c7c812ba6f9ab056a25288ed22b53c",
+    "date_utc": "2026-10-29T08:31:08Z",
     "scanner_version": "scanner-1.0",
     "profile_name": "lab_default",
     "profile_version": "lab-default-1",
@@ -9,11 +9,11 @@
     "target_id": "vibe_notes_node",
     "target_lab": true,
     "authz_status": "VERIFIED",
-    "session_id": "ses_e174a1a1313346a3aea76bf053e8af53",
+    "session_id": "ses_83e7cf10a24c4e13bb2069b9d47f9782",
     "coverage_percent": 97.3,
     "requests_used": 123,
     "request_budget": 500,
-    "duration_ms": 25347.5,
+    "duration_ms": 133680.2,
     "stop_reason": "completed",
     "plan_prompt_version": "scan_prompt_v1",
     "explain_prompt_version": "explain_prompt_v1",
@@ -30,11 +30,12 @@
       "debug_exposure",
       "missing_authentication",
       "broken_object_authorization",
-      "missing_rate_limit",
       "permissive_cors",
+      "verbose_errors",
+      "missing_rate_limit",
       "reflected_xss",
       "sql_injection",
-      "verbose_errors"
+      "weak_upload_validation"
     ],
     "used_model": true,
     "note": "model-ordered subset of the profile's own checks"
@@ -62,16 +63,16 @@
     "broken_object_authorization": {
       "confirmed": 3
     },
-    "missing_rate_limit": {
-      "needs_validation": 1
-    },
     "permissive_cors": {
       "confirmed": 1
     },
-    "sql_injection": {
+    "verbose_errors": {
       "confirmed": 1
     },
-    "verbose_errors": {
+    "missing_rate_limit": {
+      "needs_validation": 1
+    },
+    "sql_injection": {
       "confirmed": 1
     }
   },
@@ -90,13 +91,14 @@
         ],
         "param": null,
         "persona": "anonymous",
-        "summary": "/backup/server.js.bak is reachable without authentication.",
+        "summary": "/backup/server.js.bak is reachable without authentication and appears to contain a secret-shaped value.",
         "evidence_event_ids": [
-          "evt_74923e49409d4459bec3e74624c1a655"
+          "evt_1813f934fced4f778a9efd0053d9d176"
         ],
-        "excerpt": "// old copy of server.js left in the public folder\nconst SECRET = 'labsecret_notes_FAKE_7b21c9e4a05d3f68';\nconst ADMIN_PASSWORD = 'labadmin_FAKE_pass_2026';\n",
+        "excerpt": "// old copy of server.js left in the public folder\nconst SECRET = '[REDACTED:secret]';\nconst ADMIN_PASSWORD = '[REDACTED:secret]';\n",
         "proof": {
-          "path": "/backup/server.js.bak"
+          "path": "/backup/server.js.bak",
+          "secret_sha256_12": "1fbf45f832e7"
         },
         "behavioral": false
       },
@@ -105,11 +107,11 @@
         "detail": "the path is still reachable on re-check",
         "fresh_session": true,
         "event_ids": [
-          "evt_d1d74918ecdd4068aa960febb4138006"
+          "evt_b792d6201c71403a9ab29e05a0c83dc0"
         ],
-        "excerpt": "// old copy of server.js left in the public folder\nconst SECRET = 'labsecret_notes_FAKE_7b21c9e4a05d3f68';\nconst ADMIN_PASSWORD = 'labadmin_FAKE_pass_2026';\n"
+        "excerpt": "// old copy of server.js left in the public folder\nconst SECRET = '[REDACTED:secret]';\nconst ADMIN_PASSWORD = '[REDACTED:secret]';\n"
       },
-      "explanation": "A backup file containing server code can be viewed by anyone on the internet without logging in. This is high severity because internal code and secrets could be exposed.",
+      "explanation": "A backup file that looks like it may contain a secret can be downloaded by anyone without logging in. This is high severity because secrets could be exposed to the public.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -162,7 +164,7 @@
         "persona": "anonymous",
         "summary": "Missing security headers: content-security-policy, x-content-type-options, x-frame-options.",
         "evidence_event_ids": [
-          "evt_2cf3f56ff63147dfa5280d4e4bc01cd0"
+          "evt_2f6cef595cd54c03bf7872fef5a14fb0"
         ],
         "excerpt": "x-powered-by=Express, access-control-allow-origin=*, access-control-allow-credentials=true, access-control-allow-headers=Authorization, Content-Type, access-control-allow-methods=GET, POST, PUT, DELETE, OPTIONS, accept-ranges=bytes, cache-control=public, max-age=0, last-modified=Tue, 27 Oct 2026 14:",
         "proof": {
@@ -180,11 +182,11 @@
         "detail": "still missing: ['content-security-policy', 'x-content-type-options', 'x-frame-options']",
         "fresh_session": true,
         "event_ids": [
-          "evt_eb5fddd34f5040fcbbb5725d3125adc5"
+          "evt_ae325907cd2540cba7968861f2450e86"
         ],
         "excerpt": ""
       },
-      "explanation": "The site is not sending basic browser safety headers that help prevent common web attacks. This is medium severity as it increases risk but does not directly expose data.",
+      "explanation": "The site is missing common security headers that help stop certain browser-based attacks. This is medium severity, increasing risk but not directly exposing data.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -222,7 +224,7 @@
         "event_ids": [],
         "excerpt": ""
       },
-      "explanation": "The session cookie used to keep users logged in is missing protective flags that limit how browsers send it. This is medium severity because it makes session hijacking easier.",
+      "explanation": "Session cookies are missing flags that help protect them from being read or sent in unsafe ways. This is medium severity and can make account hijacking easier.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -241,9 +243,9 @@
         "persona": "anonymous",
         "summary": "/debug is reachable without authentication.",
         "evidence_event_ids": [
-          "evt_a3720b0591cb4e178e23ec269f0434b4"
+          "evt_1312ddd126124581b07575e7c6ef254e"
         ],
-        "excerpt": "{\"node\":\"v24.12.0\",\"cwd\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\",\"db\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\data\\\\notes.db\",\"secret\":\"labsecret_notes_FAKE_7b21c9e4a05d3f68\",\"env\":{\"AI_AGENT\":\"claude-code_2-1-311_agent\",\"ALLUSERSPROFILE\":\"C:",
+        "excerpt": "{\"node\":\"v24.12.0\",\"cwd\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\",\"db\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\data\\\\notes.db\",\"secret\":\"[REDACTED:secret]\",\"env\":{\"AI_AGENT\":\"claude-code_2-1-311_agent\",\"ALLUSERSPROFILE\":\"C:\\\\ProgramData\",\"APPD",
         "proof": {
           "path": "/debug"
         },
@@ -254,11 +256,11 @@
         "detail": "the path is still reachable on re-check",
         "fresh_session": true,
         "event_ids": [
-          "evt_51be8e06cf4a453f940f770dd83afe98"
+          "evt_c6f41d446c97429fa49f743817771fe5"
         ],
-        "excerpt": "{\"node\":\"v24.12.0\",\"cwd\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\",\"db\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\data\\\\notes.db\",\"secret\":\"labsecret_notes_FAKE_7b21c9e4a05d3f68\",\"env\":{\"AI_AGENT\":\"claude-code_2-1-311_agent\",\"ALLUSERSPROFILE\":\"C:"
+        "excerpt": "{\"node\":\"v24.12.0\",\"cwd\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\",\"db\":\"C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\data\\\\notes.db\",\"secret\":\"[REDACTED:secret]\",\"env\":{\"AI_AGENT\":\"claude-code_2-1-311_agent\",\"ALLUSERSPROFILE\":\"C:\\\\ProgramData\",\"APPD"
       },
-      "explanation": "A debug page that is meant for developers is reachable by anyone without authentication. This is high severity because it can leak internal information.",
+      "explanation": "A debug page is accessible without authentication. This is high severity because it can leak internal details to anyone.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -277,7 +279,7 @@
         "persona": "anonymous",
         "summary": "/api/settings is reachable without authentication.",
         "evidence_event_ids": [
-          "evt_e62bf4bdcd664d759202d1aa4bad06dc"
+          "evt_dfdaf65e3180400484f086e75e0b6090"
         ],
         "excerpt": "{\"theme\":\"light\",\"announcement\":\"Welcome to Vibe Notes\"}",
         "proof": {
@@ -290,11 +292,11 @@
         "detail": "the path is still reachable on re-check",
         "fresh_session": true,
         "event_ids": [
-          "evt_8303249563fc44b994790444367fbb02"
+          "evt_b2355983103f4b6d94fc2a5bfcd6e187"
         ],
         "excerpt": "{\"theme\":\"light\",\"announcement\":\"Welcome to Vibe Notes\"}"
       },
-      "explanation": "The settings API endpoint can be accessed without logging in at all. This is high severity because anyone could change settings.",
+      "explanation": "The settings API can be reached without logging in. This is high severity because sensitive actions may be performed by anyone.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -313,8 +315,8 @@
         "persona": "user_a",
         "summary": "Persona A received persona B's own content at '/api/notes/2' (no ownership check on the object id).",
         "evidence_event_ids": [
-          "evt_756899d8a0834a99a5b01cc01dd598ea",
-          "evt_4b5fcaa659904cb19bd21c5db5027e29"
+          "evt_bf0ab02da043496d88a09f69258d3f0c",
+          "evt_2cb6b11916fb455ab15eb9763666c975"
         ],
         "excerpt": "{\"id\":2,\"user_id\":2,\"title\":\"Shopping list\",\"body\":\"Shopping list: item 88 and item 36\"}",
         "proof": {
@@ -329,12 +331,12 @@
         "detail": "persona A still received persona B's content",
         "fresh_session": true,
         "event_ids": [
-          "evt_955e9635e605447a94f78fd044015175",
-          "evt_3020e4ef17914a4b8f01ace6a89dfe39"
+          "evt_b78bc62c6437402ba53c7c49860d916a",
+          "evt_1193a8e64a484715a3210cf76817a209"
         ],
         "excerpt": "{\"id\":2,\"user_id\":2,\"title\":\"Shopping list\",\"body\":\"Shopping list: item 88 and item 36\"}"
       },
-      "explanation": "User A can view User B's private note by changing the note ID in the URL, showing no ownership check. This is high severity because it allows reading other users' data.",
+      "explanation": "One user can view another user's note by changing the note ID, meaning ownership is not checked. This is high severity because private content can be read by other users.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -353,8 +355,8 @@
         "persona": "user_a",
         "summary": "Persona A received persona B's own content at '/api/notes/4' (no ownership check on the object id).",
         "evidence_event_ids": [
-          "evt_ae2250ba30a945878990133995e26d91",
-          "evt_2f7975571a534b2b932408a0f261e6b2"
+          "evt_0d2369a53bf8406a8939a03b6fda65cc",
+          "evt_a497f375f3d540889e3142d69cbaca41"
         ],
         "excerpt": "{\"id\":4,\"user_id\":2,\"title\":\"Book ideas\",\"body\":\"Book ideas: item 92 and item 24\"}",
         "proof": {
@@ -369,12 +371,12 @@
         "detail": "persona A still received persona B's content",
         "fresh_session": true,
         "event_ids": [
-          "evt_febfecd7cef24e7391013124bfb6c629",
-          "evt_7833af7d511e452582f48830ebd26ee7"
+          "evt_f0fcbf6ad09b4eee87783b1e9a4b02d4",
+          "evt_d1fb0bc3241e4b5788aa480704cc9480"
         ],
         "excerpt": "{\"id\":4,\"user_id\":2,\"title\":\"Book ideas\",\"body\":\"Book ideas: item 92 and item 24\"}"
       },
-      "explanation": "User A can view User B's private note by changing the note ID in the URL, showing no ownership check. This is high severity because it allows reading other users' data.",
+      "explanation": "One user can view another user's note by changing the note ID, meaning ownership is not checked. This is high severity because private content can be read by other users.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
@@ -393,8 +395,8 @@
         "persona": "user_a",
         "summary": "Persona A received persona B's own content at '/api/notes/6' (no ownership check on the object id).",
         "evidence_event_ids": [
-          "evt_48676ac74c0349c9a12bcceaaa7a93d2",
-          "evt_f8320353abda4ab5a15c9a163e77266b"
+          "evt_5f47ea1615ea4cd68b5121c4cdf0c717",
+          "evt_e8a643acc96e4052bd3eb6856e795b65"
         ],
         "excerpt": "{\"id\":6,\"user_id\":2,\"title\":\"Recipe draft\",\"body\":\"Recipe draft: item 60 and item 20\"}",
         "proof": {
@@ -409,17 +411,91 @@
         "detail": "persona A still received persona B's content",
         "fresh_session": true,
         "event_ids": [
-          "evt_ae89ee4cc7fb41f99deb80e07bfe81c2",
-          "evt_c8632f62413a44b293a1ca97a5f2ff8d"
+          "evt_57dcdcc77b2c4c5f91e7b36c3f5af273",
+          "evt_c8f14b960a754c168bc000130521f67c"
         ],
         "excerpt": "{\"id\":6,\"user_id\":2,\"title\":\"Recipe draft\",\"body\":\"Recipe draft: item 60 and item 20\"}"
       },
-      "explanation": "User A can view User B's private note by changing the note ID in the URL, showing no ownership check. This is high severity because it allows reading other users' data.",
+      "explanation": "One user can view another user's note by changing the note ID, meaning ownership is not checked. This is high severity because private content can be read by other users.",
       "explanation_label": "MODEL-GENERATED"
     },
     {
       "candidate": {
-        "id": "cand_missing_rate_limit_0010",
+        "id": "cand_permissive_cors_0010",
+        "check_id": "permissive_cors",
+        "vuln_class": "permissive_cors",
+        "severity": "medium",
+        "confidence": "high",
+        "method": "GET",
+        "endpoint": "/",
+        "endpoints": [
+          "/"
+        ],
+        "param": null,
+        "persona": "anonymous",
+        "summary": "The synthetic probe origin was reflected in Access-Control-Allow-Origin together with Access-Control-Allow-Credentials: true.",
+        "evidence_event_ids": [
+          "evt_565a0dee937c4896b0bca5249e192ed7"
+        ],
+        "excerpt": "Access-Control-Allow-Origin: http://sentinelx-cors-probe.invalid",
+        "proof": {
+          "path": "/",
+          "probe_origin": "http://sentinelx-cors-probe.invalid"
+        },
+        "behavioral": false
+      },
+      "verification": {
+        "state": "confirmed",
+        "detail": "the probe origin was reflected with credentials again",
+        "fresh_session": true,
+        "event_ids": [
+          "evt_18037b85ef0f4d7cb41a0311e483608c"
+        ],
+        "excerpt": ""
+      },
+      "explanation": "The site reflects arbitrary origins in CORS while allowing credentials, which can let other sites make authenticated requests. This is medium severity.",
+      "explanation_label": "MODEL-GENERATED"
+    },
+    {
+      "candidate": {
+        "id": "cand_verbose_errors_0011",
+        "check_id": "verbose_errors",
+        "vuln_class": "verbose_errors",
+        "severity": "low",
+        "confidence": "high",
+        "method": "POST",
+        "endpoint": "/api/login",
+        "endpoints": [
+          "/api/login"
+        ],
+        "param": null,
+        "persona": "anonymous",
+        "summary": "A syntactically invalid JSON body to /api/login produced an internal stack trace or file path.",
+        "evidence_event_ids": [
+          "evt_60bb838b70bf4dc98279bdd9b210c7e4"
+        ],
+        "excerpt": "{\"error\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\",\"stack\":\"SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)\\n    at JSON.parse (<anonymous>)\\n    at parse (C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\node_module",
+        "proof": {
+          "path": "/api/login",
+          "malformed_body": "{not valid json"
+        },
+        "behavioral": false
+      },
+      "verification": {
+        "state": "confirmed",
+        "detail": "a stack trace or internal path reproduced",
+        "fresh_session": true,
+        "event_ids": [
+          "evt_3a7fff738af64db7bed1853606b7160a"
+        ],
+        "excerpt": "{\"error\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\",\"stack\":\"SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)\\n    at JSON.parse (<anonymous>)\\n    at parse (C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\node_module"
+      },
+      "explanation": "Sending bad input to the login API causes the server to show internal error details. This is low severity, but it can help an attacker learn about the system.",
+      "explanation_label": "MODEL-GENERATED"
+    },
+    {
+      "candidate": {
+        "id": "cand_missing_rate_limit_0012",
         "check_id": "missing_rate_limit",
         "vuln_class": "missing_rate_limit",
         "severity": "medium",
@@ -433,21 +509,21 @@
         "persona": "anonymous",
         "summary": "15 failed logins for a nonexistent username all behaved identically ([401]): no throttling, lockout or delay observed. This is behavioural evidence, not a structural proof.",
         "evidence_event_ids": [
-          "evt_41db860a53ba4bb8b5189dc489f0f53c",
-          "evt_4a4e80d893ec4b3281d8a03904ec1562",
-          "evt_a1eb1842794049f28d5339131be7c1b1",
-          "evt_636a5a0cec0f4bbf963f808c300a00ec",
-          "evt_a278290dbb894d3482e281634a9d7f62",
-          "evt_00badaf663654914b81b5a30adc4896c",
-          "evt_b90900f3d4ea4001ab657ebe42794336",
-          "evt_15232200d60e4b0aaa4bae7fe496e9ac",
-          "evt_06a6c1cc7d2047748266f87b98e0de89",
-          "evt_0f7c83777a934769986bcaf8fd9aeec3",
-          "evt_7ac4c109e3cf4cab996c640c8279b0dc",
-          "evt_4445b70ee0dd4d85b9bfbaa9d260c4f7",
-          "evt_2756fad99e22428aaa9c451aef87bcca",
-          "evt_1190d957901a48a2a3f274a40abd820b",
-          "evt_3f3962a192774a0e83c57d1a57daa50f"
+          "evt_ea2a5c9f3c18488488b62679579a3cd9",
+          "evt_15d934a1c00f47a3a1e8b3bb9fcb0cd0",
+          "evt_b84a134c07cb4a1480502ec790f44da6",
+          "evt_2e0642ac2fa043a0944970837173fac1",
+          "evt_4aedd79a347d4dd5b0c521e2ba1493ac",
+          "evt_ef77591a0b874ec9ae2e5e67d2bc21f9",
+          "evt_fa42c09c98834a659e43d5082b1b2958",
+          "evt_b228e255acc84319be91dcb8b17e7bee",
+          "evt_30613f1ef0e24e5e8961c6e51c2302c6",
+          "evt_8538065ea98e4c5d868c431c70e47f77",
+          "evt_730d1c552c024638b317a3f98f19d32e",
+          "evt_2d90c90661bd44778cd0e6423989ceff",
+          "evt_958746fc3ee6454f83653ccc7c76a3fe",
+          "evt_e77eebf6967f414c84521199fd1e5e01",
+          "evt_88c7f85dd55d440dac9ef87de84f107e"
         ],
         "excerpt": "[{'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}, {'status': 401}]",
         "proof": {
@@ -464,11 +540,11 @@
         "detail": "the fresh, capped burst (5 attempts) again showed no throttling; this remains behavioural evidence, not a structural proof",
         "fresh_session": true,
         "event_ids": [
-          "evt_1a6b96031de341289bede05c61653dd4",
-          "evt_f87ee41adbf540d199298e4e3c799832",
-          "evt_77870ac647e14ce2ad4ef665b9451c20",
-          "evt_9a0ad81a6cc347d4a341c9d32728b97f",
-          "evt_e6efcadf0bbc4eca8cd806cc5d6762c8"
+          "evt_2f0c7c6e36b84a6a9183384641d32bb6",
+          "evt_dd0eaa1262ff4b4ea1d3f2db23425eb2",
+          "evt_22ffc86c29fa4de8a6f3debe0c7ed67a",
+          "evt_5d2a46b46a7a495ab03e73978bb6e088",
+          "evt_2c94eef99cf0445f9777694ea023f56b"
         ],
         "excerpt": ""
       },
@@ -477,44 +553,7 @@
     },
     {
       "candidate": {
-        "id": "cand_permissive_cors_0011",
-        "check_id": "permissive_cors",
-        "vuln_class": "permissive_cors",
-        "severity": "medium",
-        "confidence": "high",
-        "method": "GET",
-        "endpoint": "/",
-        "endpoints": [
-          "/"
-        ],
-        "param": null,
-        "persona": "anonymous",
-        "summary": "The synthetic probe origin was reflected in Access-Control-Allow-Origin together with Access-Control-Allow-Credentials: true.",
-        "evidence_event_ids": [
-          "evt_6491ff5aa72d411898fd467c57b36b9b"
-        ],
-        "excerpt": "Access-Control-Allow-Origin: http://sentinelx-cors-probe.invalid",
-        "proof": {
-          "path": "/",
-          "probe_origin": "http://sentinelx-cors-probe.invalid"
-        },
-        "behavioral": false
-      },
-      "verification": {
-        "state": "confirmed",
-        "detail": "the probe origin was reflected with credentials again",
-        "fresh_session": true,
-        "event_ids": [
-          "evt_46183d863dd7479097c8476f2e95d9ab"
-        ],
-        "excerpt": ""
-      },
-      "explanation": "The site reflects any requesting origin and allows credentials, which can let untrusted websites interact with user sessions. This is medium severity because it can enable cross-site attacks.",
-      "explanation_label": "MODEL-GENERATED"
-    },
-    {
-      "candidate": {
-        "id": "cand_sql_injection_0012",
+        "id": "cand_sql_injection_0013",
         "check_id": "sql_injection",
         "vuln_class": "sql_injection",
         "severity": "high",
@@ -528,8 +567,8 @@
         "persona": "user_a",
         "summary": "Parameter 'q' of /api/search produced a database-error signature when given a value ending in a single quote.",
         "evidence_event_ids": [
-          "evt_eab35275eae3463c9b47bc82e7fd6693",
-          "evt_21738b1592fe4757916c124090eb5356"
+          "evt_41664feb95f64d0fac35fbfbcbd643a7",
+          "evt_c9dac9ac1a6445b2aa0d0936342faa90"
         ],
         "excerpt": "{\"error\":\"unrecognized token: [REDACTED:secret]\"'\\\"\",\"stack\":\"Error: unrecognized token: [REDACTED:secret]\"'\\\"\\n    at C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\server.js:159:19\\n    at Layer.handle [as handle_request] (C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vib",
         "proof": {
@@ -546,49 +585,12 @@
         "detail": "the database-error signature reproduced",
         "fresh_session": true,
         "event_ids": [
-          "evt_61d19d64efa2413c837a45cae2c2f056",
-          "evt_82cd64449abc4a5497a61e82681d1c32"
+          "evt_7d4ff232086041248588f1b402291f6b",
+          "evt_c954732d1bb4482b9f18bd910951c69d"
         ],
         "excerpt": "{\"error\":\"unrecognized token: [REDACTED:secret]\"'\\\"\",\"stack\":\"Error: unrecognized token: [REDACTED:secret]\"'\\\"\\n    at C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\server.js:159:19\\n    at Layer.handle [as handle_request] (C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vib"
       },
-      "explanation": "The search parameter causes a database error signature when special characters are used, indicating the input is being used unsafely in a database query. This is high severity because it can allow an attacker to manipulate the database.",
-      "explanation_label": "MODEL-GENERATED"
-    },
-    {
-      "candidate": {
-        "id": "cand_verbose_errors_0013",
-        "check_id": "verbose_errors",
-        "vuln_class": "verbose_errors",
-        "severity": "low",
-        "confidence": "high",
-        "method": "POST",
-        "endpoint": "/api/login",
-        "endpoints": [
-          "/api/login"
-        ],
-        "param": null,
-        "persona": "anonymous",
-        "summary": "A syntactically invalid JSON body to /api/login produced an internal stack trace or file path.",
-        "evidence_event_ids": [
-          "evt_d81dd1d10fac49de97d8698d5a471b5f"
-        ],
-        "excerpt": "{\"error\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\",\"stack\":\"SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)\\n    at JSON.parse (<anonymous>)\\n    at parse (C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\node_module",
-        "proof": {
-          "path": "/api/login",
-          "malformed_body": "{not valid json"
-        },
-        "behavioral": false
-      },
-      "verification": {
-        "state": "confirmed",
-        "detail": "a stack trace or internal path reproduced",
-        "fresh_session": true,
-        "event_ids": [
-          "evt_bf5f66fe23fd451a972f98df680d39b1"
-        ],
-        "excerpt": "{\"error\":\"Expected property name or '}' in JSON at position 1 (line 1 column 2)\",\"stack\":\"SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)\\n    at JSON.parse (<anonymous>)\\n    at parse (C:\\\\Users\\\\satvi\\\\Desktop\\\\AI Cybersecurity\\\\labs\\\\vibe_notes_node\\\\node_module"
-      },
-      "explanation": "Sending malformed JSON to the login API returns internal stack traces or file paths to the caller. This is low severity because it leaks internal details that could help an attacker.",
+      "explanation": "The search parameter appears to trigger database errors with certain input, suggesting the query may be built unsafely. This is high severity because it could allow data theft or damage.",
       "explanation_label": "MODEL-GENERATED"
     }
   ],
@@ -600,7 +602,7 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_2cf3f56ff63147dfa5280d4e4bc01cd0"
+          "evt_2f6cef595cd54c03bf7872fef5a14fb0"
         ],
         "reason": null
       },
@@ -666,7 +668,7 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_74923e49409d4459bec3e74624c1a655"
+          "evt_1813f934fced4f778a9efd0053d9d176"
         ],
         "reason": null
       },
@@ -684,7 +686,7 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_a3720b0591cb4e178e23ec269f0434b4"
+          "evt_1312ddd126124581b07575e7c6ef254e"
         ],
         "reason": null
       },
@@ -750,7 +752,7 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_e62bf4bdcd664d759202d1aa4bad06dc"
+          "evt_dfdaf65e3180400484f086e75e0b6090"
         ],
         "reason": null
       },
@@ -776,7 +778,7 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_6491ff5aa72d411898fd467c57b36b9b"
+          "evt_565a0dee937c4896b0bca5249e192ed7"
         ],
         "reason": null
       },
@@ -826,7 +828,7 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_d81dd1d10fac49de97d8698d5a471b5f"
+          "evt_60bb838b70bf4dc98279bdd9b210c7e4"
         ],
         "reason": null
       },
@@ -844,8 +846,8 @@
         "exercised": true,
         "persona": "user_a",
         "evidence_event_ids": [
-          "evt_eab35275eae3463c9b47bc82e7fd6693",
-          "evt_21738b1592fe4757916c124090eb5356"
+          "evt_41664feb95f64d0fac35fbfbcbd643a7",
+          "evt_c9dac9ac1a6445b2aa0d0936342faa90"
         ],
         "reason": null
       },
@@ -887,12 +889,12 @@
         "exercised": true,
         "persona": "user_a",
         "evidence_event_ids": [
-          "evt_756899d8a0834a99a5b01cc01dd598ea",
-          "evt_4b5fcaa659904cb19bd21c5db5027e29",
-          "evt_ae2250ba30a945878990133995e26d91",
-          "evt_2f7975571a534b2b932408a0f261e6b2",
-          "evt_48676ac74c0349c9a12bcceaaa7a93d2",
-          "evt_f8320353abda4ab5a15c9a163e77266b"
+          "evt_bf0ab02da043496d88a09f69258d3f0c",
+          "evt_2cb6b11916fb455ab15eb9763666c975",
+          "evt_0d2369a53bf8406a8939a03b6fda65cc",
+          "evt_a497f375f3d540889e3142d69cbaca41",
+          "evt_5f47ea1615ea4cd68b5121c4cdf0c717",
+          "evt_e8a643acc96e4052bd3eb6856e795b65"
         ],
         "reason": null
       },
@@ -902,31 +904,31 @@
         "exercised": true,
         "persona": "anonymous",
         "evidence_event_ids": [
-          "evt_41db860a53ba4bb8b5189dc489f0f53c",
-          "evt_4a4e80d893ec4b3281d8a03904ec1562",
-          "evt_a1eb1842794049f28d5339131be7c1b1",
-          "evt_636a5a0cec0f4bbf963f808c300a00ec",
-          "evt_a278290dbb894d3482e281634a9d7f62",
-          "evt_00badaf663654914b81b5a30adc4896c",
-          "evt_b90900f3d4ea4001ab657ebe42794336",
-          "evt_15232200d60e4b0aaa4bae7fe496e9ac",
-          "evt_06a6c1cc7d2047748266f87b98e0de89",
-          "evt_0f7c83777a934769986bcaf8fd9aeec3",
-          "evt_7ac4c109e3cf4cab996c640c8279b0dc",
-          "evt_4445b70ee0dd4d85b9bfbaa9d260c4f7",
-          "evt_2756fad99e22428aaa9c451aef87bcca",
-          "evt_1190d957901a48a2a3f274a40abd820b",
-          "evt_3f3962a192774a0e83c57d1a57daa50f"
+          "evt_ea2a5c9f3c18488488b62679579a3cd9",
+          "evt_15d934a1c00f47a3a1e8b3bb9fcb0cd0",
+          "evt_b84a134c07cb4a1480502ec790f44da6",
+          "evt_2e0642ac2fa043a0944970837173fac1",
+          "evt_4aedd79a347d4dd5b0c521e2ba1493ac",
+          "evt_ef77591a0b874ec9ae2e5e67d2bc21f9",
+          "evt_fa42c09c98834a659e43d5082b1b2958",
+          "evt_b228e255acc84319be91dcb8b17e7bee",
+          "evt_30613f1ef0e24e5e8961c6e51c2302c6",
+          "evt_8538065ea98e4c5d868c431c70e47f77",
+          "evt_730d1c552c024638b317a3f98f19d32e",
+          "evt_2d90c90661bd44778cd0e6423989ceff",
+          "evt_958746fc3ee6454f83653ccc7c76a3fe",
+          "evt_e77eebf6967f414c84521199fd1e5e01",
+          "evt_88c7f85dd55d440dac9ef87de84f107e"
         ],
         "reason": null
       },
       {
         "check_id": "weak_upload_validation",
-        "endpoint": "(all)",
+        "endpoint": "(none)",
         "exercised": false,
         "persona": null,
         "evidence_event_ids": [],
-        "reason": "profile excludes this check"
+        "reason": "not applicable: no matching endpoint was found"
       }
     ]
   },
