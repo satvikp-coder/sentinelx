@@ -318,7 +318,7 @@ def render_md(results: dict, notes: list[str], stamp: str) -> str:
                                           if v["pre_activated"] else "")) + " |")
         L += ["", "Activated rules:", ""]
         for d in r["detail"]:
-            tag = "ACTIVE" if d["gate_passed"] else "REJECTED by gate"
+            tag = "activated" if d["gate_passed"] else "REJECTED by gate"
             L.append(f"- {tag}: `{d['action']}` route `{d['route']}`"
                      + (f" param `{d['parameter']}`" if d["parameter"] else "")
                      + f" ({d['intent']})")

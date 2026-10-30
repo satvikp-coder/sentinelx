@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
-from sentinelx.common_schemas import EvidenceState, ShieldScope
+from sentinelx.common_schemas import ApprovalRecord, EvidenceState, ShieldRule, ShieldScope
 from sentinelx.model_clients import ModelClient
 from sentinelx.policy.redaction import redact
 
@@ -25,6 +25,8 @@ from .recorder import ShieldRecorder, hash_client_key
 from .rules import (
     BenignReplayGate,
     EvalDecision,
+    GateError,
+    GateResult,
     RuleCompiler,
     RuleLifecycle,
     ShieldAction,
@@ -70,7 +72,8 @@ class ShieldProxy:
         self.request_log: list[dict[str, Any]] = []
         self.rule_log: list[dict[str, Any]] = []
         self.counts = {"proposed": 0, "activated": 0, "rejected_by_gate": 0,
-                       "compile_rejected": 0, "escalations": 0}
+                       "compile_rejected": 0, "escalations": 0, "stored_proposed": 0}
+        self.tickets: list[Any] = []
 
     # ------------------------------------------------------------------ ASGI entry point
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
@@ -183,10 +186,19 @@ class ShieldProxy:
             return ShieldAction.BLOCK_ROUTE_PATTERN, "/admin*", None
         return None
 
-    def _auto_shield(self, client_key: str, intent: str, path: str, params: dict[str, str],
-                     event_id: str) -> None:
-        """Compile a narrow rule from the detected intent, replay benign traffic, activate or
-        escalate. Deterministic code only; every rule is scoped to the flagged client."""
+    def _gate_for(self, rule: ShieldRule) -> BenignReplayGate:
+        """Worst case: the flagged client could be a legitimate user, so replay the benign set
+        as if it came from the same client the rule is scoped to."""
+        replay = [{**req, "client_key": rule.scope.client} for req in self._benign]
+        return BenignReplayGate(self.store, self.session_id, replay)
+
+    def _consider_rule(self, client_key: str, intent: str, path: str, params: dict[str, str],
+                       event_id: str) -> None:
+        """recommend/enforce only. Compile a narrow rule from the detected intent and gate it.
+        Gate-rejected: open an escalation ticket. Gate-passed: store as PROPOSED with the gate
+        result as evidence; activate only in enforce mode with auto_shield. Never in monitor."""
+        if self.config.mode == "monitor":
+            return
         spec = self._rule_spec(intent, path, params)
         if spec is None:
             return
@@ -205,24 +217,51 @@ class ShieldProxy:
             return
         rule = result.rule
         self.counts["proposed"] += 1
-        # Worst case: the flagged client could be a legitimate user, so replay the benign set
-        # as if it came from the same client the rule is scoped to.
-        replay = [{**req, "client_key": client_key} for req in self._benign]
-        gate = BenignReplayGate(self.store, self.session_id, replay).check(rule)
+        gate = self._gate_for(rule).check(rule)
+        self.store.append(self.session_id, "shield_gate", EvidenceState.OBSERVED,
+                          "sentinelx.shield",
+                          {"rule_id": rule.id, "passed": gate.passed,
+                           "benign_total": gate.benign_total,
+                           "benign_blocked": gate.benign_blocked, "rule_hash": gate.rule_hash})
         entry = {"rule_id": rule.id, "intent": intent, "action": action.value, "route": route,
                  "parameter": parameter, "client_key": client_key, "gate_passed": gate.passed,
                  "proposed_epoch": time.time(), "activated_epoch": None}
         if not gate.passed:
             self.counts["rejected_by_gate"] += 1
             self.counts["escalations"] += 1
+            self.tickets.append(gate.escalation_ticket)
+            self.store.append(self.session_id, "shield_escalation", EvidenceState.OBSERVED,
+                              "sentinelx.shield",
+                              {"rule_id": rule.id,
+                               "ticket_id": gate.escalation_ticket.id
+                               if gate.escalation_ticket else None})
             entry["benign_blocked"] = gate.benign_blocked
             self.rule_log.append(entry)
             return
         self.rules.add_rule(rule)
-        self.rules.activate_rule(rule.id)
-        self.counts["activated"] += 1
-        entry["activated_epoch"] = time.time()
+        self.counts["stored_proposed"] += 1
         self.rule_log.append(entry)
+        if self.config.mode == "enforce" and self.config.auto_shield:
+            self.rules.activate_rule(rule.id, gate)
+            self.counts["activated"] += 1
+            entry["activated_epoch"] = time.time()
+
+    def approve_rule(self, rule_id: str, approval: ApprovalRecord) -> GateResult:
+        """Human approval: re-runs the gate now and activates only if it still passes."""
+        rule = self.rules.get_rule(rule_id)
+        if rule is None:
+            raise GateError(f"unknown rule {rule_id}")
+        result = self.rules.approve_rule(rule_id, approval, self._gate_for(rule))
+        entry = next((e for e in self.rule_log if e["rule_id"] == rule_id), None)
+        if result.passed:
+            self.counts["activated"] += 1
+            if entry:
+                entry["activated_epoch"] = time.time()
+        else:
+            self.counts["rejected_by_gate"] += 1
+            self.counts["escalations"] += 1
+            self.tickets.append(result.escalation_ticket)
+        return result
 
     def stats(self) -> dict[str, Any]:
         return {"forwarded": self.forwarded, "blocked": self.blocked,
@@ -324,8 +363,7 @@ class ShieldProxy:
                         "sentinelx.shield",
                         {"request_id": headers.get("x-request-id"), "intent": intent,
                          "signals": [s.name for s in signals], "client_key": client_key})
-                    if self.config.mode == "enforce" and self.config.auto_shield:
-                        self._auto_shield(client_key, intent, path, params, evt.id)
+                    self._consider_rule(client_key, intent, path, params, evt.id)
             except Exception as exc:  # fail open: keep going
                 shield_error = f"{type(exc).__name__}: {exc}"
 

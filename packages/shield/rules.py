@@ -5,6 +5,8 @@ The shield never edits code. Deterministic code decides; the model, if ever used
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -12,8 +14,11 @@ from enum import StrEnum
 from typing import Any
 
 from sentinelx.common_schemas import (
+    ApprovalDecision,
+    ApprovalRecord,
     EscalationStatus,
     EscalationTicket,
+    EvidenceState,
     ShieldRule,
     ShieldScope,
     ShieldStatus,
@@ -51,6 +56,15 @@ class GateResult:
     benign_total: int
     blocking_requests: list[dict[str, Any]]
     escalation_ticket: EscalationTicket | None
+    rule_hash: str | None = None
+    checked_at: datetime | None = None
+
+
+class GateError(ValueError):
+    """Activation or approval refused: the gate proof is missing, failed, stale or mismatched."""
+
+
+GATE_MAX_AGE_S = 60.0
 
 
 @dataclass(frozen=True)
@@ -59,6 +73,15 @@ class EvalDecision:
     action: ShieldAction | None
     rule_id: Id | None
     detail: str = ""
+
+
+def rule_hash(rule: ShieldRule) -> str:
+    """Stable hash of what the gate judged: identity, scope, action and cited intent."""
+    body = json.dumps(
+        {"id": rule.id, "target": rule.target_id, "scope": rule.scope.model_dump(mode="json"),
+         "action": rule.action, "intent": rule.intent_event_ids},
+        sort_keys=True)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
 def _now() -> datetime:
@@ -187,10 +210,9 @@ class BenignReplayGate:
         Returns GateResult with passed status and escalation ticket if rejected.
         """
         blocking: list[dict[str, Any]] = []
-        # A PROPOSED rule never matches in the evaluator; replay it as if it were ACTIVE.
-        candidate = rule.model_copy(update={"status": ShieldStatus.ACTIVE})
+        # A PROPOSED rule never matches in live evaluation; replay judges scope only.
         for req in self._benign_requests:
-            decision = evaluate_rule(candidate, req)
+            decision = RuleEvaluator.evaluate(rule, req, assume_active=True)
             if not decision.allowed:
                 blocking.append(req)
 
@@ -209,9 +231,10 @@ class BenignReplayGate:
                 status=EscalationStatus.OPEN,
                 created_at=_now(),
             )
-            return GateResult(False, len(blocking), len(self._benign_requests), blocking, ticket)
+            return GateResult(False, len(blocking), len(self._benign_requests), blocking, ticket,
+                              rule_hash(rule), _now())
 
-        return GateResult(True, 0, len(self._benign_requests), [], None)
+        return GateResult(True, 0, len(self._benign_requests), [], None, rule_hash(rule), _now())
 
     def load_benign_from_recorder(self, recorder: ShieldRecorder) -> None:
         """Load recently observed non-suspicious requests from recorder as benign traffic."""
@@ -308,14 +331,15 @@ class RuleEvaluator:
     """Pure function: request in, allow/modify/block decision out. No I/O."""
 
     @staticmethod
-    def evaluate(rule: ShieldRule, request: dict[str, Any]) -> EvalDecision:
+    def evaluate(rule: ShieldRule, request: dict[str, Any], assume_active: bool = False
+                 ) -> EvalDecision:
         """Evaluate a single rule against a request.
 
         Returns EvalDecision with allowed status and action details.
         """
         # Check if rule is active and not expired
         now = _now()
-        if rule.status != ShieldStatus.ACTIVE:
+        if rule.status != ShieldStatus.ACTIVE and not assume_active:
             return EvalDecision(True, None, None, "rule not active")
         if rule.expires_at < now:
             return EvalDecision(True, None, None, "rule expired")
@@ -417,13 +441,43 @@ class RuleLifecycle:
         self._rules[rule_id] = rule
         return True
 
-    def activate_rule(self, rule_id: Id) -> bool:
+    def activate_rule(self, rule_id: Id, gate: GateResult | None,
+                      max_age_s: float = GATE_MAX_AGE_S) -> bool:
+        """The ONLY place a rule becomes ACTIVE. Requires a fresh, passing GateResult whose
+        rule hash matches this rule; raises GateError otherwise."""
         rule = self._rules.get(rule_id)
-        if not rule or rule.status != ShieldStatus.PROPOSED:
+        if rule is None or rule.status != ShieldStatus.PROPOSED:
             return False
-        rule = rule.model_copy(update={"status": ShieldStatus.ACTIVE})
-        self._rules[rule_id] = rule
+        if gate is None:
+            raise GateError("activation needs a GateResult")
+        if not gate.passed:
+            raise GateError("gate did not pass")
+        if gate.rule_hash != rule_hash(rule):
+            raise GateError("gate result belongs to a different rule")
+        if gate.checked_at is None or (_now() - gate.checked_at).total_seconds() > max_age_s:
+            raise GateError("gate result is stale")
+        self._rules[rule_id] = rule.model_copy(update={"status": ShieldStatus.ACTIVE})
         return True
+
+    def approve_rule(self, rule_id: Id, approval: ApprovalRecord, gate: BenignReplayGate
+                     ) -> GateResult:
+        """Human approval of a PROPOSED rule. The gate is RE-RUN now; the rule is activated
+        only if it still passes, however the approval reads."""
+        rule = self._rules.get(rule_id)
+        if rule is None or rule.status != ShieldStatus.PROPOSED:
+            raise GateError(f"rule {rule_id} is not a PROPOSED rule")
+        if (approval.subject_type != "shield_rule" or approval.subject_id != rule_id
+                or approval.decision != ApprovalDecision.APPROVE):
+            raise GateError("approval record does not approve this rule")
+        result = gate.check(rule)
+        self.store.append(self.session_id, "shield_approval", EvidenceState.OBSERVED,
+                          "sentinelx.shield",
+                          {"rule_id": rule_id, "approval_id": approval.id,
+                           "reviewer": approval.reviewer, "gate_passed": result.passed,
+                           "benign_blocked": result.benign_blocked})
+        if result.passed:
+            self.activate_rule(rule_id, result)
+        return result
 
 
 def retire_rules_for_finding(

@@ -63,7 +63,16 @@ def proxy_factory(upstream_url: str, mode: str, benign: list[dict] | None,
         eid = p.store.append(p.session_id, "shield_intent", EvidenceState.INFERRED, "test",
                              {"intent": "RECON"}).id
         for client, intent, path in steps:
-            p._auto_shield(hash_client_key(client), intent, path, {}, eid)
+            if mode == "monitor":  # monitor never proposes; install an ACTIVE rule by hand
+                action, route, parameter = p._rule_spec(intent, path, {})
+                rule = p._compiler.compile(
+                    eid, action, ShieldScope(route=route, client=hash_client_key(client)),
+                    "test", "test", intent_event_ids=[eid]).rule
+                p.rules.add_rule(rule)
+                p.rules.activate_rule(rule.id, p._gate_for(rule).check(rule))
+                p.counts["activated"] += 1
+            else:
+                p._consider_rule(hash_client_key(client), intent, path, {}, eid)
         holder.append(app)
         return app
     return build
