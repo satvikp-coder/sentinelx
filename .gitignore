@@ -75,3 +75,4 @@ opencode.json
 # sentinelx init outputs (user config)
 sentinelx.site.yaml
 sentinelx.agent.yaml
+sentinelx.targets.json
