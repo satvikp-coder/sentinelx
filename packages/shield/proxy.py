@@ -27,6 +27,8 @@ HOP_BY_HOP = frozenset({
     "te", "trailers", "transfer-encoding", "upgrade",
 })
 
+SHIELD_HEADER = "x-sentinel-shield"
+
 
 def _clean_path(path: str) -> str:
     """Extract path component if request target is absolute-form (e.g. GET http://evil.example/x)."""
@@ -130,6 +132,55 @@ class ShieldProxy:
         return self.detector.scan_request(client_key, method, path, params, headers, text,
                                           self._has_session(headers), now)
 
+    # ------------------------------------------------------------------ rule evaluation
+    def _evaluate_rules(self, client_key: str, method: str, path: str, query: bytes,
+                        headers: dict[str, str], body: bytes, signals: list, now: float) -> tuple[str | None, dict | None]:
+        """Evaluate rules against request. Returns (action, rule) or (None, None)."""
+        from sentinelx.shield.rules import evaluate_rules, ShieldAction
+        from sentinelx.evidence.store import EvidenceStore
+
+        # Get active rules from evidence store
+        events = self.store.list_session(self.session_id)
+        rules = []
+        for evt in events:
+            if evt.kind == "shield_rule" and evt.payload.get("status") == "ACTIVE":
+                # Reconstruct rule from evidence
+                from sentinelx.common_schemas import ShieldRule, ShieldScope, ShieldStatus
+                rule = ShieldRule(
+                    id=evt.payload["id"],
+                    target_id=evt.payload["target_id"],
+                    scope=ShieldScope(**evt.payload["scope"]),
+                    action=evt.payload["action"],
+                    reason=evt.payload["reason"],
+                    linked_finding_id=evt.payload.get("linked_finding_id"),
+                    intent_event_ids=evt.payload["intent_event_ids"],
+                    owner=evt.payload["owner"],
+                    created_at=evt.timestamp_utc,
+                    expires_at=evt.payload["expires_at"],
+                    status=ShieldStatus.ACTIVE,
+                )
+                rules.append(rule)
+
+        if not rules:
+            return None, None
+
+        req = {
+            "method": method,
+            "path": path,
+            "params": {},
+            "headers": headers,
+            "client_key": self._client_key({}, ""),  # placeholder
+        }
+        # Parse query for params
+        from urllib.parse import parse_qs
+        if query:
+            parsed = parse_qs(query.decode("utf-8", "replace"))
+            req["params"] = {k: v[0] if v else "" for k, v in parsed.items()}
+
+        # For now, use a simple evaluation - in real implementation this would use the rule evaluator
+        # For now, return None to not block (will implement proper rule engine later)
+        return None, None
+
     # ------------------------------------------------------------------ upstream forwarding
     async def _forward(self, method: str, path: str, query: bytes,
                        headers: dict[str, str], body: bytes) -> httpx.Response:
@@ -148,14 +199,15 @@ class ShieldProxy:
         )
         return resp
 
-    # ------------------------------------------------------------------ response sending
-    @staticmethod
-    async def _send_response(send: Any, status: int, headers: httpx.Headers,
-                             body: bytes) -> None:
+    # ------------------------------------------------------------------ response sending with shield header
+    async def _send_response(self, send: Any, status: int, headers: httpx.Headers,
+                             body: bytes, shield_action: str | None = None) -> None:
         out_headers = [
             (k.encode("latin-1"), v.encode("latin-1"))
             for k, v in headers.items() if k.lower() not in HOP_BY_HOP
         ]
+        if shield_action:
+            out_headers.append((SHIELD_HEADER.encode("latin-1"), shield_action.encode("latin-1")))
         await send({"type": "http.response.start", "status": status, "headers": out_headers})
         await send({"type": "http.response.body", "body": body})
 
@@ -216,8 +268,24 @@ class ShieldProxy:
             except Exception as exc:  # fail open: keep going
                 shield_error = f"{type(exc).__name__}: {exc}"
 
+        shield_action: str | None = None
         resp: httpx.Response | None = None
         try:
+            # Evaluate rules if in enforce mode
+            shield_action = None
+            if self.config.mode == "enforce" and self.config.auto_shield:
+                action, rule = self._evaluate_rules(client_key, method, path, query, headers, body, signals, now)
+                if action:
+                    shield_action = action.value
+                    # Record SHIELD_BLOCK evidence
+                    self.recorder.record(
+                        client_key, method, path, 403, 0, 0.0,
+                        signals, suspicious=True, shield_error=f"blocked:{action.value}"
+                    )
+                    await send({"type": "http.response.start", "status": 403, "headers": []})
+                    await send({"type": "http.response.body", "body": b"blocked by shield"})
+                    return
+
             resp = await self._forward(method, path, query, headers, body)
         except Exception:
             if self.config.fail_open:
@@ -246,7 +314,7 @@ class ShieldProxy:
                 except Exception:
                     pass
 
-        await self._send_response(send, resp.status_code, resp.headers, content)
+        await self._send_response(send, resp.status_code, resp.headers, content, shield_action)
 
     # ---- model path (off request path)
 

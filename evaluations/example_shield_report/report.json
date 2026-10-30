@@ -1,0 +1,191 @@
+{
+  "timestamp": "2026-10-30T11:49:56.536255+00:00",
+  "note": "Shield proxy not running; Arms B and C same as Arm A. Shield proxy integration incomplete.",
+  "scenarios": {
+    "A": {
+      "attack_results": [
+        {
+          "stage": "recon",
+          "sent": 17,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 17,
+          "reached_upstream": 0,
+          "latency_p50": 0.0033000032999552786,
+          "latency_p95": 0.005200003215577453
+        },
+        {
+          "stage": "failed_logins",
+          "sent": 15,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 15,
+          "reached_upstream": 0,
+          "latency_p50": 0.0042000028770416975,
+          "latency_p95": 0.24159999884432182
+        },
+        {
+          "stage": "object_enum",
+          "sent": 19,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 19,
+          "reached_upstream": 0,
+          "latency_p50": 0.0032999960239976645,
+          "latency_p95": 0.005200003215577453
+        },
+        {
+          "stage": "injection",
+          "sent": 8,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 8,
+          "reached_upstream": 0,
+          "latency_p50": 0.0032000025385059416,
+          "latency_p95": 0.004900000931229442
+        },
+        {
+          "stage": "admin_probe",
+          "sent": 6,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 6,
+          "reached_upstream": 0,
+          "latency_p50": 0.0032999960239976645,
+          "latency_p95": 0.004999994416721165
+        }
+      ],
+      "benign_sent": 40,
+      "benign_blocked_by_marker": 0,
+      "benign_blocked_by_lab": 0,
+      "benign_altered": 0,
+      "intent_accuracy": 1.0,
+      "rules_proposed": 0,
+      "rules_activated": 0,
+      "rules_rejected": 0,
+      "rules_expired": 0,
+      "escalations_created": 0,
+      "shield_latency_p50": null,
+      "shield_latency_p95": null
+    },
+    "B": {
+      "attack_results": [
+        {
+          "stage": "recon",
+          "sent": 17,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 17,
+          "reached_upstream": 0,
+          "latency_p50": 0.0045000051613897085,
+          "latency_p95": 0.006800000846851617
+        },
+        {
+          "stage": "failed_logins",
+          "sent": 15,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 15,
+          "reached_upstream": 0,
+          "latency_p50": 0.0035000048228539526,
+          "latency_p95": 0.012500000593718141
+        },
+        {
+          "stage": "object_enum",
+          "sent": 19,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 19,
+          "reached_upstream": 0,
+          "latency_p50": 0.0040000013541430235,
+          "latency_p95": 0.007300004654098302
+        },
+        {
+          "stage": "injection",
+          "sent": 8,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 8,
+          "reached_upstream": 0,
+          "latency_p50": 0.0034999975468963385,
+          "latency_p95": 0.004900000931229442
+        },
+        {
+          "stage": "admin_probe",
+          "sent": 6,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 6,
+          "reached_upstream": 0,
+          "latency_p50": 0.0032999960239976645,
+          "latency_p95": 0.004800000169780105
+        }
+      ],
+      "benign_sent": 40,
+      "benign_blocked_by_marker": 0,
+      "benign_blocked_by_lab": 0,
+      "benign_altered": 0,
+      "intent_accuracy": 1.0,
+      "rules_proposed": 0,
+      "rules_activated": 0,
+      "rules_rejected": 0,
+      "rules_expired": 0,
+      "escalations_created": 0,
+      "shield_latency_p50": null,
+      "shield_latency_p95": null,
+      "note": "Shield proxy not running; same as Arm A"
+    },
+    "C": {
+      "attack_results": [
+        {
+          "stage": "recon",
+          "sent": 17,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 17,
+          "reached_upstream": 0,
+          "latency_p50": 0.0034999975468963385,
+          "latency_p95": 0.005199995939619839
+        },
+        {
+          "stage": "failed_logins",
+          "sent": 15,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 15,
+          "reached_upstream": 0,
+          "latency_p50": 0.0043000036384910345,
+          "latency_p95": 0.018300001102034003
+        },
+        {
+          "stage": "object_enum",
+          "sent": 19,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 19,
+          "reached_upstream": 0,
+          "latency_p50": 0.0035999983083456755,
+          "latency_p95": 0.7862000056775287
+        },
+        {
+          "stage": "injection",
+          "sent": 8,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 8,
+          "reached_upstream": 0,
+          "latency_p50": 0.005000001692678779,
+          "latency_p95": 0.007199996616691351
+        },
+        {
+          "stage": "admin_probe",
+          "sent": 6,
+          "blocked_by_marker": 0,
+          "blocked_by_lab": 6,
+          "reached_upstream": 0,
+          "latency_p50": 0.005200003215577453,
+          "latency_p95": 0.006800000846851617
+        }
+      ],
+      "benign_sent": 40,
+      "benign_blocked_by_marker": 0,
+      "benign_blocked_by_lab": 0,
+      "benign_altered": 0,
+      "intent_accuracy": 1.0,
+      "rules_proposed": 0,
+      "rules_activated": 0,
+      "rules_rejected": 0,
+      "rules_expired": 0,
+      "escalations_created": 0,
+      "shield_latency_p50": null,
+      "shield_latency_p95": null,
+      "note": "Shield proxy not running; same as Arm A"
+    }
+  }
+}
