@@ -35,6 +35,7 @@ sentinelx = "sentinelx_cli.main:main"
 [tool.setuptools.package-data]
 "sentinelx.common_schemas" = ["schemas/*.json"]
 "sentinelx.evidence" = ["migrations/*.sql"]
+"sentinelx_cli" = ["templates/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -21,48 +21,48 @@ def check_port_free(port: int) -> bool:
         return False
 
 
+def _secret_like(name: str) -> bool:
+    return any(tok in name for tok in ("KEY", "TOKEN", "SECRET"))
+
+
 def doctor_cmd(args) -> int:
-    """Run environment and configuration checks."""
+    """Run environment and configuration checks. Exit 0 if Python and DB checks pass."""
     print("SentinelX Doctor")
     print("=" * 50)
 
     all_ok = True
 
-    # Python version
+    # Python version (the package requires >=3.11, so this always passes at runtime)
     py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    print(f"Python: {py_version}")
-    if sys.version_info < (3, 11):
-        print("  ERROR: Python 3.11+ required")
-        all_ok = False
-    else:
-        print("  OK")
+    print(f"Python: {py_version}  OK")
 
-    # Docker
+    # Docker (informational only)
     docker_path = shutil.which("docker")
     if docker_path:
         try:
-            result = subprocess.run(["docker", "version", "--format", "{{.ServerVersion}}"],
-                                    capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                ["docker", "version", "--format", "{{.ServerVersion}}"],
+                capture_output=True, text=True, timeout=10,
+            )
             if result.returncode == 0:
                 print(f"Docker: {result.stdout.strip()} (installed at {docker_path})")
             else:
                 print(f"Docker: installed at {docker_path} but daemon not reachable")
-        except Exception as e:
-            print(f"Docker: installed at {docker_path} but error: {e}")
+        except (OSError, subprocess.SubprocessError) as exc:
+            print(f"Docker: installed at {docker_path} but error: {exc}")
     else:
         print("Docker: NOT INSTALLED")
 
-    # Node
+    # Node (informational only)
     node_path = shutil.which("node")
     if node_path:
         try:
-            result = subprocess.run(["node", "--version"], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                print(f"Node: {result.stdout.strip()} (at {node_path})")
-            else:
-                print(f"Node: at {node_path} but version check failed")
-        except Exception as e:
-            print(f"Node: at {node_path} but error: {e}")
+            result = subprocess.run(
+                ["node", "--version"], capture_output=True, text=True, timeout=5,
+            )
+            print(f"Node: {result.stdout.strip()} (at {node_path})")
+        except (OSError, subprocess.SubprocessError) as exc:
+            print(f"Node: at {node_path} but error: {exc}")
     else:
         print("Node: NOT INSTALLED")
 
@@ -74,38 +74,25 @@ def doctor_cmd(args) -> int:
         if not writable:
             all_ok = False
     else:
-        print(f"Evidence DB: {db_path} (will be created)")
-        # Check parent directory writable
-        parent_writable = os.access(db_path.parent, os.W_OK)
-        if not parent_writable:
-            print("  WARNING: parent directory not writable")
+        writable = os.access(db_path.parent, os.W_OK)
+        print(f"Evidence DB: {db_path} (will be created; parent writable: {writable})")
+        if not writable:
             all_ok = False
 
-    # Model profile from environment
-    print("\nModel config (from environment):")
-    model_vars = {
-        "MODEL_PROVIDER": "provider",
-        "MODEL_BASE_URL": "base_url",
-        "MODEL_NAME": "model",
-        "MODEL_API_KEY": "api_key",
-        "MODEL_PROVIDER": "provider",
-    }
-    # Check for any MODEL_* env vars
-    model_keys = [k for k in os.environ if k.startswith("MODEL_")]
+    # Model config: print env var NAMES and only "set"/"not set" (never values)
+    print("\nModel config (environment):")
+    model_keys = sorted(k for k in os.environ if k.startswith("MODEL_"))
     if model_keys:
-        for k in sorted(model_keys):
-            v = os.environ[k]
-            if "KEY" in k or "TOKEN" in k or "SECRET" in k:
-                display = "set" if v else "NOT set"
-            else:
-                display = v if v else "NOT set"
-            print(f"  {k}: {display}")
+        for name in model_keys:
+            state = "set" if os.environ.get(name) else "not set"
+            print(f"  {name}: {state}")
     else:
         print("  No MODEL_* environment variables set")
 
     # Lab ports
     print("\nLab ports:")
-    for port, name in [(18080, "vibe_shop_php"), (18081, "vibe_notes_node"), (18090, "shield_proxy")]:
+    ports = [(18080, "vibe_shop_php"), (18081, "vibe_notes_node"), (18090, "shield_proxy")]
+    for port, name in ports:
         free = check_port_free(port)
         print(f"  Port {port} ({name}): {'FREE' if free else 'IN USE'}")
 
@@ -113,6 +100,5 @@ def doctor_cmd(args) -> int:
     if all_ok:
         print("All checks PASSED")
         return 0
-    else:
-        print("Some checks FAILED")
-        return 1
+    print("Some checks FAILED")
+    return 1

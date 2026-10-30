@@ -71,3 +71,7 @@ evaluations/scan_runs/
 evaluations/fix_runs/
 labs_applied/
 opencode.json
+
+# sentinelx init outputs (user config)
+sentinelx.site.yaml
+sentinelx.agent.yaml

@@ -1,141 +1,217 @@
 #!/usr/bin/env python3
-"""sentinelx site - Manage Site Guard targets."""
+"""sentinelx site - manage Site Guard targets (lab targets only in this version)."""
 
 from __future__ import annotations
 
-import os
+import json
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from sentinelx.scanner.authz import (
+    AuthzConfig,
     is_lab_host,
+    new_verification_token,
+    register_lab_target,
+    register_non_lab_target,
 )
+
+from .repo import repo_root, run_script
+
+TARGETS_FILE = Path("sentinelx.targets.json")
+LABS = {  # known lab ports (from apps/labctl.py); lab-only version
+    18080: "vibe_shop_php", 18081: "vibe_notes_node",
+    18082: "vibe_shop_php_reference", 18083: "vibe_notes_node_reference",
+}
+STATE_LABELS = {"confirmed": "VERIFIED", "needs_validation": "INFERRED",
+                "rejected": "REJECTED"}
+
+
+def _load_targets() -> dict:
+    if TARGETS_FILE.is_file():
+        try:
+            return json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _save_targets(targets: dict) -> None:
+    TARGETS_FILE.write_text(json.dumps(targets, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _allow_non_lab() -> bool:
+    import os
+
+    return os.environ.get("ALLOW_NON_LAB_TARGETS", "").lower() in ("1", "true", "yes")
 
 
 def site_cmd(args, subcmd: str) -> int:
-    if subcmd == "add":
-        return _site_add(args)
-    elif subcmd == "verify":
-        return _site_verify(args)
-    elif subcmd == "scan":
-        return _site_scan(args)
-    elif subcmd == "fix":
-        return _site_fix(args)
-    elif subcmd == "guard":
-        return _site_guard(args)
-    elif subcmd == "report":
-        return _site_report(args)
-    else:
-        print(f"Unknown site command: {args.site_cmd}", file=sys.stderr)
+    handlers = {
+        "add": _add, "verify": _verify, "scan": _scan,
+        "fix": _fix, "guard": _guard, "report": _report,
+    }
+    if subcmd not in handlers:
+        print(f"Unknown site command: {subcmd}", file=sys.stderr)
         return 1
+    return handlers[subcmd](args)
 
 
-def _site_add(args) -> int:
-    url = args.url
-    from urllib.parse import urlparse
-    parsed = urlparse(url)
+def _add(args) -> int:
+    parsed = urlparse(args.url)
     host = parsed.hostname or ""
+    if not host:
+        print(f"ERROR: could not parse a host from {args.url!r}", file=sys.stderr)
+        return 2
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
     if args.lab:
         if not is_lab_host(host):
-            print(f"ERROR: --lab only allowed for localhost, 127.0.0.1, or *.lab.test (got {host})", file=sys.stderr)
+            print(f"ERROR: --lab only allowed for localhost, 127.0.0.1, ::1 or *.lab.test "
+                  f"(got {host!r})", file=sys.stderr)
             return 2
-        target_id = parsed.hostname.replace(".", "_").replace(":", "_")
-        print(f"Registering lab target: {target_id}")
-        # In real implementation, would call register_lab_target and store
-        print(f"Registered lab target: {target_id} -> {url}")
+        target_id = LABS.get(port, host)
+        register_lab_target(target_id, [host], [port], schemes=[parsed.scheme or "http"])
+        targets = _load_targets()
+        targets[target_id] = {"url": args.url, "lab": True}
+        _save_targets(targets)
+        print(f"registered lab target: {target_id} -> {args.url} (auto-verified)")
         return 0
+
+    # Non-lab: print ownership token + instructions; never scan here.
+    token, _token_hash = new_verification_token()
+    well_known = f"{parsed.scheme}://{host}:{port}/.well-known/sentinelx-verify.txt"
+    print(f"ownership token: {token}")
+    print(f"serve exactly this token at: {well_known}")
+    if _allow_non_lab():
+        config = AuthzConfig(allow_non_lab_targets=True)
+        target = register_non_lab_target(config, host, host, port, scheme=parsed.scheme or "https")
+        _ = target  # starts PENDING; served token + `site verify` would complete verification
+        print("ALLOW_NON_LAB_TARGETS is enabled; target registered as PENDING (verify to finish)")
     else:
-        # Non-lab target
-        if os.environ.get("ALLOW_NON_LAB_TARGETS", "").lower() not in ("1", "true", "yes"):
-            print("Non-lab scanning is DISABLED. Set ALLOW_NON_LAB_TARGETS=true to enable.", file=sys.stderr)
-        from sentinelx.scanner.authz import new_verification_token
-        token, token_hash = new_verification_token()
-        print(f"Ownership token: {token}")
-        print(f"Serve this token at: {parsed.scheme}://{host}{parsed.path or ''}/.well-known/sentinelx-verify.txt")
-        print("Non-lab scanning is DISABLED unless ALLOW_NON_LAB_TARGETS=true")
-        return 0
-
-
-def _site_verify(args) -> int:
-    print(f"Verifying target: {args.target_id}")
-    # In real implementation, would check the well-known file
-    print("Not implemented yet")
+        print("non-lab scanning is DISABLED unless ALLOW_NON_LAB_TARGETS=true")
+        print("nothing was scanned or registered")
     return 0
 
 
-def _site_scan(args) -> int:
-    print(f"Scanning target: {args.target_id}")
-    result = subprocess.run([
-        sys.executable, "scripts/run_scan.py",
-        "--target", "vibe_notes_node",  # hardcoded for now
-        "--out", f"scan_report_{args.target_id}.json"
-    ], capture_output=True, text=True)
-    print(result.stdout)
-    if result.stderr:
-        print(result.stderr, file=sys.stderr)
-    return result.returncode
-
-
-def _site_fix(args) -> int:
-    repo_path = Path(args.repo)
-    if not repo_path.exists() or not repo_path.is_dir():
-        print(f"ERROR: --repo path does not exist: {args.repo}", file=sys.stderr)
+def _verify(args) -> int:
+    targets = _load_targets()
+    entry = targets.get(args.target_id)
+    if entry is None:
+        print(f"ERROR: unknown target {args.target_id!r} (run `sentinelx site add`)",
+              file=sys.stderr)
         return 1
-    print(f"Running fixes for target: {args.target_id} on repo: {repo_path}")
-    result = subprocess.run([
-        sys.executable, "scripts/run_fix.py",
-        "--target", "vibe_notes_node",  # hardcoded for now
-        "--scan-report", f"scan_report_{args.target_id}.json",
-        "--repo", str(repo_path)
-    ], capture_output=True, text=True)
-    print(result.stdout)
-    if result.stderr:
-        print(result.stderr, file=sys.stderr)
-    return result.returncode
+    if entry.get("lab"):
+        print(f"{args.target_id}: lab targets are auto-verified at registration")
+        return 0
+    print(f"{args.target_id}: non-lab verification needs the served well-known token fetch; "
+          "not implemented in this lab-only version", file=sys.stderr)
+    return 1
 
 
-def _site_guard(args) -> int:
-    # Validate upstream
-    from urllib.parse import urlparse
+def _scan(args) -> int:
+    target_id = args.target_id
+    if target_id not in LABS.values():
+        print(f"ERROR: scan needs a known lab target name "
+              f"({', '.join(sorted(set(LABS.values())))})", file=sys.stderr)
+        return 1
+    print(f"scanning {target_id} via scripts/run_scan.py ...")
+    return run_script("run_scan.py", ["--target", target_id])
 
-    from sentinelx.scanner.authz import is_lab_host
+
+def _fix(args) -> int:
+    repo = Path(args.repo)
+    if not repo.is_dir():
+        print(f"ERROR: --repo must be an existing local directory: {args.repo}", file=sys.stderr)
+        return 1
+    report = _latest_scan_report(args.target_id)
+    if report is None:
+        print(f"ERROR: no scan report for {args.target_id!r}; run `sentinelx site scan` first",
+              file=sys.stderr)
+        return 1
+    print(f"fixing {args.target_id} from {report}")
+    print("note: the fix engine works on a disposable copy of the lab source "
+          "(--repo validated only)")
+    return run_script("run_fix.py", ["--target", args.target_id, "--scan-report", str(report)])
+
+
+def _guard(args) -> int:
     parsed = urlparse(args.upstream)
-    if not is_lab_host(parsed.hostname or ""):
-        print(f"ERROR: upstream must be a lab target (localhost/127.0.0.1/*.lab.test), got {parsed.hostname}", file=sys.stderr)
+    host = parsed.hostname or ""
+    if not is_lab_host(host):
+        print(f"ERROR: upstream must be a lab target (localhost / 127.0.0.1 / *.lab.test), "
+              f"got {host!r}", file=sys.stderr)
         return 2
-
-    # Start the shield proxy
+    listen = args.listen
+    lhost, _, lport = listen.rpartition(":")
+    if not lhost or not lport.isdigit():
+        print(f"ERROR: --listen must be host:port, got {listen!r}", file=sys.stderr)
+        return 2
     import os
-    import subprocess
-    env = os.environ.copy()
+
+    env = dict(os.environ)
     env["SHIELD_UPSTREAM"] = args.upstream
     env["SHIELD_MODE"] = args.mode
     env["SHIELD_AUTO_SHIELD"] = "1" if args.auto_shield else "0"
-    env["SHIELD_LAB_MODE"] = "1" if args.lab else "0"
-    env["PYTHONPATH"] = str(Path.cwd())
-
-    print(f"Starting shield proxy: {args.mode} mode on {args.listen} -> {args.upstream}")
+    env["SHIELD_LAB_MODE"] = "1"
+    root = repo_root()
+    print(f"starting shield (uvicorn) on {listen} -> {args.upstream} "
+          f"[mode={args.mode} auto_shield={args.auto_shield}]")
+    cmd = [sys.executable, "-m", "uvicorn", "packages.shield.server:create_shield_app",
+           "--factory", "--host", lhost, "--port", lport, "--log-level", "info"]
     try:
-        subprocess.run([
-            "uvicorn",
-            "packages.shield.server:create_shield_app",
-            "--factory",
-            "--host", "127.0.0.1",
-            "--port", "18090",
-            "--log-level", "info",
-        ], env={**os.environ, "SHIELD_UPSTREAM": args.upstream, "SHIELD_MODE": args.mode,
-                "SHIELD_AUTO_SHIELD": "1" if args.auto_shield else "0",
-                "SHIELD_LAB_MODE": "1" if args.lab else "0"}, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Shield proxy failed: {e}", file=sys.stderr)
+        return subprocess.run(cmd, cwd=root, env=env).returncode
+    except KeyboardInterrupt:
+        return 0
+
+
+def _latest_scan_report(target_id: str) -> Path | None:
+    root = repo_root() / "evaluations" / "scan_runs"
+    best: tuple[float, Path] | None = None
+    for report in root.glob("*/report.json"):
+        try:
+            data = json.loads(report.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if data.get("provenance", {}).get("target_id") == target_id:
+            mtime = report.stat().st_mtime
+            if best is None or mtime > best[0]:
+                best = (mtime, report)
+    return best[1] if best else None
+
+
+def _report(args) -> int:
+    report = _latest_scan_report(args.target_id)
+    if report is None:
+        print(f"no scan report for {args.target_id!r}", file=sys.stderr)
         return 1
-    return 0
+    data = json.loads(report.read_text(encoding="utf-8"))
+    prov = data.get("provenance", {})
+    print(f"scan: {prov.get('date_utc')} session={prov.get('session_id')} "
+          f"coverage={prov.get('coverage_percent')}% stop={prov.get('stop_reason')}")
+    for f in data.get("findings", []):
+        cand = f.get("candidate", {})
+        state = f.get("verification", {}).get("state", "?")
+        label = STATE_LABELS.get(state, state.upper())
+        print(f"  {cand.get('id')} {cand.get('vuln_class')} {cand.get('method', '')} "
+              f"{cand.get('endpoint', '')} state={state} [{label}]")
+    fix_db = repo_root() / "evaluations" / "fix_runs" / "fix.sqlite"
+    if fix_db.is_file():
+        import sqlite3
 
-
-def _site_report(args) -> int:
-    print(f"Report for target: {args.target_id}")
-    # In real implementation, would query evidence store
-    print("Not implemented yet")
+        try:
+            con = sqlite3.connect(f"file:{fix_db.as_posix()}?mode=ro", uri=True)
+            rows = con.execute("SELECT body FROM escalations").fetchall()
+            states = {}
+            for (body,) in rows:
+                status = json.loads(body).get("status", "?")
+                states[status] = states.get(status, 0) + 1
+            con.close()
+            summary = ", ".join(f"{k}={v}" for k, v in sorted(states.items())) or "none"
+            print(f"fix escalations: {len(rows)} ({summary})")
+        except sqlite3.Error as exc:
+            print(f"fix escalations: unreadable ({exc})")
+    else:
+        print("fix escalations: no fix runs yet")
     return 0

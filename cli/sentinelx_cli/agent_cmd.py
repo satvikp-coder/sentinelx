@@ -1,108 +1,76 @@
 #!/usr/bin/env python3
-"""sentinelx agent - Agent Guard SDK commands."""
+"""sentinelx agent - evaluate ONE action with the real policy gateway."""
 
 from __future__ import annotations
 
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
-from sentinelx.common_schemas import ScenarioSpec
-from sentinelx.policy.config import LoadedPolicy
-from sentinelx.policy.engine import evaluate
+from sentinelx.common_schemas import ScenarioSpec, SessionState
+from sentinelx.policy import SessionContext, evaluate, load_policy
+
+ACTION_KEYS = {"tool", "arguments", "allowed_hosts", "goal"}
 
 
 def agent_cmd(args) -> int:
-    if args.agent_cmd == "check":
-        return _agent_check(args)
-    else:
+    if args.agent_cmd != "check":
         print(f"Unknown agent command: {args.agent_cmd}", file=sys.stderr)
         return 1
+    return agent_check(Path(args.policy), Path(args.action))
 
 
-def _agent_check(args) -> int:
-    policy_path = Path(args.policy)
-    action_path = Path(args.action)
-
-    if not policy_path.exists():
-        print(f"ERROR: Policy file not found: {policy_path}", file=sys.stderr)
+def agent_check(policy_path: Path, action_path: Path) -> int:
+    """Load policy + action, run one evaluation, print decision. Exit 2 on validation errors."""
+    if not policy_path.is_file():
+        print(f"ERROR: policy file not found: {policy_path}", file=sys.stderr)
         return 2
-    if not action_path.exists():
-        print(f"ERROR: Action file not found: {action_path}", file=sys.stderr)
+    if not action_path.is_file():
+        print(f"ERROR: action file not found: {action_path}", file=sys.stderr)
         return 2
 
-    # Load policy
-    with open(policy_path) as f:
-        import yaml
-        policy_data = yaml.safe_load(f)
-
-    # Load action
-    with open(action_path) as f:
-        action_data = json.load(f)
-
-    # Create policy object
     try:
-        policy = LoadedPolicy.from_yaml(policy_path)
-    except Exception as e:
-        print(f"ERROR: Invalid policy: {e}", file=sys.stderr)
+        policy = load_policy(policy_path)
+    except Exception as exc:  # strict loader: surface the validation message
+        print(f"ERROR: invalid policy: {exc}", file=sys.stderr)
         return 2
 
-    # Build action request
     try:
-        action_request = {
-            "action_id": "cli_check",
-            "step": 0,
-            "actor": "agent",
-            "tool": action_data.get("tool"),
-            "arguments": action_data.get("arguments", {}),
-            "origin_observation_ids": [],
-        }
-    except Exception as e:
-        print(f"ERROR: Invalid action format: {e}", file=sys.stderr)
+        spec = json.loads(action_path.read_text(encoding="utf-8"))
+        if not isinstance(spec, dict) or set(spec) - ACTION_KEYS:
+            raise ValueError(f"action JSON keys must be a subset of {sorted(ACTION_KEYS)}")
+        tool = spec["tool"]
+        arguments = spec.get("arguments") or {}
+        allowed_hosts = spec.get("allowed_hosts") or []
+        goal = spec.get("goal") or "sentinelx agent check"
+        if not isinstance(tool, str) or not tool:
+            raise ValueError("'tool' must be a non-empty string")
+        if not isinstance(arguments, dict):
+            raise ValueError("'arguments' must be an object")
+        if not isinstance(allowed_hosts, list):
+            raise ValueError("'allowed_hosts' must be a list")
+    except (ValueError, KeyError, json.JSONDecodeError) as exc:
+        print(f"ERROR: invalid action: {exc}", file=sys.stderr)
         return 2
 
-    # Create minimal scenario and session context
-    scenario = {
-        "id": "cli_check",
-        "seed": 0,
-        "fixture_id": "cli",
-        "fixture_version": "1",
-        "goal": "CLI check",
-        "allowed_hosts": [],
-        "allowed_actions": [],
-        "attack_surface": "cli",
-        "attack_payload_id": "cli",
-        "forbidden_outcome": {"type": "none", "endpoint": "none"},
-        "goal_assertion": {"type": "none", "expected": None},
-    }
-
-    session_context = {
-        "session_id": "cli_check",
-        "step": 0,
-        "actor": "cli",
-    }
-
-    # Evaluate
-    from sentinelx.common_schemas import ActionRequest as AR
-    from sentinelx.common_schemas import SessionContext
-
-    action_req = AR(**action_request)
-    scenario_spec = ScenarioSpec(**scenario)
-    session_ctx = SessionContext(**session_context)
-
-    decision = evaluate(
-        action_request=action_request,
-        scenario=scenario_spec,
-        policy_config=policy,
-        session_context=session_ctx,
+    scenario = ScenarioSpec(
+        id="cli-check", seed=0, fixture_id="cli", fixture_version="1",
+        goal=goal, allowed_hosts=allowed_hosts, allowed_actions=[tool],
+        attack_surface="cli", attack_payload_id="cli",
+        forbidden_outcome={"type": "none", "endpoint": "none"},
+        goal_assertion={"type": "none", "expected": None},
     )
+    context = SessionContext(session_id="cli-check", state=SessionState.RUNNING)
+    request = dict(
+        session_id="cli-check", step=1, action_id="cli-check-1",
+        timestamp=datetime.now(UTC), actor="cli", tool=tool, arguments=arguments,
+    )
+    decision = evaluate(request, scenario, policy, context)
 
-    # Print decision
-    print(f"Decision: {decision.decision.value}")
-    print(f"Reason: {decision.reason_code}")
-    print(f"Explanation: {decision.explanation}")
-    print(f"Requires human: {decision.requires_human}")
-    if decision.signals:
-        print(f"Signals: {[s.kind.value for s in decision.signals]}")
-
-    return 0 if decision.decision.value != "BLOCK" else 1
+    print(f"decision: {decision.decision.value}")
+    print(f"reason_code: {decision.reason_code}")
+    print(f"rule_ids: {decision.rule_ids}")
+    print(f"requires_human: {decision.requires_human}")
+    print(f"explanation: {decision.explanation}")
+    return 0
