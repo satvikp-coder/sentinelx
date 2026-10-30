@@ -1,0 +1,65 @@
+signals:
+  - name: sensitive_path_env
+    category: path_probe
+    location: path
+    pattern: "\\.env([/?]|$)"
+  - name: sensitive_path_git
+    category: path_probe
+    location: path
+    pattern: "\\.git([/?]|$)"
+  - name: backup_extension
+    category: path_probe
+    location: path
+    pattern: "\\.(bak|old|orig|backup)([/?]|$)"
+  - name: debug_route
+    category: path_probe
+    location: path
+    pattern: "/(debug|admin|info|phpinfo)([/?]|$)"
+  - name: sql_break_char
+    category: injection
+    location: params
+    pattern: "('|--|;|\\bunion\\b|\\bselect\\b|\\bdrop\\b|\\binsert\\b|\\bdelete\\b|\\bupdate\\b)"
+  - name: markup_reflected
+    category: injection
+    location: params_reflected
+    pattern: "<script|<iframe|javascript:|onerror\\s*="
+  - name: scanner_ua
+    category: scanner
+    location: user_agent
+    pattern: "sqlmap|nikto|nmap|masscan|dirb|gobuster|acunetix|nessus|burpsuite"
+  - name: oversized_param
+    category: malformed
+    location: params
+    max_param_length: 2048
+  - name: protected_no_session
+    category: auth_bypass
+    location: path
+    path: /admin
+    requires_session: true
+
+windows:
+  high_request_rate:
+    category: behavior
+    max_requests: 100
+    window_seconds: 60
+  repeated_failed_logins:
+    category: behavior
+    max_failed_logins: 5
+    window_seconds: 300
+    path: /login
+    method: POST
+  high_404_rate:
+    category: behavior
+    max_404_ratio: 0.5
+    min_requests: 20
+    window_seconds: 60
+  object_id_enumeration:
+    category: behavior
+    max_sequential_ids: 10
+    window_seconds: 60
+    object_path_pattern: "/(order|item|user|product)/\\d+"
+  admin_probe:
+    category: behavior
+    max_admin_hits: 5
+    window_seconds: 60
+    path_prefix: /admin
