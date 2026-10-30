@@ -70,3 +70,4 @@ evaluations/scan_runs/
 # the example fix report is committed separately
 evaluations/fix_runs/
 labs_applied/
+opencode.json

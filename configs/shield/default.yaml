@@ -1,0 +1,17 @@
+mode: monitor
+auto_shield: false
+fail_open: true
+upstream: http://orders.lab.test:18080
+listen:
+  host: 127.0.0.1
+  port: 18090
+size_caps:
+  max_request_bytes: 1048576
+  max_response_bytes: 1048576
+timeouts:
+  connect_timeout_s: 5.0
+  read_timeout_s: 15.0
+lab_mode: false
+kill_switch_file: null
+evidence_batch_interval_s: 5.0
+suspicious_rate_cap_per_min: 20

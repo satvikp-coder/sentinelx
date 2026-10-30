@@ -1,0 +1,630 @@
+{
+  "generated": "2026-10-30T14:54:45+00:00",
+  "lab": "vibe_notes_node",
+  "lab_state_hash": "45f008bb0485e03d43957654a0e6f08f2b033c0fc2cd7059cc04b9683d4fb518",
+  "arms": {
+    "A": {
+      "records": 107,
+      "refused_by_guarded_client": 0,
+      "attack": {
+        "total": {
+          "sent": 65,
+          "reached_upstream": 65,
+          "blocked_by_shield": 0,
+          "lab_4xx_5xx": 46
+        },
+        "per_stage": {
+          "recon": {
+            "sent": 17,
+            "reached_upstream": 17,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 12
+          },
+          "failed_logins": {
+            "sent": 15,
+            "reached_upstream": 15,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 15
+          },
+          "object_enum": {
+            "sent": 19,
+            "reached_upstream": 19,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 13
+          },
+          "injection": {
+            "sent": 8,
+            "reached_upstream": 8,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 1
+          },
+          "admin_probe": {
+            "sent": 6,
+            "reached_upstream": 6,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 5
+          }
+        }
+      },
+      "benign": {
+        "sent": 40,
+        "blocked_or_altered_by_shield": 0,
+        "lab_4xx_5xx": 0,
+        "blocked_by_rule": []
+      },
+      "intent_accuracy": "n/a",
+      "shield_latency": "n/a",
+      "rules": "n/a",
+      "time_to_protect": "n/a",
+      "client_e2e_latency": {
+        "n": 107,
+        "p50_ms": 1.422,
+        "p95_ms": 31.191
+      }
+    },
+    "B": {
+      "records": 107,
+      "refused_by_guarded_client": 0,
+      "attack": {
+        "total": {
+          "sent": 65,
+          "reached_upstream": 65,
+          "blocked_by_shield": 0,
+          "lab_4xx_5xx": 46
+        },
+        "per_stage": {
+          "recon": {
+            "sent": 17,
+            "reached_upstream": 17,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 12
+          },
+          "failed_logins": {
+            "sent": 15,
+            "reached_upstream": 15,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 15
+          },
+          "object_enum": {
+            "sent": 19,
+            "reached_upstream": 19,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 13
+          },
+          "injection": {
+            "sent": 8,
+            "reached_upstream": 8,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 1
+          },
+          "admin_probe": {
+            "sent": 6,
+            "reached_upstream": 6,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 5
+          }
+        }
+      },
+      "benign": {
+        "sent": 40,
+        "blocked_or_altered_by_shield": 0,
+        "lab_4xx_5xx": 0,
+        "blocked_by_rule": []
+      },
+      "intent_accuracy": {
+        "recon": {
+          "correct": 6,
+          "labelled": 6,
+          "sent": 17,
+          "accuracy": 0.353
+        },
+        "failed_logins": {
+          "correct": 10,
+          "labelled": 14,
+          "sent": 15,
+          "accuracy": 0.667
+        },
+        "object_enum": {
+          "correct": 0,
+          "labelled": 19,
+          "sent": 19,
+          "accuracy": 0.0
+        },
+        "injection": {
+          "correct": 3,
+          "labelled": 8,
+          "sent": 8,
+          "accuracy": 0.375
+        },
+        "admin_probe": {
+          "correct": 0,
+          "labelled": 6,
+          "sent": 6,
+          "accuracy": 0.0
+        }
+      },
+      "shield_latency": {
+        "n": 108,
+        "p50_ms": 0.292,
+        "p95_ms": 0.584
+      },
+      "rules": {
+        "proposed": 0,
+        "activated": 0,
+        "rejected_by_gate": 0,
+        "escalations": 0,
+        "compile_rejected": 0,
+        "for_benign_client": 0,
+        "detail": []
+      },
+      "time_to_protect": "n/a (monitor mode never activates rules)",
+      "client_e2e_latency": {
+        "n": 107,
+        "p50_ms": 3.462,
+        "p95_ms": 36.62
+      }
+    },
+    "C": {
+      "records": 107,
+      "refused_by_guarded_client": 0,
+      "attack": {
+        "total": {
+          "sent": 65,
+          "reached_upstream": 27,
+          "blocked_by_shield": 38,
+          "lab_4xx_5xx": 13
+        },
+        "per_stage": {
+          "recon": {
+            "sent": 17,
+            "reached_upstream": 12,
+            "blocked_by_shield": 5,
+            "lab_4xx_5xx": 7
+          },
+          "failed_logins": {
+            "sent": 15,
+            "reached_upstream": 5,
+            "blocked_by_shield": 10,
+            "lab_4xx_5xx": 5
+          },
+          "object_enum": {
+            "sent": 19,
+            "reached_upstream": 1,
+            "blocked_by_shield": 18,
+            "lab_4xx_5xx": 0
+          },
+          "injection": {
+            "sent": 8,
+            "reached_upstream": 8,
+            "blocked_by_shield": 0,
+            "lab_4xx_5xx": 1
+          },
+          "admin_probe": {
+            "sent": 6,
+            "reached_upstream": 1,
+            "blocked_by_shield": 5,
+            "lab_4xx_5xx": 0
+          }
+        }
+      },
+      "benign": {
+        "sent": 40,
+        "blocked_or_altered_by_shield": 0,
+        "lab_4xx_5xx": 0,
+        "blocked_by_rule": []
+      },
+      "intent_accuracy": {
+        "recon": {
+          "correct": 6,
+          "labelled": 6,
+          "sent": 17,
+          "accuracy": 0.353
+        },
+        "failed_logins": {
+          "correct": 10,
+          "labelled": 10,
+          "sent": 15,
+          "accuracy": 0.667
+        },
+        "object_enum": {
+          "correct": 0,
+          "labelled": 19,
+          "sent": 19,
+          "accuracy": 0.0
+        },
+        "injection": {
+          "correct": 3,
+          "labelled": 8,
+          "sent": 8,
+          "accuracy": 0.375
+        },
+        "admin_probe": {
+          "correct": 0,
+          "labelled": 6,
+          "sent": 6,
+          "accuracy": 0.0
+        }
+      },
+      "shield_latency": {
+        "n": 108,
+        "p50_ms": 0.268,
+        "p95_ms": 1.05
+      },
+      "rules": {
+        "proposed": 30,
+        "activated": 26,
+        "rejected_by_gate": 4,
+        "escalations": 4,
+        "compile_rejected": 0,
+        "for_benign_client": 0,
+        "detail": [
+          {
+            "rule_id": "rule_64cb5fce5535",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/.env",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372081.7531548,
+            "activated_epoch": 1793372081.7531724
+          },
+          {
+            "rule_id": "rule_3c844da28b0c",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/.git",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372081.7726862,
+            "activated_epoch": 1793372081.7727003
+          },
+          {
+            "rule_id": "rule_aa7d2e2daa89",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/debug",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": false,
+            "proposed_epoch": 1793372081.8940177,
+            "activated_epoch": null,
+            "benign_blocked": 1
+          },
+          {
+            "rule_id": "rule_ee46602bde82",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/admin",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372081.9091449,
+            "activated_epoch": 1793372081.9091551
+          },
+          {
+            "rule_id": "rule_93e12187339e",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/phpinfo",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.120439,
+            "activated_epoch": 1793372082.1204486
+          },
+          {
+            "rule_id": "rule_60270e60e5ee",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/info",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.1385677,
+            "activated_epoch": 1793372082.138598
+          },
+          {
+            "rule_id": "rule_e4cd060d9363",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/login",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.2835836,
+            "activated_epoch": 1793372082.2835956
+          },
+          {
+            "rule_id": "rule_d4978d460762",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/1",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": false,
+            "proposed_epoch": 1793372082.4872563,
+            "activated_epoch": null,
+            "benign_blocked": 3
+          },
+          {
+            "rule_id": "rule_3f4869506673",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/2",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.5012164,
+            "activated_epoch": 1793372082.5012293
+          },
+          {
+            "rule_id": "rule_5f66aa713ea7",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/3",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.5275762,
+            "activated_epoch": 1793372082.527588
+          },
+          {
+            "rule_id": "rule_656801037ce1",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/4",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.5476763,
+            "activated_epoch": 1793372082.547686
+          },
+          {
+            "rule_id": "rule_5a679272f53c",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/5",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.5549812,
+            "activated_epoch": 1793372082.5549905
+          },
+          {
+            "rule_id": "rule_47aaf75ad67b",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/6",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6061661,
+            "activated_epoch": 1793372082.6061707
+          },
+          {
+            "rule_id": "rule_395eb4b3323d",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/7",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.60899,
+            "activated_epoch": 1793372082.6089964
+          },
+          {
+            "rule_id": "rule_ae4eaf69f182",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/8",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6170356,
+            "activated_epoch": 1793372082.6170397
+          },
+          {
+            "rule_id": "rule_85d2244d560d",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/9",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6244388,
+            "activated_epoch": 1793372082.624443
+          },
+          {
+            "rule_id": "rule_80566283c7a3",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/10",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6283984,
+            "activated_epoch": 1793372082.6284032
+          },
+          {
+            "rule_id": "rule_cc961bcbfbff",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/11",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6377861,
+            "activated_epoch": 1793372082.6377907
+          },
+          {
+            "rule_id": "rule_afb2ce313389",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/12",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6415775,
+            "activated_epoch": 1793372082.6415815
+          },
+          {
+            "rule_id": "rule_c9632aa42ddd",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/13",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6504207,
+            "activated_epoch": 1793372082.6504257
+          },
+          {
+            "rule_id": "rule_48a853c7b582",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/14",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.660217,
+            "activated_epoch": 1793372082.6602223
+          },
+          {
+            "rule_id": "rule_982ac7a6b307",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/15",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.6636114,
+            "activated_epoch": 1793372082.6636167
+          },
+          {
+            "rule_id": "rule_4479249f6529",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/16",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.7206147,
+            "activated_epoch": 1793372082.7206264
+          },
+          {
+            "rule_id": "rule_f388c09f97b3",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/17",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.7370167,
+            "activated_epoch": 1793372082.7370512
+          },
+          {
+            "rule_id": "rule_aa840190fd01",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/18",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.7419329,
+            "activated_epoch": 1793372082.7419393
+          },
+          {
+            "rule_id": "rule_78b94eba937e",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/notes/19",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.758442,
+            "activated_epoch": 1793372082.7584515
+          },
+          {
+            "rule_id": "rule_5eab06a31fb8",
+            "intent": "INJECTION_PROBE",
+            "action": "reject_param_pattern",
+            "route": "/api/search",
+            "parameter": "q",
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": false,
+            "proposed_epoch": 1793372082.7655716,
+            "activated_epoch": null,
+            "benign_blocked": 1
+          },
+          {
+            "rule_id": "rule_ca4544d7c266",
+            "intent": "CREDENTIAL_GUESSING",
+            "action": "rate_limit_client",
+            "route": "/api/search",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": false,
+            "proposed_epoch": 1793372082.8676858,
+            "activated_epoch": null,
+            "benign_blocked": 1
+          },
+          {
+            "rule_id": "rule_cda54357c819",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/admin/users",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.9702973,
+            "activated_epoch": 1793372082.9703076
+          },
+          {
+            "rule_id": "rule_0edf23eb8a7a",
+            "intent": "RECON",
+            "action": "block_route_pattern",
+            "route": "/admin/settings",
+            "parameter": null,
+            "client_key": "sk_e64ba38a4b958c72bc0d421150ba4646",
+            "gate_passed": true,
+            "proposed_epoch": 1793372082.9858108,
+            "activated_epoch": 1793372082.9858193
+          }
+        ]
+      },
+      "time_to_protect": {
+        "recon": {
+          "seconds": 0.047,
+          "rule": "rule_64cb5fce5535",
+          "pre_activated": false
+        },
+        "failed_logins": {
+          "seconds": 0.139,
+          "rule": "rule_e4cd060d9363",
+          "pre_activated": false
+        },
+        "object_enum": {
+          "seconds": 0.016,
+          "rule": "rule_3f4869506673",
+          "pre_activated": false
+        },
+        "injection": "not protected",
+        "admin_probe": {
+          "seconds": 0.0,
+          "rule": "rule_ee46602bde82",
+          "pre_activated": true
+        }
+      },
+      "client_e2e_latency": {
+        "n": 107,
+        "p50_ms": 5.671,
+        "p95_ms": 59.583
+      }
+    }
+  },
+  "caveats": [
+    "arm C: 0 benign false blocks is by construction: every rule is scoped to the attacker's client key, and benign traffic uses another key"
+  ]
+}
