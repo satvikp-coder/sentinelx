@@ -62,6 +62,9 @@ class WindowRule(BaseModel):
     method: str | None = None
 
 
+LOGIN_PATHS = ("/login", "/api/login")
+
+
 @dataclass
 class ClientWindow:
     """Sliding-window state for one client key."""
@@ -89,13 +92,13 @@ class ClientWindow:
         self.statuses.append((now, status))
         self._trim(self.hits, now)
         self._trim(self.statuses, now)
-        if path == "/login" and status in (401, 403):
+        if path in LOGIN_PATHS and status in (401, 403):
             self.failed_logins.append(now)
             self._trim(self.failed_logins, now)
         if path.startswith("/admin"):
             self.admin_hits.append(now)
             self._trim(self.admin_hits, now)
-        m = re.search(r"/(order|item|user|product)/(\d+)", path)
+        m = re.search(r"/(order|item|user|product|notes?)/(\d+)", path)
         if m:
             self.object_ids.append((now, m.group(1), int(m.group(2))))
             self._trim(self.object_ids, now)
@@ -227,7 +230,7 @@ class Detector:
         if window.statuses:
             window.statuses.pop()
         window.statuses.append((now, status))
-        if path == "/login" and status in (401, 403):
+        if path in LOGIN_PATHS and status in (401, 403):
             window.failed_logins.append(now)
             cutoff = now - window.window_seconds
             while window.failed_logins and window.failed_logins[0] < cutoff:

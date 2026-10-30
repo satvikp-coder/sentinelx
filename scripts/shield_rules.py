@@ -31,7 +31,9 @@ def _gen_id(prefix: str = "appr") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-def _get_session_and_lifecycle(db_path: str = ":memory:") -> tuple[SessionService, EvidenceStore, RuleLifecycle, str]:
+def _get_session_and_lifecycle(
+    db_path: str = ":memory:",
+) -> tuple[SessionService, EvidenceStore, RuleLifecycle, str]:
     conn = connect(db_path)
     migrate(conn)
     store = EvidenceStore(conn)
@@ -64,7 +66,9 @@ def cmd_show(args: argparse.Namespace) -> int:
         return 1
     print(f"id: {rule.id}")
     print(f"target: {rule.target_id}")
-    print(f"scope: route={rule.scope.route} param={rule.scope.parameter} client={rule.scope.client}")
+    print(
+        f"scope: route={rule.scope.route} param={rule.scope.parameter} client={rule.scope.client}"
+    )
     print(f"action: {rule.action}")
     print(f"reason: {rule.reason}")
     print(f"linked_finding: {rule.linked_finding_id}")

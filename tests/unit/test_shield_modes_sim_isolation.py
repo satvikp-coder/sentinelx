@@ -28,7 +28,8 @@ def _setup() -> tuple[SessionService, EvidenceStore, str]:
     store = EvidenceStore(conn)
     session_svc = SessionService(conn)
     session, _ = session_svc.create(
-        kind="GUARD", policy_version="1.0",
+        kind="GUARD",
+        policy_version="1.0",
         actor=Actor(id="test", role=ActorRole.SYSTEM),
     )
     return session_svc, store, session.id
@@ -47,7 +48,8 @@ def test_modes_monitor_never_blocks():
     store = EvidenceStore(conn)
     session_svc = SessionService(conn)
     session, _ = session_svc.create(
-        kind="GUARD", policy_version="1.0",
+        kind="GUARD",
+        policy_version="1.0",
         actor=Actor(id="test", role=ActorRole.SYSTEM),
     )
     config = ShieldConfig(
@@ -57,9 +59,10 @@ def test_modes_monitor_never_blocks():
         fail_open=True,
     )
     detector = Detector([], [])
-    recorder = ShieldRecorder(store, session.id, batch_interval_s=5.0,
-                              suspicious_rate_cap_per_min=20)
-    proxy = ShieldProxy(config, store, session.id, detector, recorder)
+    recorder = ShieldRecorder(
+        store, session.id, batch_interval_s=5.0, suspicious_rate_cap_per_min=20
+    )
+    ShieldProxy(config, store, session.id, detector, recorder)
 
     # In monitor mode, rules are never activated automatically
     # The shield should only label, not block
@@ -101,6 +104,7 @@ def test_simulator_guarded_client_only():
     # The hacker_sim.py uses GuardedClient exclusively
     # Static check: no direct httpx.Client or requests import in hacker_sim.py
     import ast
+
     with open("scripts/hacker_sim.py") as f:
         tree = ast.parse(f.read())
     for node in ast.walk(tree):
@@ -109,9 +113,9 @@ def test_simulator_guarded_client_only():
                 assert alias.name not in ("requests"), f"Direct import of {alias.name}"
         if isinstance(node, ast.ImportFrom):
             if node.module == "requests":
-                assert False, "Direct import from requests"
+                raise AssertionError("Direct import from requests")
             if node.module == "httpx" and any(a.name == "Client" for a in node.names):
-                assert False, "Direct import of httpx.Client"
+                raise AssertionError("Direct import of httpx.Client")
 
 
 def test_simulator_refuses_unregistered_target():
@@ -124,7 +128,8 @@ def test_simulator_refuses_unregistered_target():
     migrate(conn)
     session_svc = SessionService(conn)
     session, _ = session_svc.create(
-        kind=SessionKind.GUARD, policy_version="1.0",
+        kind=SessionKind.GUARD,
+        policy_version="1.0",
         actor=Actor(id="test", role=ActorRole.SYSTEM),
     )
 
@@ -133,7 +138,9 @@ def test_simulator_refuses_unregistered_target():
         target_id="test", hosts=["orders.lab.test"], ports=[18080], schemes=["http"]
     )
     profile = ScanProfile(name="test", state_changing_methods=(), synthetic_accounts=())
-    client = GuardedClient(target, conn=conn, session_id=session.id, config=authz_config, profile=profile)
+    GuardedClient(
+        target, conn=conn, session_id=session.id, config=authz_config, profile=profile
+    )
     # Unregistered target would fail at registration
     # The target registration itself enforces lab targets
 
@@ -179,19 +186,31 @@ def test_benign_replay_gate_creates_ticket():
     store = EvidenceStore(conn)
     session_svc = SessionService(conn)
     session, _ = session_svc.create(
-        kind="GUARD", policy_version="1.0",
+        kind="GUARD",
+        policy_version="1.0",
         actor=Actor(id="test", role=ActorRole.SYSTEM),
     )
 
-    gate = BenignReplayGate(store, session.id, benign_requests=[
-        {"method": "GET", "path": "/api/notes", "params": {}, "headers": {}},
-    ])
+    gate = BenignReplayGate(
+        store,
+        session.id,
+        benign_requests=[
+            {"method": "GET", "path": "/api/notes", "params": {}, "headers": {}},
+        ],
+    )
 
     rule = ShieldRule(
-        id="r1", target_id=session.id, scope=ShieldScope(route="/api/notes", parameter=None, client=None),
-        action=ShieldAction.BLOCK_ROUTE_PATTERN.value, reason="test", linked_finding_id=None,
-        intent_event_ids=["evt1"], owner="test", created_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC) + timedelta(hours=1), status="ACTIVE"
+        id="r1",
+        target_id=session.id,
+        scope=ShieldScope(route="/api/notes", parameter=None, client=None),
+        action=ShieldAction.BLOCK_ROUTE_PATTERN.value,
+        reason="test",
+        linked_finding_id=None,
+        intent_event_ids=["evt1"],
+        owner="test",
+        created_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+        status="ACTIVE",
     )
 
     result = gate.check(rule)

@@ -135,7 +135,9 @@ class RuleCompiler:
 
         # Block overly broad rules
         if scope.parameter is None and scope.client is None and scope.route == "/":
-            return CompileResult(None, True, "Rule with no route, parameter, or client is overly broad")
+            return CompileResult(
+                None, True, "Rule with no route, parameter, or client is overly broad"
+            )
         if suggested_action == ShieldAction.BLOCK_ROUTE_PATTERN and scope.route == "/":
             return CompileResult(None, True, "Blocking all routes is not allowed")
         if suggested_action == ShieldAction.REQUIRE_AUTH_ON_ROUTE and scope.route == "/":
@@ -185,8 +187,10 @@ class BenignReplayGate:
         Returns GateResult with passed status and escalation ticket if rejected.
         """
         blocking: list[dict[str, Any]] = []
+        # A PROPOSED rule never matches in the evaluator; replay it as if it were ACTIVE.
+        candidate = rule.model_copy(update={"status": ShieldStatus.ACTIVE})
         for req in self._benign_requests:
-            decision = evaluate_rule(rule, req)
+            decision = evaluate_rule(candidate, req)
             if not decision.allowed:
                 blocking.append(req)
 
@@ -196,7 +200,10 @@ class BenignReplayGate:
                 id=f"esc_{uuid.uuid4().hex[:12]}",
                 finding_id=rule.linked_finding_id or f"finding_{uuid.uuid4().hex[:12]}",
                 evidence_event_ids=rule.intent_event_ids,
-                explanation=f"Benign-replay gate rejected rule {rule.id}: {len(blocking)} benign request(s) would be blocked/altered",
+                explanation=(
+                    f"Benign-replay gate rejected rule {rule.id}: "
+                    f"{len(blocking)} benign request(s) would be blocked/altered"
+                ),
                 options=["DISCARD_RULE", "NARROW_SCOPE"],
                 suggested_interim_shield_id=rule.id,
                 status=EscalationStatus.OPEN,
@@ -232,18 +239,68 @@ class BenignReplayGate:
             {"method": "GET", "path": "/health", "headers": {}, "params": {}},
             {"method": "POST", "path": "/api/signup", "headers": {}, "params": {}},
             {"method": "POST", "path": "/api/login", "headers": {}, "params": {}},
-            {"method": "GET", "path": "/api/notes", "headers": {"Authorization": "Bearer test"}, "params": {}},
-            {"method": "POST", "path": "/api/notes", "headers": {"Authorization": "Bearer test"}, "params": {}},
-            {"method": "GET", "path": "/api/notes/1", "headers": {"Authorization": "Bearer test"}, "params": {}},
-            {"method": "PUT", "path": "/api/notes/1", "headers": {"Authorization": "Bearer test"}, "params": {}},
-            {"method": "GET", "path": "/api/search?q=plan", "headers": {"Authorization": "Bearer test"}, "params": {}},
-            {"method": "POST", "path": "/api/notes/1/share", "headers": {"Authorization": "Bearer test"}, "params": {}},
-            {"method": "PUT", "path": "/api/profile", "headers": {"Authorization": "Bearer test"}, "params": {}},
+            {
+                "method": "GET",
+                "path": "/api/notes",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
+            {
+                "method": "POST",
+                "path": "/api/notes",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
+            {
+                "method": "GET",
+                "path": "/api/notes/1",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
+            {
+                "method": "PUT",
+                "path": "/api/notes/1",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
+            {
+                "method": "GET",
+                "path": "/api/search?q=plan",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
+            {
+                "method": "POST",
+                "path": "/api/notes/1/share",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
+            {
+                "method": "PUT",
+                "path": "/api/profile",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
             {"method": "GET", "path": "/u/carol", "headers": {}, "params": {}},
             {"method": "GET", "path": "/api/settings", "headers": {}, "params": {}},
-            {"method": "POST", "path": "/api/settings", "headers": {"Authorization": "Bearer admin"}, "params": {}},
-            {"method": "GET", "path": "/debug", "headers": {"Authorization": "Bearer admin"}, "params": {}},
-            {"method": "DELETE", "path": "/api/notes/1", "headers": {"Authorization": "Bearer test"}, "params": {}},
+            {
+                "method": "POST",
+                "path": "/api/settings",
+                "headers": {"Authorization": "Bearer admin"},
+                "params": {},
+            },
+            {
+                "method": "GET",
+                "path": "/debug",
+                "headers": {"Authorization": "Bearer admin"},
+                "params": {},
+            },
+            {
+                "method": "DELETE",
+                "path": "/api/notes/1",
+                "headers": {"Authorization": "Bearer test"},
+                "params": {},
+            },
         ]
 
 

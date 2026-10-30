@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import time
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 
+from sentinelx.common_schemas import EvidenceState, ShieldScope
 from sentinelx.model_clients import ModelClient
 from sentinelx.policy.redaction import redact
 
@@ -21,6 +22,14 @@ from .config import ShieldConfig
 from .detect import Detector
 from .intent import IntentAssessment, map_intent
 from .recorder import ShieldRecorder, hash_client_key
+from .rules import (
+    BenignReplayGate,
+    EvalDecision,
+    RuleCompiler,
+    RuleLifecycle,
+    ShieldAction,
+    evaluate_rules,
+)
 
 HOP_BY_HOP = frozenset({
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -40,7 +49,8 @@ def _clean_path(path: str) -> str:
 class ShieldProxy:
     def __init__(self, config: ShieldConfig, store, session_id: str, detector: Detector,
                  recorder: ShieldRecorder, http_client: httpx.AsyncClient | None = None,
-                 clock=time.monotonic) -> None:
+                 clock=time.monotonic, benign_requests: list[dict] | None = None
+                 ) -> None:
         self.config = config
         self.store = store
         self.session_id = session_id
@@ -51,6 +61,16 @@ class ShieldProxy:
         self._clock = clock
         self._upstream_url = config.upstream.rstrip("/")
         self._model_calls: dict[str, list[float]] = {}
+        self.rules = RuleLifecycle(store, session_id)
+        self._compiler = RuleCompiler(store, session_id)
+        self._benign = list(benign_requests or [])
+        self._seen_rules: set[tuple] = set()
+        self.forwarded = 0
+        self.blocked = 0
+        self.request_log: list[dict[str, Any]] = []
+        self.rule_log: list[dict[str, Any]] = []
+        self.counts = {"proposed": 0, "activated": 0, "rejected_by_gate": 0,
+                       "compile_rejected": 0, "escalations": 0}
 
     # ------------------------------------------------------------------ ASGI entry point
     async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
@@ -106,7 +126,8 @@ class ShieldProxy:
         return None
 
     def _has_session(self, headers: dict[str, str]) -> bool:
-        return self._session_cookie(headers) is not None
+        auth = headers.get("authorization", "").lower()
+        return self._session_cookie(headers) is not None or auth.startswith("bearer ")
 
     # ------------------------------------------------------------------ kill switch
     def _is_killed(self) -> bool:
@@ -133,53 +154,80 @@ class ShieldProxy:
                                           self._has_session(headers), now)
 
     # ------------------------------------------------------------------ rule evaluation
-    def _evaluate_rules(self, client_key: str, method: str, path: str, query: bytes,
-                        headers: dict[str, str], body: bytes, signals: list, now: float) -> tuple[str | None, dict | None]:
-        """Evaluate rules against request. Returns (action, rule) or (None, None)."""
-        from sentinelx.shield.rules import evaluate_rules, ShieldAction
-        from sentinelx.evidence.store import EvidenceStore
+    @staticmethod
+    def _params(query: bytes) -> dict[str, str]:
+        if not query:
+            return {}
+        parsed = parse_qs(query.decode("utf-8", "replace"))
+        return {k: v[0] if v else "" for k, v in parsed.items()}
 
-        # Get active rules from evidence store
-        events = self.store.list_session(self.session_id)
-        rules = []
-        for evt in events:
-            if evt.kind == "shield_rule" and evt.payload.get("status") == "ACTIVE":
-                # Reconstruct rule from evidence
-                from sentinelx.common_schemas import ShieldRule, ShieldScope, ShieldStatus
-                rule = ShieldRule(
-                    id=evt.payload["id"],
-                    target_id=evt.payload["target_id"],
-                    scope=ShieldScope(**evt.payload["scope"]),
-                    action=evt.payload["action"],
-                    reason=evt.payload["reason"],
-                    linked_finding_id=evt.payload.get("linked_finding_id"),
-                    intent_event_ids=evt.payload["intent_event_ids"],
-                    owner=evt.payload["owner"],
-                    created_at=evt.timestamp_utc,
-                    expires_at=evt.payload["expires_at"],
-                    status=ShieldStatus.ACTIVE,
-                )
-                rules.append(rule)
+    def _match_rule(self, client_key: str, method: str, path: str, params: dict[str, str],
+                    headers: dict[str, str]) -> EvalDecision:
+        req = {"method": method, "path": path, "params": params, "headers": headers,
+               "client_key": client_key}
+        return evaluate_rules(self.rules.list_rules(), req)
 
-        if not rules:
-            return None, None
+    @staticmethod
+    def _rule_spec(intent: str, path: str, params: dict[str, str]
+                   ) -> tuple[ShieldAction, str, str | None] | None:
+        """Narrow (action, route, parameter) for a detected intent, or None to do nothing."""
+        if intent == "RECON":
+            return ShieldAction.BLOCK_ROUTE_PATTERN, path, None
+        if intent == "CREDENTIAL_GUESSING":
+            return ShieldAction.RATE_LIMIT_CLIENT, path, None
+        if intent == "DATA_ENUMERATION":
+            return ShieldAction.BLOCK_ROUTE_PATTERN, path.rsplit("/", 1)[0] + "/*", None
+        if intent == "INJECTION_PROBE" and params:
+            return ShieldAction.REJECT_PARAM_PATTERN, path, next(iter(params))
+        if intent == "ADMIN_PROBE":
+            return ShieldAction.BLOCK_ROUTE_PATTERN, "/admin*", None
+        return None
 
-        req = {
-            "method": method,
-            "path": path,
-            "params": {},
-            "headers": headers,
-            "client_key": self._client_key({}, ""),  # placeholder
-        }
-        # Parse query for params
-        from urllib.parse import parse_qs
-        if query:
-            parsed = parse_qs(query.decode("utf-8", "replace"))
-            req["params"] = {k: v[0] if v else "" for k, v in parsed.items()}
+    def _auto_shield(self, client_key: str, intent: str, path: str, params: dict[str, str],
+                     event_id: str) -> None:
+        """Compile a narrow rule from the detected intent, replay benign traffic, activate or
+        escalate. Deterministic code only; every rule is scoped to the flagged client."""
+        spec = self._rule_spec(intent, path, params)
+        if spec is None:
+            return
+        action, route, parameter = spec
+        key = (action.value, route, parameter, client_key)
+        if key in self._seen_rules:
+            return
+        self._seen_rules.add(key)
+        result = self._compiler.compile(
+            intent_id=event_id, suggested_action=action,
+            scope=ShieldScope(route=route, parameter=parameter, client=client_key),
+            reason=f"auto-shield for {intent}", owner="shield-auto",
+            intent_event_ids=[event_id])
+        if result.rejected or result.rule is None:
+            self.counts["compile_rejected"] += 1
+            return
+        rule = result.rule
+        self.counts["proposed"] += 1
+        # Worst case: the flagged client could be a legitimate user, so replay the benign set
+        # as if it came from the same client the rule is scoped to.
+        replay = [{**req, "client_key": client_key} for req in self._benign]
+        gate = BenignReplayGate(self.store, self.session_id, replay).check(rule)
+        entry = {"rule_id": rule.id, "intent": intent, "action": action.value, "route": route,
+                 "parameter": parameter, "client_key": client_key, "gate_passed": gate.passed,
+                 "proposed_epoch": time.time(), "activated_epoch": None}
+        if not gate.passed:
+            self.counts["rejected_by_gate"] += 1
+            self.counts["escalations"] += 1
+            entry["benign_blocked"] = gate.benign_blocked
+            self.rule_log.append(entry)
+            return
+        self.rules.add_rule(rule)
+        self.rules.activate_rule(rule.id)
+        self.counts["activated"] += 1
+        entry["activated_epoch"] = time.time()
+        self.rule_log.append(entry)
 
-        # For now, use a simple evaluation - in real implementation this would use the rule evaluator
-        # For now, return None to not block (will implement proper rule engine later)
-        return None, None
+    def stats(self) -> dict[str, Any]:
+        return {"forwarded": self.forwarded, "blocked": self.blocked,
+                "counts": dict(self.counts), "rules": list(self.rule_log),
+                "requests": list(self.request_log)}
 
     # ------------------------------------------------------------------ upstream forwarding
     async def _forward(self, method: str, path: str, query: bytes,
@@ -199,7 +247,7 @@ class ShieldProxy:
         )
         return resp
 
-    # ------------------------------------------------------------------ response sending with shield header
+    # ------------------------------------------------------------------ response sending
     async def _send_response(self, send: Any, status: int, headers: httpx.Headers,
                              body: bytes, shield_action: str | None = None) -> None:
         out_headers = [
@@ -242,6 +290,7 @@ class ShieldProxy:
 
     # ------------------------------------------------------------------ main request flow
     async def _handle(self, scope: dict, receive: Any, send: Any) -> None:
+        t0 = time.perf_counter()
         method = scope["method"]
         path = _clean_path(scope["path"])
         query = scope["query_string"]
@@ -257,46 +306,74 @@ class ShieldProxy:
         client_key = self._client_key(headers, remote_addr)
         killed = self._is_killed()
         now = self._clock()
+        params = self._params(query)
 
-        signals = []
+        signals: list = []
         shield_error: str | None = None
         started = now
+        intent: str | None = None
 
         if not killed:
             try:
                 signals = self._scan(client_key, method, path, query, headers, body, now)
+                if signals:
+                    label, _ = map_intent([s.name for s in signals])
+                    intent = str(getattr(label, "value", label))
+                    evt = self.store.append(
+                        self.session_id, "shield_intent", EvidenceState.INFERRED,
+                        "sentinelx.shield",
+                        {"request_id": headers.get("x-request-id"), "intent": intent,
+                         "signals": [s.name for s in signals], "client_key": client_key})
+                    if self.config.mode == "enforce" and self.config.auto_shield:
+                        self._auto_shield(client_key, intent, path, params, evt.id)
             except Exception as exc:  # fail open: keep going
                 shield_error = f"{type(exc).__name__}: {exc}"
 
-        shield_action: str | None = None
+        entry: dict[str, Any] = {
+            "request_id": headers.get("x-request-id"), "client_key": client_key,
+            "method": method, "path": path, "intent": intent,
+            "signals": [s.name for s in signals], "blocked": False, "forwarded": False}
+
         resp: httpx.Response | None = None
         try:
-            # Evaluate rules if in enforce mode
-            shield_action = None
-            if self.config.mode == "enforce" and self.config.auto_shield:
-                action, rule = self._evaluate_rules(client_key, method, path, query, headers, body, signals, now)
-                if action:
-                    shield_action = action.value
-                    # Record SHIELD_BLOCK evidence
-                    self.recorder.record(
-                        client_key, method, path, 403, 0, 0.0,
-                        signals, suspicious=True, shield_error=f"blocked:{action.value}"
-                    )
-                    await send({"type": "http.response.start", "status": 403, "headers": []})
+            if self.config.mode == "enforce" and not killed:
+                decision = self._match_rule(client_key, method, path, params, headers)
+                if not decision.allowed:
+                    action = decision.action.value if decision.action else "blocked"
+                    self.blocked += 1
+                    entry.update(blocked=True, action=action, rule_id=decision.rule_id,
+                                 status=403, epoch=time.time(),
+                                 overhead_ms=(time.perf_counter() - t0) * 1000.0)
+                    self._log(entry)
+                    try:
+                        self.recorder.record(client_key, method, path, 403, 0, 0.0, signals,
+                                             suspicious=True, shield_error=False)
+                    except Exception:
+                        pass  # evidence failure never changes the decision
+                    await send({"type": "http.response.start", "status": 403,
+                                "headers": [(SHIELD_HEADER.encode(), b"blocked")]})
                     await send({"type": "http.response.body", "body": b"blocked by shield"})
                     return
 
+            t_up = time.perf_counter()
             resp = await self._forward(method, path, query, headers, body)
+            upstream_s = time.perf_counter() - t_up
         except Exception:
             if self.config.fail_open:
                 await self._fail_open(scope, receive, send)
                 return
             raise
 
+        self.forwarded += 1
         content = resp.content
         if len(content) > self.config.size_caps.max_response_bytes:
             content = content[:self.config.size_caps.max_response_bytes]
         latency_ms = (self._clock() - started) * 1000.0
+        try:
+            if not killed:
+                self.detector.record_response(client_key, path, resp.status_code, self._clock())
+        except Exception:
+            pass
 
         # record evidence (fail open: record SHIELD_ERROR, never block)
         try:
@@ -314,7 +391,14 @@ class ShieldProxy:
                 except Exception:
                     pass
 
-        await self._send_response(send, resp.status_code, resp.headers, content, shield_action)
+        entry.update(forwarded=True, status=resp.status_code, epoch=time.time(),
+                     overhead_ms=(time.perf_counter() - t0 - upstream_s) * 1000.0)
+        self._log(entry)
+        await self._send_response(send, resp.status_code, resp.headers, content, None)
+
+    def _log(self, entry: dict[str, Any]) -> None:
+        if len(self.request_log) < 20000:
+            self.request_log.append(entry)
 
     # ---- model path (off request path)
 
