@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-30T11:49:56.536255+00:00",
+  "timestamp": "2026-10-30T14:02:03.158925+00:00",
   "note": "Shield proxy not running; Arms B and C same as Arm A. Shield proxy integration incomplete.",
   "scenarios": {
     "A": {
@@ -10,8 +10,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 17,
           "reached_upstream": 0,
-          "latency_p50": 0.0033000032999552786,
-          "latency_p95": 0.005200003215577453
+          "latency_p50": 4.5000051613897085,
+          "latency_p95": 245.70000095991418
         },
         {
           "stage": "failed_logins",
@@ -19,8 +19,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 15,
           "reached_upstream": 0,
-          "latency_p50": 0.0042000028770416975,
-          "latency_p95": 0.24159999884432182
+          "latency_p50": 3.5999983083456755,
+          "latency_p95": 7.800001185387373
         },
         {
           "stage": "object_enum",
@@ -28,8 +28,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 19,
           "reached_upstream": 0,
-          "latency_p50": 0.0032999960239976645,
-          "latency_p95": 0.005200003215577453
+          "latency_p50": 3.5999983083456755,
+          "latency_p95": 5.599998985417187
         },
         {
           "stage": "injection",
@@ -37,8 +37,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 8,
           "reached_upstream": 0,
-          "latency_p50": 0.0032000025385059416,
-          "latency_p95": 0.004900000931229442
+          "latency_p50": 3.5999983083456755,
+          "latency_p95": 4.800000169780105
         },
         {
           "stage": "admin_probe",
@@ -46,8 +46,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 6,
           "reached_upstream": 0,
-          "latency_p50": 0.0032999960239976645,
-          "latency_p95": 0.004999994416721165
+          "latency_p50": 5.199995939619839,
+          "latency_p95": 6.499998562503606
         }
       ],
       "benign_sent": 40,
@@ -71,8 +71,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 17,
           "reached_upstream": 0,
-          "latency_p50": 0.0045000051613897085,
-          "latency_p95": 0.006800000846851617
+          "latency_p50": 13.199998647905886,
+          "latency_p95": 24.000000848900527
         },
         {
           "stage": "failed_logins",
@@ -80,8 +80,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 15,
           "reached_upstream": 0,
-          "latency_p50": 0.0035000048228539526,
-          "latency_p95": 0.012500000593718141
+          "latency_p50": 14.199998986441642,
+          "latency_p95": 102.99999848939478
         },
         {
           "stage": "object_enum",
@@ -89,8 +89,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 19,
           "reached_upstream": 0,
-          "latency_p50": 0.0040000013541430235,
-          "latency_p95": 0.007300004654098302
+          "latency_p50": 12.800002878066152,
+          "latency_p95": 25.300003471784294
         },
         {
           "stage": "injection",
@@ -98,8 +98,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 8,
           "reached_upstream": 0,
-          "latency_p50": 0.0034999975468963385,
-          "latency_p95": 0.004900000931229442
+          "latency_p50": 15.300000086426735,
+          "latency_p95": 21.60000440198928
         },
         {
           "stage": "admin_probe",
@@ -107,8 +107,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 6,
           "reached_upstream": 0,
-          "latency_p50": 0.0032999960239976645,
-          "latency_p95": 0.004800000169780105
+          "latency_p50": 13.40000017080456,
+          "latency_p95": 19.60000372491777
         }
       ],
       "benign_sent": 40,
@@ -133,8 +133,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 17,
           "reached_upstream": 0,
-          "latency_p50": 0.0034999975468963385,
-          "latency_p95": 0.005199995939619839
+          "latency_p50": 15.400000847876072,
+          "latency_p95": 24.000000848900527
         },
         {
           "stage": "failed_logins",
@@ -142,8 +142,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 15,
           "reached_upstream": 0,
-          "latency_p50": 0.0043000036384910345,
-          "latency_p95": 0.018300001102034003
+          "latency_p50": 16.49999467190355,
+          "latency_p95": 68.49999772384763
         },
         {
           "stage": "object_enum",
@@ -151,8 +151,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 19,
           "reached_upstream": 0,
-          "latency_p50": 0.0035999983083456755,
-          "latency_p95": 0.7862000056775287
+          "latency_p50": 19.500002963468432,
+          "latency_p95": 2172.3000027122907
         },
         {
           "stage": "injection",
@@ -160,8 +160,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 8,
           "reached_upstream": 0,
-          "latency_p50": 0.005000001692678779,
-          "latency_p95": 0.007199996616691351
+          "latency_p50": 14.000004739500582,
+          "latency_p95": 21.30000211764127
         },
         {
           "stage": "admin_probe",
@@ -169,8 +169,8 @@
           "blocked_by_marker": 0,
           "blocked_by_lab": 6,
           "reached_upstream": 0,
-          "latency_p50": 0.005200003215577453,
-          "latency_p95": 0.006800000846851617
+          "latency_p50": 13.700002455152571,
+          "latency_p95": 14.099998224992305
         }
       ],
       "benign_sent": 40,

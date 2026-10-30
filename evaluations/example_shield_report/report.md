@@ -1,5 +1,5 @@
 # Shield Evaluation Report
-Generated: 2026-10-30T11:49:56.536904+00:00
+Generated: 2026-10-30T14:02:03.160965+00:00
 **Note**: Shield proxy not running; Arms B and C same as Arm A (direct to lab).
 Shield proxy integration incomplete; honest metrics reported.
 
@@ -46,6 +46,6 @@ Shield proxy integration incomplete; honest metrics reported.
 ## Limitations
 
 - Shield proxy not running as a server; Arms B and C identical to Arm A (direct to lab).
-- 'blocked' in Arm A reflects lab authentication requirements, not shield action.
+- 'Blocked' in Arm A = lab authentication requirements, not shield action.
 - Shield proxy integration incomplete; full three-way test requires running shield proxy server.
-- Intent accuracy is 1.0 because simulator uses ground truth labels, not shield labels.
+- Intent accuracy = 1.00 because simulator uses ground truth labels, not shield labels.

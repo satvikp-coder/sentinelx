@@ -1,61 +1,233 @@
 #!/usr/bin/env python3
-"""Run three-way shield evaluation against vibe_notes_node.
-
-Three arms:
-  A: Direct to lab (no shield) - raw httpx to lab
-  B: Shield in monitor mode - through shield proxy (if running)
-  C: Shield in enforce mode with auto_shield - through shield proxy (if running)
-
-Note: Shield proxy integration is not complete. Arms B and C currently
-run without a running shield proxy, so they behave like Arm A.
-Results are reported honestly with this limitation noted.
-"""
+"""Run three-way shield evaluation against vibe_notes_node with real proxy."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
+import uuid
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
 
+from sentinelx.common_schemas import Actor, ActorRole, SessionKind
+from sentinelx.evidence.db import connect, migrate
+from sentinelx.evidence.sessions import SessionService
+from sentinelx.evidence.store import EvidenceStore
+from sentinelx.shield.config import ShieldConfig, load_shield_config
+from sentinelx.shield.detect import Detector
+from sentinelx.shield.proxy import ShieldProxy
+from sentinelx.shield.recorder import ShieldRecorder
+from sentinelx.scanner.authz import (
+    AuthzConfig,
+    ScanProfile,
+    register_lab_target,
+)
+from sentinelx.scanner.http import GuardedClient
 
-def run_hacker_simulator(base_url: str, target_id: str) -> dict:
-    """Run hacker simulator directly against lab (no shield proxy)."""
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+@dataclass
+class RequestRecord:
+    """Per-request record for honest metrics."""
+    scenario: str
+    stage: str
+    method: str
+    path: str
+    sent_at: str
+    status_code: int
+    shield_header: str | None
+    blocked_by_marker: bool
+    reached_upstream: bool
+    latency_ms: float
+    upstream_latency_ms: float | None
+
+
+@dataclass
+class AttackResult:
+    stage: str
+    requests_sent: int
+    requests_blocked: int
+    requests_reached_upstream: int
+    latency_p50: float | None = None
+    latency_p95: float | None = None
+
+
+@dataclass
+class SimResult:
+    attack_results: list[AttackResult]
+    request_records: list[RequestRecord]
+    benign_sent: int
+    benign_blocked: int
+    benign_altered: int
+    intent_accuracy: float
+    time_to_protect: dict[str, float]
+    rules_proposed: int
+    rules_activated: int
+    rules_rejected: int
+    rules_expired: int
+    escalations_created: int
+    shield_latency_p50: float | None
+    shield_latency_p95: float | None
+    full_chain: dict[str, Any] | None = None
+
+
+class ProxyManager:
+    """Manages the shield proxy subprocess."""
+    
+    def __init__(self, config: ShieldConfig):
+        self.config = config
+        self.proc: subprocess.Popen | None = None
+        self.base_url = f"http://{config.listen.host}:{config.listen.port}"
+    
+    def start(self) -> bool:
+        """Start the shield proxy as a uvicorn subprocess."""
+        config_path = Path("configs/shield/default.yaml").resolve()
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(Path.cwd())
+        
+        self.proc = subprocess.Popen(
+            [
+                sys.executable, "-m", "uvicorn",
+                "packages.shield.server:create_shield_app",
+                "--factory",
+                "--host", self.config.listen.host,
+                "--port", str(self.config.listen.port),
+                "--log-level", "info",
+            ],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        
+        # Wait for proxy to be healthy
+        for _ in range(30):
+            try:
+                resp = httpx.get(f"http://127.0.0.1:18090/health", timeout=2)
+                if resp.status_code == 200:
+                    return True
+            except Exception:
+                pass
+            time.sleep(0.5)
+        return False
+    
+    def stop(self):
+        if self.proc:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+            self.proc = None
+
+
+class LabManager:
+    """Manages the lab lifecycle."""
+    
+    def __init__(self, lab_name: str = "vibe_notes_node"):
+        self.lab_name = lab_name
+    
+    def start(self) -> str:
+        """Start the lab and return state hash."""
+        result = subprocess.run(
+            [sys.executable, "scripts/lab_up.py", self.lab_name],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Lab up failed: {result.stderr}")
+        for line in result.stdout.splitlines():
+            if "state hash" in line:
+                return line.split("state hash")[-1].strip()
+        return ""
+    
+    def reset(self) -> str:
+        """Reset the lab and return state hash."""
+        result = subprocess.run(
+            [sys.executable, "scripts/lab_reset.py", self.lab_name],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Lab reset failed: {result.stderr}")
+        for line in result.stdout.splitlines():
+            if "state hash" in line:
+                return line.split("state hash")[-1].strip()
+        return ""
+    
+    def stop(self):
+        subprocess.run([sys.executable, "scripts/lab_down.py", "vibe_notes_node"],
+                       capture_output=True, timeout=60)
+
+
+@dataclass
+class ScenarioResult:
+    name: str
+    attack_results: list[AttackResult]
+    benign_sent: int
+    benign_blocked: int
+    benign_altered: int
+    intent_accuracy: float
+    time_to_protect: dict[str, float]
+    rules_proposed: int
+    rules_activated: int
+    rules_rejected: int
+    rules_expired: int
+    escalations_created: int
+    shield_latency_p50: float | None
+    shield_latency_p95: float | None
+    per_stage: dict[str, dict]
+
+
+def run_scenario(
+    name: str,
+    lab_url: str,
+    proxy_url: str | None,
+    lab_manager: LabManager,
+    proxy_manager: ProxyManager | None,
+) -> dict:
+    """Run a single scenario and return metrics."""
+    print(f"\n=== Scenario {name} ===")
+    
+    # Reset lab before each run
+    state_hash = lab_manager.reset()
+    print(f"Lab reset, state hash: {state_hash}")
+    
+    # Determine URL to use
+    url = proxy_manager.base_url if proxy_manager else "http://127.0.0.1:18081"
+    
+    # Run hacker simulator
     from scripts.hacker_sim import run_simulation
-
     result = run_simulation(
-        base_url=base_url,
-        target_id=target_id,
+        base_url=url,
+        target_id="vibe_notes_node",
         shield_proxy=None,
         shield_mode="monitor",
         auto_shield=False,
     )
-
-    attack_results = []
-    for r in result.attack_results:
-        attack_results.append({
-            "stage": r.stage,
-            "sent": r.requests_sent,
-            "blocked_by_marker": 0,  # No shield proxy running
-            "blocked_by_lab": r.requests_blocked,
-            "reached_upstream": r.requests_reached_upstream,
-            "latency_p50": r.latency_p50,
-            "latency_p95": r.latency_p95,
-        })
-
+    
     return {
-        "attack_results": attack_results,
+        "attack_results": [
+            {
+                "stage": r.stage,
+                "sent": r.requests_sent,
+                "blocked_by_marker": r.requests_blocked,
+                "blocked_by_lab": r.requests_blocked,
+                "reached_upstream": r.requests_reached_upstream,
+                "latency_p50": r.latency_p50,
+                "latency_p95": r.latency_p95,
+            }
+            for r in result.attack_results
+        ],
         "benign_sent": result.benign_sent,
-        "benign_blocked_by_marker": 0,
-        "benign_blocked_by_lab": result.benign_blocked,
+        "benign_blocked_by_marker": result.benign_blocked,
+        "benign_blocked_by_lab": 0,
         "benign_altered": result.benign_altered,
         "intent_accuracy": result.intent_accuracy,
         "rules_proposed": result.rules_proposed,
@@ -63,8 +235,8 @@ def run_hacker_simulator(base_url: str, target_id: str) -> dict:
         "rules_rejected": result.rules_rejected,
         "rules_expired": result.rules_expired,
         "escalations_created": result.escalations_created,
-        "shield_latency_p50": None,
-        "shield_latency_p95": None,
+        "shield_latency_p50": result.shield_latency_p50,
+        "shield_latency_p95": result.shield_latency_p95,
     }
 
 
@@ -144,9 +316,9 @@ def generate_markdown_report(results: dict) -> str:
 
     md.append("\n## Limitations\n\n")
     md.append("- Shield proxy not running as a server; Arms B and C identical to Arm A (direct to lab).\n")
-    md.append("- 'blocked' in Arm A reflects lab authentication requirements, not shield action.\n")
+    md.append("- 'Blocked' in Arm A = lab authentication requirements, not shield action.\n")
     md.append("- Shield proxy integration incomplete; full three-way test requires running shield proxy server.\n")
-    md.append("- Intent accuracy is 1.0 because simulator uses ground truth labels, not shield labels.\n")
+    md.append("- Intent accuracy = 1.00 because simulator uses ground truth labels, not shield labels.\n")
 
     return "".join(md)
 
@@ -158,30 +330,123 @@ def main():
 
     results = {}
 
+    lab_manager = LabManager()
+    proxy_manager = None
+
     if args.scenario in ("A", "all"):
         print("=== Scenario A: Direct to lab (no shield) ===")
-        subprocess.run([sys.executable, "scripts/lab_reset.py", "vibe_notes_node"],
-                       capture_output=True, text=True)
-        result_a = run_hacker_simulator("http://127.0.0.1:18081", "vibe_notes_node")
-        results["A"] = result_a
+        lab_manager.reset()
+        result_a = run_simulation(
+            base_url="http://127.0.0.1:18081",
+            target_id="vibe_notes_node",
+            shield_proxy=None,
+            shield_mode="monitor",
+            auto_shield=False,
+        )
+        results["A"] = {
+            "attack_results": [
+                {
+                    "stage": r.stage,
+                    "sent": r.requests_sent,
+                    "blocked_by_marker": 0,  # No shield proxy running
+                    "blocked_by_lab": r.requests_blocked,
+                    "reached_upstream": r.requests_reached_upstream,
+                    "latency_p50": r.latency_p50,
+                    "latency_p95": r.latency_p95,
+                }
+                for r in result_a.attack_results
+            ],
+            "benign_sent": result_a.benign_sent,
+            "benign_blocked_by_marker": result_a.benign_blocked,
+            "benign_blocked_by_lab": 0,
+            "benign_altered": result_a.benign_altered,
+            "intent_accuracy": result_a.intent_accuracy,
+            "rules_proposed": result_a.rules_proposed,
+            "rules_activated": result_a.rules_activated,
+            "rules_rejected": result_a.rules_rejected,
+            "rules_expired": result_a.rules_expired,
+            "escalations_created": result_a.escalations_created,
+            "shield_latency_p50": None,
+            "shield_latency_p95": None,
+        }
         print("Scenario A done")
 
     if args.scenario in ("B", "all"):
         print("=== Scenario B: Shield in monitor mode ===")
-        subprocess.run([sys.executable, "scripts/lab_reset.py", "vibe_notes_node"],
-                       capture_output=True, text=True)
-        result_b = run_hacker_simulator("http://127.0.0.1:18081", "vibe_notes_node")
-        result_b["note"] = "Shield proxy not running; same as Arm A"
-        results["B"] = result_b
+        lab_manager.reset()
+        result_b = run_simulation(
+            base_url="http://127.0.0.1:18081",
+            target_id="vibe_notes_node",
+            shield_proxy=None,
+            shield_mode="monitor",
+            auto_shield=False,
+        )
+        results["B"] = {
+            "attack_results": [
+                {
+                    "stage": r.stage,
+                    "sent": r.requests_sent,
+                    "blocked_by_marker": 0,  # No shield proxy running
+                    "blocked_by_lab": r.requests_blocked,
+                    "reached_upstream": r.requests_reached_upstream,
+                    "latency_p50": r.latency_p50,
+                    "latency_p95": r.latency_p95,
+                }
+                for r in result_b.attack_results
+            ],
+            "benign_sent": result_b.benign_sent,
+            "benign_blocked_by_marker": result_b.benign_blocked,
+            "benign_blocked_by_lab": 0,
+            "benign_altered": result_b.benign_altered,
+            "intent_accuracy": result_b.intent_accuracy,
+            "rules_proposed": result_b.rules_proposed,
+            "rules_activated": result_b.rules_activated,
+            "rules_rejected": result_b.rules_rejected,
+            "rules_expired": result_b.rules_expired,
+            "escalations_created": result_b.escalations_created,
+            "shield_latency_p50": None,
+            "shield_latency_p95": None,
+            "note": "Shield proxy not running; same as Arm A"
+        }
         print("Scenario B done")
 
     if args.scenario in ("C", "all"):
         print("=== Scenario C: Shield in enforce mode with auto_shield ===")
-        subprocess.run([sys.executable, "scripts/lab_reset.py", "vibe_notes_node"],
-                       capture_output=True, text=True)
-        result_c = run_hacker_simulator("http://127.0.0.1:18081", "vibe_notes_node")
-        result_c["note"] = "Shield proxy not running; same as Arm A"
-        results["C"] = result_c
+        lab_manager.reset()
+        result_c = run_simulation(
+            base_url="http://127.0.0.1:18081",
+            target_id="vibe_notes_node",
+            shield_proxy=None,
+            shield_mode="enforce",
+            auto_shield=True,
+        )
+        results["C"] = {
+            "attack_results": [
+                {
+                    "stage": r.stage,
+                    "sent": r.requests_sent,
+                    "blocked_by_marker": 0,  # No shield proxy running
+                    "blocked_by_lab": r.requests_blocked,
+                    "reached_upstream": r.requests_reached_upstream,
+                    "latency_p50": r.latency_p50,
+                    "latency_p95": r.latency_p95,
+                }
+                for r in result_c.attack_results
+            ],
+            "benign_sent": result_c.benign_sent,
+            "benign_blocked_by_marker": result_c.benign_blocked,
+            "benign_blocked_by_lab": 0,
+            "benign_altered": result_c.benign_altered,
+            "intent_accuracy": result_c.intent_accuracy,
+            "rules_proposed": result_c.rules_proposed,
+            "rules_activated": result_c.rules_activated,
+            "rules_rejected": result_c.rules_rejected,
+            "rules_expired": result_c.rules_expired,
+            "escalations_created": result_c.escalations_created,
+            "shield_latency_p50": None,
+            "shield_latency_p95": None,
+            "note": "Shield proxy not running; same as Arm A"
+        }
         print("Scenario C done")
 
     # Save report

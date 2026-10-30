@@ -138,7 +138,7 @@ class HackerSimulator:
             )
         except Exception as e:
             resp = type("Resp", (), {"status_code": 403, "content": str(e).encode(), "headers": {}})()
-        latency = time.perf_counter() - start
+        latency = (time.perf_counter() - start) * 1000  # ms
 
         shield_header = None
         if hasattr(resp, 'headers'):
@@ -149,7 +149,7 @@ class HackerSimulator:
 
         req_id = f"req_{uuid.uuid4().hex[:12]}"
         self.ground_truth[req_id] = stage
-        self.latencies.append(time.perf_counter() - start)
+        self.latencies.append(latency / 1000)
 
         return resp, latency, shield_header
 
@@ -365,6 +365,53 @@ class HackerSimulator:
                 sent += 1
         return sent, blocked, altered
 
+    def run_all_stages(self) -> list[tuple[AttackResult, list]]:
+        return [
+            self.stage_1_recon(),
+            self.stage_2_failed_logins(),
+            self.stage_3_object_enum(),
+            self.stage_4_injection_probes(),
+            self.stage_5_admin_probe(),
+        ]
+
+    def _p50(self, latencies: list[float]) -> float | None:
+        if not latencies:
+            return None
+        return sorted(latencies)[len(latencies) // 2] * 1000  # ms
+
+    def _p95(self, latencies: list[float]) -> float | None:
+        if not latencies:
+            return None
+        return sorted(latencies)[int(len(latencies) * 0.95)] * 1000  # ms
+
+    def run_benign_traffic(self, duration_seconds: int = 30) -> tuple[int, int, int]:
+        sent = 0
+        blocked = 0
+        altered = 0
+        benign_paths = [
+            ("GET", "/"),
+            ("GET", "/health"),
+            (
+                "POST",
+                "/api/signup",
+                {"username": f"benign_{uuid.uuid4().hex[:8]}", "password": "pass"},
+            ),
+            ("POST", "/api/login", {"username": "carol", "password": "carolpass"}),
+        ]
+        for _ in range(10):
+            for item in benign_paths:
+                method = item[0]
+                path = item[1]
+                json_data = item[2] if len(item) > 2 else None
+                resp, _, shield_hdr = self._make_request(method, path, json=json_data, stage="benign")
+                if resp.status_code >= 400:
+                    if shield_hdr in ("blocked", "altered", "challenged"):
+                        altered += 1
+                    else:
+                        blocked += 1
+                sent += 1
+        return sent, blocked, altered
+
     def run(self) -> SimResult:
         benign_sent, benign_blocked, benign_altered = self.run_benign_traffic()
 
@@ -391,8 +438,8 @@ class HackerSimulator:
             rules_rejected=0,
             rules_expired=0,
             escalations_created=0,
-            shield_latency_p50=self._p50(self.latencies) if len(self.latencies) >= 20 else None,
-            shield_latency_p95=self._p95(self.latencies) if len(self.latencies) >= 20 else None,
+            shield_latency_p50=p50,
+            shield_latency_p95=p95,
         )
 
     def close(self):
