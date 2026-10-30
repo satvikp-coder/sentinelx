@@ -1,0 +1,12 @@
+# Agent Guard policy for examples/agent_guard_basic.py (strict: these four keys only).
+allowed_hosts:
+  - orders.lab.test
+
+allowed_tools:
+  - fetch_page
+
+high_impact_actions:
+  - send_data
+
+secret_patterns:
+  - "synth_tok_[0-9a-f]{8,}"
