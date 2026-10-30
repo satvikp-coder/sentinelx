@@ -8,7 +8,10 @@ Usage:
 """
 
 import argparse
+import json
 import sys
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,39 +24,46 @@ from sentinelx.evidence.records import RecordStore  # noqa: E402
 DEFAULT_DB = ROOT / "evaluations" / "fix_runs" / "fix.sqlite"
 
 
+def _load(conn, ticket_id: str) -> dict:
+    row = conn.execute("SELECT body FROM escalations WHERE id = ?", (ticket_id,)).fetchone()
+    if row is None:
+        raise ValueError(f"no such escalation ticket: {ticket_id!r}")
+    return json.loads(row["body"])
+
+
+def _set_status(conn, ticket_id: str, status: EscalationStatus) -> None:
+    body = _load(conn, ticket_id)
+    body["status"] = status.value
+    conn.execute("UPDATE escalations SET body = ? WHERE id = ?",
+                (json.dumps(body, sort_keys=True), ticket_id))
+    conn.commit()
+
+
 def _list(conn) -> None:
-    rows = conn.execute("SELECT id, status, body FROM escalations ORDER BY id").fetchall()
+    rows = conn.execute("SELECT id, body FROM escalations ORDER BY id").fetchall()
     if not rows:
         print("no escalation tickets")
         return
     for row in rows:
-        import json
-
         body = json.loads(row["body"])
-        print(f"{row['id']}  [{row['status']}]  finding={body['finding_id']}")
+        print(f"{row['id']}  [{body['status']}]  finding={body['finding_id']}")
         print(f"    {body['explanation']}")
         for i, opt in enumerate(body["options"], 1):
             print(f"      {i}. {opt}")
 
 
 def _ack(conn, ticket_id: str) -> None:
-    conn.execute("UPDATE escalations SET status = ? WHERE id = ?",
-                (EscalationStatus.ACKNOWLEDGED.value, ticket_id))
-    conn.commit()
+    _set_status(conn, ticket_id, EscalationStatus.ACKNOWLEDGED)
     print(f"{ticket_id} -> ACKNOWLEDGED")
 
 
 def _resolve(conn, ticket_id: str, reviewer: str, decision: str, rationale: str) -> None:
-    import uuid
-    from datetime import UTC, datetime
-
+    _load(conn, ticket_id)  # raises a clear error if the ticket does not exist
     RecordStore(conn).insert(ApprovalRecord(
         id=f"appr_{uuid.uuid4().hex[:12]}", subject_type="escalation", subject_id=ticket_id,
         reviewer=reviewer, decision=ApprovalDecision(decision), rationale=rationale,
         timestamp=datetime.now(UTC)))
-    conn.execute("UPDATE escalations SET status = ? WHERE id = ?",
-                (EscalationStatus.RESOLVED.value, ticket_id))
-    conn.commit()
+    _set_status(conn, ticket_id, EscalationStatus.RESOLVED)
     print(f"{ticket_id} -> RESOLVED ({decision} by {reviewer})")
 
 
