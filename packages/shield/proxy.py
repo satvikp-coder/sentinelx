@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -25,6 +26,13 @@ HOP_BY_HOP = frozenset({
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailers", "transfer-encoding", "upgrade",
 })
+
+
+def _clean_path(path: str) -> str:
+    """Extract path component if request target is absolute-form (e.g. GET http://evil.example/x)."""
+    if "://" in path:
+        return urlsplit(path).path or "/"
+    return path
 
 
 class ShieldProxy:
@@ -154,7 +162,7 @@ class ShieldProxy:
     # ------------------------------------------------------------------ fail-open path
     async def _fail_open(self, scope: dict, receive: Any, send: Any) -> None:
         method = scope["method"]
-        path = scope["path"]
+        path = _clean_path(scope["path"])
         query = scope["query_string"]
         headers = self._scope_headers(scope)
         body = await self._read_body(receive)
@@ -183,7 +191,7 @@ class ShieldProxy:
     # ------------------------------------------------------------------ main request flow
     async def _handle(self, scope: dict, receive: Any, send: Any) -> None:
         method = scope["method"]
-        path = scope["path"]
+        path = _clean_path(scope["path"])
         query = scope["query_string"]
         headers = self._scope_headers(scope)
         remote_addr = scope.get("client", ("0.0.0.0", 0))[0]

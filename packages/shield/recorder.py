@@ -22,10 +22,44 @@ def hash_client_key(client_id: str) -> str:
     return "sk_" + hashlib.sha256(client_id.encode("utf-8")).hexdigest()[:32]
 
 
+_HEX = set("0123456789abcdefABCDEF")
+_B64 = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+
+
+def _is_mostly_hex_or_b64(seg: str) -> bool:
+    if not seg:
+        return False
+    # Pure hex token (e.g., 32-char hash)
+    if all(c in _HEX for c in seg):
+        return True
+    # Base64-like token: all base64 chars AND (has uppercase OR has digit OR has +/=)
+    if all(c in _B64 for c in seg):
+        has_upper = any(c.isupper() for c in seg)
+        has_digit = any(c.isdigit() for c in seg)
+        has_special = any(c in "+/=" for c in seg)
+        return has_upper or has_digit or has_special
+    return False
+
+
+def _has_letter_and_digit(seg: str) -> bool:
+    has_letter = any(c.isalpha() for c in seg)
+    has_digit = any(c.isdigit() for c in seg)
+    return has_letter and has_digit
+
+
 def path_template(path: str) -> str:
     import re
 
-    return re.sub(r"/\d+", "/{}", path)
+    def repl(m: re.Match[str]) -> str:
+        seg = m.group(1)
+        if seg.isdigit():
+            return "/{}"
+        if (len(seg) >= 16 or _is_mostly_hex_or_b64(seg)
+                or (len(seg) > 8 and _has_letter_and_digit(seg))):
+            return "/{id}"
+        return "/" + seg
+
+    return re.sub(r"/([^/?#]+)", repl, path)
 
 
 class ShieldRecorder:

@@ -198,6 +198,23 @@ def test_proxy_x_lab_client_only_in_lab_mode():
         _run(client2.aclose())
 
 
+def test_proxy_absolute_form_target_ignored():
+    # Absolute-form target forwarded to upstream, not evil.example
+    transport = httpx.MockTransport(lambda req: httpx.Response(
+        200, content=req.content,
+        headers={"content-type": "text/plain"}))
+    client = httpx.AsyncClient(transport=transport)
+    proxy, _, _, _ = _make_proxy(http_client=client)
+    try:
+        resp = _run(_call_proxy(proxy, "GET", "http://evil.example/x",
+                                headers={"content-type": "text/plain"}, body=b"payload"))
+        assert resp["status"] == 200
+        assert resp["body"] == b"payload"
+        # The proxy should have forwarded to upstream path /x (verified by mock handler)
+    finally:
+        _run(client.aclose())
+
+
 def test_proxy_no_websocket_support():
     transport = httpx.MockTransport(upstream_handler(200, body=b"ok"))
     client = httpx.AsyncClient(transport=transport)

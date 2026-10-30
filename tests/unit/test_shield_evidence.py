@@ -39,6 +39,17 @@ def test_path_template_masks_ids():
     assert path_template("/checkout") == "/checkout"
 
 
+def test_path_template_masks_identifiers_and_tokens():
+    # 32-char token
+    assert path_template("/reset/abcdef1234567890abcdef1234567890") == "/reset/{id}"
+    # alphanumeric identifier 18 chars
+    assert path_template("/share/a1b2c3d4e5f6a7b8c9") == "/share/{id}"
+    # numeric stays {}
+    assert path_template("/api/notes/12") == "/api/notes/{}"
+    # short alphabetic stays
+    assert path_template("/login") == "/login"
+
+
 def test_benign_requests_are_batched_one_event():
     store, session_id = _make_store()
     clock = FakeClock(0.0)
