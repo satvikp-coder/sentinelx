@@ -428,3 +428,50 @@ def test_model_dict_provenance_renders_provider_model_mode(tmp_path):
     assert prov.ok
     assert "/" in prov.data.model_label
     assert "(" in prov.data.model_label
+
+
+# ---------------------------------------------------------------- 13 html-fix tests
+def _build_html(tmp_path: Path) -> str:
+    root = _make_full_fixture(tmp_path)
+    sections = load_all(root)
+    result = render_index(sections, check_integrity(root, None), tmp_path / "index.html")
+    return result.out_path.read_text(encoding="utf-8")
+
+
+def test_balanced_tags(tmp_path):
+    from html.parser import HTMLParser
+
+    class TagBalance(HTMLParser):
+        VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input",
+                "link", "meta", "param", "source", "track", "wbr"}
+
+        def __init__(self):
+            super().__init__()
+            self.stack: list[str] = []
+            self.errors: list[str] = []
+
+        def handle_starttag(self, tag: str, attrs) -> None:
+            if tag not in self.VOID:
+                self.stack.append(tag)
+
+        def handle_endtag(self, tag: str) -> None:
+            if tag in self.VOID:
+                return
+            if self.stack and self.stack[-1] == tag:
+                self.stack.pop()
+            else:
+                self.errors.append(f"unexpected </{tag}>, stack top: "
+                                   f"{self.stack[-1] if self.stack else 'empty'}")
+
+    html_text = _build_html(tmp_path)
+    parser = TagBalance()
+    parser.feed(html_text)
+    assert not parser.errors, parser.errors[:5]
+    assert not parser.stack, f"unclosed tags: {parser.stack}"
+
+
+def test_no_double_escaped_entities(tmp_path):
+    html_text = _build_html(tmp_path)
+    assert "&middot;" not in html_text
+    assert "&amp;" not in html_text
+    assert "\u00b7" in html_text

@@ -98,7 +98,7 @@ def render_agent_guard(sections: dict[str, Section]) -> str:
 
     for run in runs:
         chip = label_chip("SIMULATED" if "SIMULATED" in run.label else "OBSERVED")
-        parts.append(f"<h3>{chip} <span class='muted'>{esc(run.label)} &middot; "
+        parts.append(f"<h3>{chip} <span class='muted'>{esc(run.label)} · "
                      f"{esc(run.source)}</span></h3>")
         rows = []
         cards = []
@@ -125,7 +125,7 @@ def render_agent_guard(sections: dict[str, Section]) -> str:
                     f"</div><div class=\"metric\">{esc(usage.get('model_http_calls', ''))}"
                     f"</div><div class=\"muted\">tokens in/out: "
                     f"{esc(usage.get('tokens_in', ''))}/{esc(usage.get('tokens_out', ''))}"
-                    "</div>")
+                    "</div></div>")
         parts.append('<div class="grid">' + "".join(cards) + "</div>")
     return "".join(parts)
 
@@ -195,7 +195,7 @@ def render_scan(section: Section) -> str:
             parts.append(na_card(f"{row.lab} planted-recall scoring", row.scoring_missing))
         model = row.model_label or f"model {NOT_RECORDED} in this report"
         parts.append(f"<div class='muted'>{esc(model)}</div>")
-        cov = (f"coverage {row.coverage_percent}% &middot; requests "
+        cov = (f"coverage {row.coverage_percent}% \u00b7 requests "
                f"{row.requests_used}/{row.request_budget}")
         parts.append(f"<div>{label_chip('OBSERVED')} <span class='muted'>{esc(cov)}</span>"
                      "</div>")
@@ -365,10 +365,10 @@ def render_integrity(report: IntegrityReport) -> str:
                   "run the build from the folder that holds the database</strong></div>")
     return (
         "<h2>Evidence integrity</h2>" + banner
-        + f"<p class='muted'>{esc(report.note)} &middot; built "
-        + f"{esc(report.built_at_utc)} &middot; db: {esc(report.db_path or NOT_RECORDED)}</p>"
-        + f"<p>sessions checked: <strong>{len(report.rows)}</strong> &middot; "
-        + f"OK: <strong>{report.ok_count}</strong> &middot; "
+        + f"<p class='muted'>{esc(report.note)} · built "
+        + f"{esc(report.built_at_utc)} · db: {esc(report.db_path or NOT_RECORDED)}</p>"
+        + f"<p>sessions checked: <strong>{len(report.rows)}</strong> · "
+        + f"OK: <strong>{report.ok_count}</strong> · "
         + f"failed/missing: <strong>{len(report.failed)}</strong></p>{table}")
 
 
