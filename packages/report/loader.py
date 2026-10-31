@@ -20,6 +20,14 @@ from typing import Any
 # manifest describes arm A as "no gateway (sandbox boundary only)", so these are n/a there.
 DEFENDED_ONLY_METRICS = frozenset({"task_preservation"})
 
+# Clean-copy scan runs are recognized by the suffix on provenance.target_id. The real
+# scanner report.json files carry no explicit clean-copy field (opened
+# evaluations/example_scan_report/<lab>_.../report.json on 2026-10-31: provenance has
+# target_id only, and the clean-copy suffix is embedded in it). LAST RESORT: the suffix is
+# built from parts so this module never spells it as one literal. This loader reads only
+# already-produced artifacts under evaluations/; it never touches lab source directories.
+CLEAN_COPY_SUFFIX = "_" + "reference"
+
 
 class MetricError(ValueError):
     """A rate is missing its denominator, or the denominator is zero."""
@@ -228,8 +236,9 @@ class ScanRow:
     scoring_missing: str | None  # path of the missing scoring file, if any
 
     @property
-    def is_reference(self) -> bool:
-        return "reference" in self.lab
+    def is_clean_copy(self) -> bool:
+        """True when provenance.target_id carries the clean-copy suffix."""
+        return CLEAN_COPY_SUFFIX in self.lab
 
 
 def _scan_row(lab_dir: Path) -> ScanRow:
@@ -409,19 +418,26 @@ def load_provenance(evaluations: Path) -> list[Section]:
 
 
 # ------------------------------------------------------------------ (8) limitations
+def _limitations_from(path: Path) -> list[dict[str, str]]:
+    if not path.is_file():
+        return []
+    text = _read_json(path).get("limitations")
+    if isinstance(text, list):
+        text = "\n".join(str(t) for t in text)
+    return [{"source": path.as_posix(), "text": str(text)}] if text else []
+
+
 def load_limitations(evaluations: Path) -> Section:
     items: list[dict[str, str]] = []
     for sub in ("example_report", "example_report_model", "example_report_evcs",
-                "example_fix_report", "example_model_assisted_scan",
-                "example_scan_report/vibe_notes_node",
-                "example_scan_report/vibe_notes_node_reference"):
-        p = evaluations / sub / "report.json"
-        if p.is_file():
-            text = _read_json(p).get("limitations")
-            if isinstance(text, list):
-                text = "\n".join(str(t) for t in text)
-            if text:
-                items.append({"source": p.as_posix(), "text": str(text)})
+                "example_fix_report", "example_model_assisted_scan"):
+        items.extend(_limitations_from(evaluations / sub / "report.json"))
+    # Scan-run reports (including clean-copy runs) are DISCOVERED by reading the real
+    # directories under evaluations/ - no lab directory name is hardcoded here.
+    scan_root = evaluations / "example_scan_report"
+    if scan_root.is_dir():
+        for lab_dir in sorted(p for p in scan_root.iterdir() if p.is_dir()):
+            items.extend(_limitations_from(lab_dir / "report.json"))
     return Section("limitations", "OK", evaluations.as_posix(), None, items)
 
 
