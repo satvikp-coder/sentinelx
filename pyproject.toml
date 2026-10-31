@@ -27,7 +27,7 @@ browser = ["playwright>=1.48,<2"]
 
 [tool.setuptools]
 package-dir = {"sentinelx" = "packages", "sentinelx_cli" = "cli/sentinelx_cli"}
-packages = ["sentinelx", "sentinelx.common_schemas", "sentinelx.agent_runtime", "sentinelx.model_clients", "sentinelx.adversarial", "sentinelx.policy", "sentinelx.evidence", "sentinelx.investigator", "sentinelx.containment", "sentinelx.verifier", "sentinelx.scanner", "sentinelx.fixer", "sentinelx.shield", "sentinelx.evaluation", "sentinelx_cli"]
+packages = ["sentinelx", "sentinelx.common_schemas", "sentinelx.agent_runtime", "sentinelx.model_clients", "sentinelx.adversarial", "sentinelx.policy", "sentinelx.evidence", "sentinelx.investigator", "sentinelx.containment", "sentinelx.verifier", "sentinelx.scanner", "sentinelx.fixer", "sentinelx.shield", "sentinelx.evaluation", "sentinelx.report", "sentinelx_cli"]
 
 [project.scripts]
 sentinelx = "sentinelx_cli.main:main"

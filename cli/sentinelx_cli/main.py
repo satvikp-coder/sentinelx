@@ -10,6 +10,7 @@ from .agent_cmd import agent_cmd
 from .doctor import doctor_cmd
 from .escalations import escalations_cmd
 from .init_cmd import init_cmd
+from .report_cmd import report_cmd
 from .shield_cmd import shield_cmd
 from .site import site_cmd
 
@@ -127,6 +128,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("--policy", required=True, help="Policy YAML file")
     p_check.add_argument("--action", required=True, help="Action JSON file")
     p_check.set_defaults(func=agent_cmd)
+
+    # report
+    p_report = subparsers.add_parser("report", help="Build the static results report")
+    report_sub = p_report.add_subparsers(dest="report_cmd", required=True)
+    p_build = report_sub.add_parser("build", help="Build report/index.html from stored results")
+    p_build.add_argument("--out", default="report/index.html", help="Output HTML path")
+    p_build.add_argument("--evaluations", default="evaluations",
+                         help="Evaluations directory with the example_* report folders")
+    p_build.add_argument("--db", default=None,
+                         help="Evidence SQLite DB for the integrity check (default: search)")
+    p_build.set_defaults(func=report_cmd)
 
     return parser
 
