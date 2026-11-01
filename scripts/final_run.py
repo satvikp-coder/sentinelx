@@ -271,7 +271,21 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
                                      "worst_case_usd": worst,
                                      "guard_exit_code": None}
             records.append(rec)
-        _write_manifest(manifest_path, started, records, dry_run=True)
+        # write manifest without subprocess (no git_commit)
+        manifest = {
+            "git_commit": "unknown",
+            "started_utc": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "ended_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "dry_run": True,
+            "steps": [r.to_json() for r in records],
+            "model_providers": sorted({r.estimated.get("profile") for r in records
+                                       if r.estimated.get("profile")}),
+            "estimated_spend_usd_total": round(sum(
+                float(r.estimated["worst_case_usd"]) for r in records
+                if r.estimated.get("worst_case_usd") is not None), 4),
+        }
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         print(f"\ndry-run finished; manifest: {manifest_path.as_posix()}", flush=True)
         return 0
 
