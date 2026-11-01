@@ -127,3 +127,26 @@ See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UT
 
 ## Next step
 Prompt 9 is complete end to end (Part 0 housekeeping, the Baseten provider and spend guard, and the full fix engine with a real run against both labs). Waiting for the developer to start the next prompt.
+
+## Task 21C: structured edit fix — confirmed secret leak fix (2026-11-01)
+- Branch `work/ds`, commit `1864437...d10d8b7` plus `d10d8b7`'s children: `214bc69` (21A edit applier),
+  `53014f5` (21B-wip scaffolding), `904729b` (21B generate_patch_edits), `ccb59c1` (21C end-to-end tests),
+  `1864437` (21D patch-format flag/report field), then the 21C security fix commit (this entry).
+- Root cause: `packages/fixer/edits.py` `apply_edits()` embedded fuzzy-matched lines from UNREDACTED
+  source (`difflib.get_close_matches` over the whole file) into the `find-occurs-0-times` rejection
+  message, and `packages/fixer/patch_gen.py` `generate_patch_edits()` forwarded that message verbatim as
+  retry feedback to the model — leaking arbitrary sensitive source content (API keys) into retry
+  requests and `PatchGenResult.reasons` (and from there into ladder escalation explanations and the
+  fix report's `patch_reasons`).
+- Fix: `packages/fixer/edits.py` only — rejection diagnostics now use safe structured reason codes
+  (`SEARCH_BLOCK_NOT_FOUND`, `AMBIGUOUS_SEARCH_BLOCK`, `INVALID_EDIT_TARGET`, `EDIT_VALIDATION_FAILED`)
+  with NO source text, no candidate lines, no find/replace strings, no unredacted exception messages.
+  Does not rely on regex key-format detection. Deterministic rejection, bounded retries, source
+  immutability on failed edits, approval requirement, and independent verification all preserved.
+- Verification (`.venv\Scripts\python.exe`): new regression tests `tests/unit/test_fixer_edit_secret_leak.py`
+  (7 tests) — pre-fix 4 failed / 3 passed (exit 1; canary `sk-FAKE1234...90abcdefghij` leaked in
+  plaintext into the retry request body); post-fix 7 passed (exit 0). Fixer suite 53 passed. CLI +
+  report tests exit 0. Full fast loop `pytest -q -m "not slow"`: exit 0, 1202 collected, 0 failed.
+  `ruff check .`: All checks passed! `git diff --check`: exit 0. Forbidden paths vs main: empty diff.
+  Default patch_format remains "diff". Live edit-vs-diff comparison NOT RUN (mocked model client only;
+  needs main-repo evaluation with credentials/budget controls).

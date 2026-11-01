@@ -81,11 +81,19 @@ def apply_edits(
     for idx, edit in enumerate(edits.edits, start=1):
         rel = edit.file
         if rel not in allowed_files:
-            return EditResult(False, f"edit {idx}: file '{rel}' not in allowed files", {}, "")
+            return EditResult(
+                False, f"edit {idx}: INVALID_EDIT_TARGET: file '{rel}' not in allowed files",
+                {}, "",
+            )
         if not _is_safe_path(scope_root, rel):
-            return EditResult(False, f"edit {idx}: unsafe path '{rel}'", {}, "")
+            return EditResult(
+                False, f"edit {idx}: INVALID_EDIT_TARGET: unsafe path '{rel}'", {}, ""
+            )
         if rel not in current:
-            return EditResult(False, f"edit {idx}: file '{rel}' not in original_files", {}, "")
+            return EditResult(
+                False, f"edit {idx}: INVALID_EDIT_TARGET: file '{rel}' not in original files",
+                {}, "",
+            )
         file_text = current[rel]
         find_norm = _normalize_line_endings(edit.find)
         replace_norm = _normalize_line_endings(edit.replace)
@@ -99,15 +107,13 @@ def apply_edits(
             count += 1
             start = i + 1
         if count == 0:
-            first_line = find_norm.splitlines()[0] if find_norm else ""
-            lines = file_text.splitlines()
-            candidates = difflib.get_close_matches(first_line, lines, n=3, cutoff=0.6)
-            cand_text = "; ".join(c[:200] for c in candidates) if candidates else "none"
-            msg = f"edit {idx}: find text occurs 0 times. candidates: {cand_text}"
-            return EditResult(False, msg, {}, "")
+            return EditResult(
+                False, f"edit {idx}: SEARCH_BLOCK_NOT_FOUND: find text occurs 0 times", {}, ""
+            )
         if count > 1:
             return EditResult(
-                False, f"edit {idx}: find text occurs {count} times (ambiguous)", {}, ""
+                False, f"edit {idx}: AMBIGUOUS_SEARCH_BLOCK: find text occurs {count} times "
+                       "(ambiguous)", {}, ""
             )
 
         new_file = file_text.replace(find_norm, replace_norm, 1)
@@ -143,7 +149,10 @@ def apply_edits(
     unified_diff = "\n".join(diff_lines)
     if total_changed > max_changed_lines:
         return EditResult(
-            False, f"diff too large ({total_changed} lines, max {max_changed_lines})", {}, ""
+            False,
+            f"edit {idx}: EDIT_VALIDATION_FAILED: diff too large "
+            f"({total_changed} lines, max {max_changed_lines})",
+            {}, "",
         )
 
     final_contents: dict[str, str] = {}
