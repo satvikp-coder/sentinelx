@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -21,10 +22,43 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sentinelx.policy import redaction as _redact
+
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
 LABS = ("vibe_notes_node", "vibe_shop_php")
 WORST_CASE_RE = re.compile(r"\$([0-9.]+) worst case")
+
+
+def _redact_text(s: str) -> str:
+    if not isinstance(s, str):
+        return ""
+    return _redact.redact(s).value
+
+
+def _redact_cmd(cmd: list[str]) -> list[str]:
+    return [_redact_text(str(c)) for c in cmd]
+
+
+def _build_child_env(live: bool) -> dict[str, str]:
+    # allowlist minimal env + model vars only for live steps
+    allowed = {"PATH", "HOME", "USER", "USERNAME", "LANG", "PYTHONPATH"}
+    base = {k: v for k, v in os.environ.items() if k in allowed}
+    env = dict(base)
+    # redact values whose names contain KEY/TOKEN/SECRET
+    redacted = {}
+    for k, _v in list(env.items()):
+        if re.search(r"(KEY|TOKEN|SECRET)", k, re.IGNORECASE):
+            redacted[k] = "[REDACTED]"
+    env.update(redacted)
+    if live:
+        for k in list(os.environ.keys()):
+            if k.startswith("MODEL_") or k.startswith("BASETEN_"):
+                env[k] = os.environ.get(k, "")
+                # mask if name matches pattern
+                if re.search(r"(KEY|TOKEN|SECRET)", k, re.IGNORECASE):
+                    env[k] = "[REDACTED]"
+    return env
 
 
 @dataclass
@@ -51,10 +85,20 @@ class StepRecord:
     output_tail: str = ""
 
     def to_json(self) -> dict:
-        return {"name": self.name, "commands": self.commands,
+        # redact commands and limit output tail
+        redacted_cmds = []
+        for cmd in self.commands:
+            redacted_cmds.append(_redact_cmd(cmd))
+        # limit output tail to last 20 lines, each <=300 chars
+        tail = self.output_tail or ""
+        lines = tail.splitlines()
+        limited = lines[-20:] if len(lines) > 20 else lines
+        limited = [line[:300] for line in limited]
+        output_tail = "\n".join(limited)
+        return {"name": self.name, "commands": redacted_cmds,
                 "exit_code": self.exit_code, "duration_s": self.duration_s,
                 "skipped_reason": self.skipped_reason, "estimated": self.estimated,
-                "output_tail": self.output_tail[-1500:]}
+                "output_tail": output_tail}
 
 
 def cli_cmd() -> list[str]:
@@ -138,8 +182,16 @@ def build_steps(evaluations: Path | None = None) -> list[PlannedStep]:
     return steps
 
 
-def run_cmd(cmd: list[str], timeout: int = 3600) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+def run_cmd(
+    cmd: list[str],
+    timeout: int = 3600,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess:
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout, env=env)
+    # redact captured output before returning
+    proc.stdout = _redact_text(proc.stdout)
+    proc.stderr = _redact_text(proc.stderr)
+    return proc
 
 
 def estimate_spend(step: PlannedStep) -> tuple[int, str | None]:
@@ -195,8 +247,11 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
             print(f"--- {step.name}: spend guard OK (worst case ${worst}, "
                   f"{step.est_calls} expected calls)", flush=True)
 
+        # print commands with redaction
+        env = _build_child_env(step.live)
         for cmd in step.commands:
-            print(f"--- {step.name}: $ {' '.join(cmd)}", flush=True)
+            redacted_cmd = _redact_cmd(cmd)
+            print(f"--- {step.name}: $ {' '.join(redacted_cmd)}", flush=True)
         if dry_run:
             record.skipped_reason = "dry-run: not executed"
             records.append(record)
@@ -207,15 +262,18 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
         failed = False
         for cmd in step.commands:
             try:
-                last = run_cmd(cmd)
+                last = run_cmd(cmd, env=env)
             except (OSError, subprocess.SubprocessError) as exc:
                 record.exit_code = -1
-                record.output_tail = f"{type(exc).__name__}: {exc}"
+                record.output_tail = _redact_text(f"{type(exc).__name__}: {exc}")
                 failed = True
                 break
-            print((last.stdout or "")[-1200:], flush=True)
+            # print redacted stdout tail
+            out = (last.stdout or "")[-1200:]
+            print(out, flush=True)
             if last.returncode != 0:
-                record.output_tail = (last.stderr or "")[-1500:]
+                # store redacted stderr tail
+                record.output_tail = _redact_text(last.stderr or "")
                 failed = True
                 break
         record.duration_s = round(time.monotonic() - started_at, 1)

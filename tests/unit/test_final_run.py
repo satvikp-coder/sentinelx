@@ -32,7 +32,7 @@ def proc(cmd: list[str], code: int, out: str = "", err: str = "") -> subprocess.
 def recorder(monkeypatch):
     calls: list[list[str]] = []
 
-    def _run(cmd, timeout=3600):
+    def _run(cmd, timeout=3600, env=None):
         calls.append(list(cmd))
         return ok_proc(cmd)
 
@@ -55,7 +55,7 @@ def test_dry_run_runs_nothing(recorder, tmp_path):
 
 
 def test_failing_step_stops_and_manifest_records(recorder, tmp_path, monkeypatch):
-    def _run(cmd, timeout=3600):
+    def _run(cmd, timeout=3600, env=None):
         recorder.append(list(cmd))
         if any(part.endswith("run_experiment.py") for part in cmd):
             return proc(cmd, 1, err="boom")
@@ -74,7 +74,7 @@ def test_failing_step_stops_and_manifest_records(recorder, tmp_path, monkeypatch
 
 
 def test_over_budget_step_is_refused(recorder, tmp_path, monkeypatch):
-    def _run(cmd, timeout=3600):
+    def _run(cmd, timeout=3600, env=None):
         recorder.append(list(cmd))
         if any(part.endswith("estimate_cost.py") for part in cmd):
             return proc(cmd, 3, out="refused: over budget")
