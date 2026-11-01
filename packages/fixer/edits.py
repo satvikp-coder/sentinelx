@@ -82,16 +82,16 @@ def apply_edits(
         rel = edit.file
         if rel not in allowed_files:
             return EditResult(
-                False, f"edit {idx}: INVALID_EDIT_TARGET: file '{rel}' not in allowed files",
+                False, f"edit {idx}: INVALID_EDIT_TARGET: file not in allowed files",
                 {}, "",
             )
         if not _is_safe_path(scope_root, rel):
             return EditResult(
-                False, f"edit {idx}: INVALID_EDIT_TARGET: unsafe path '{rel}'", {}, ""
+                False, f"edit {idx}: INVALID_EDIT_TARGET: unsafe path", {}, ""
             )
         if rel not in current:
             return EditResult(
-                False, f"edit {idx}: INVALID_EDIT_TARGET: file '{rel}' not in original files",
+                False, f"edit {idx}: INVALID_EDIT_TARGET: file not in original files",
                 {}, "",
             )
         file_text = current[rel]
@@ -120,45 +120,66 @@ def apply_edits(
         new_contents[rel] = new_file
         current[rel] = new_file
 
-    diff_lines: list[str] = []
-    total_changed = 0
-    for path, new_text in current.items():
-        original_text = _normalize_line_endings(original_files.get(path, ""))
-        if original_text == new_text:
-            continue
-        orig_lines = original_text.splitlines(keepends=True)
-        new_lines = new_text.splitlines(keepends=True)
-        for d in difflib.unified_diff(
-            orig_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""
-        ):
-            is_change = d.startswith("+") or d.startswith("-")
-            is_header = d.startswith("+++") or d.startswith("---")
-            if is_change and not is_header:
-                total_changed += 1
-        diff = "\n".join(
-            difflib.unified_diff(
-                original_text.splitlines(keepends=True),
-                new_text.splitlines(keepends=True),
-                fromfile=f"a/{path}",
-                tofile=f"b/{path}",
-                lineterm="",
+    try:
+        final_contents: dict[str, str] = {}
+        for path, text in new_contents.items():
+            orig = original_files.get(path, "")
+            final_contents[path] = _preserve_eol(orig, text)
+
+        diff_lines: list[str] = []
+        total_changed = 0
+        for path, new_text in final_contents.items():
+            original_text = original_files.get(path, "")
+            if original_text == new_text:
+                continue
+            # Build the diff from the file's REAL line endings (raw original vs
+            # preserved-eol final) so the patch matches what `git apply` sees on
+            # disk. difflib emits header lines without a terminator when
+            # lineterm="" and leaves unterminated body lines bare, so every
+            # emitted line is re-terminated with the file's own line ending.
+            term = "\r\n" if "\r\n" in original_text else "\n"
+            orig_lines = original_text.splitlines(keepends=True)
+            new_lines = new_text.splitlines(keepends=True)
+            raw_hunk = list(
+                difflib.unified_diff(
+                    orig_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm=""
+                )
             )
-        )
-        diff_lines.append(diff)
+            processed: list[str] = []
+            has_no_newline = False
+            for d in raw_hunk:
+                if d.startswith(("---", "+++", "@@")):
+                    processed.append(d + term)
+                elif d.startswith(("+", "-", " ")):
+                    if d.endswith(("\n", "\r\n")):
+                        processed.append(d)
+                    else:
+                        processed.append(d + term)
+                        has_no_newline = True
+                else:
+                    processed.append(d if d.endswith(("\n", "\r\n")) else d + term)
+            if has_no_newline:
+                processed.append("\\ No newline at end of file" + term)
+            for d in processed:
+                is_change = d.startswith("+") or d.startswith("-")
+                is_header = d.startswith("+++") or d.startswith("---")
+                if is_change and not is_header:
+                    total_changed += 1
+            diff_lines.append("".join(processed))
 
-    unified_diff = "\n".join(diff_lines)
-    if total_changed > max_changed_lines:
+        unified_diff = "".join(diff_lines)
+        if total_changed > max_changed_lines:
+            return EditResult(
+                False,
+                f"edit {idx}: EDIT_VALIDATION_FAILED: diff too large "
+                f"({total_changed} lines, max {max_changed_lines})",
+                {}, "",
+            )
+    except Exception:
+        # Never leak exception text or source into a rejection diagnostic.
         return EditResult(
-            False,
-            f"edit {idx}: EDIT_VALIDATION_FAILED: diff too large "
-            f"({total_changed} lines, max {max_changed_lines})",
-            {}, "",
+            False, f"edit {idx}: EDIT_VALIDATION_FAILED: could not build patch", {}, ""
         )
-
-    final_contents: dict[str, str] = {}
-    for path, text in current.items():
-        orig = original_files.get(path, "")
-        final_contents[path] = _preserve_eol(orig, text)
 
     return EditResult(True, None, final_contents, unified_diff)
 

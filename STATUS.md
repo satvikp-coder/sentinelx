@@ -144,9 +144,60 @@ Prompt 9 is complete end to end (Part 0 housekeeping, the Baseten provider and s
   Does not rely on regex key-format detection. Deterministic rejection, bounded retries, source
   immutability on failed edits, approval requirement, and independent verification all preserved.
 - Verification (`.venv\Scripts\python.exe`): new regression tests `tests/unit/test_fixer_edit_secret_leak.py`
-  (7 tests) — pre-fix 4 failed / 3 passed (exit 1; canary `sk-FAKE1234...90abcdefghij` leaked in
+  (7 tests) �?" pre-fix 4 failed / 3 passed (exit 1; canary `sk-FAKE1234...90abcdefghij` leaked in
   plaintext into the retry request body); post-fix 7 passed (exit 0). Fixer suite 53 passed. CLI +
   report tests exit 0. Full fast loop `pytest -q -m "not slow"`: exit 0, 1202 collected, 0 failed.
   `ruff check .`: All checks passed! `git diff --check`: exit 0. Forbidden paths vs main: empty diff.
   Default patch_format remains "diff". Live edit-vs-diff comparison NOT RUN (mocked model client only;
   needs main-repo evaluation with credentials/budget controls).
+
+## Task 21C: structured edit fix — confirmed secret leak fix (2026-11-01)
+- Branch `work/ds`, commit `1864437...d10d8b7` plus `d10d8b7`'s children: `214bc69` (21A edit applier),
+  `53014f5` (21B-wip scaffolding), `904729b` (21B generate_patch_edits), `ccb59c1` (21C end-to-end tests),
+  `1864437` (21D patch-format flag/report field), then the 21C security fix commit (this entry).
+- Root cause: `packages/fixer/edits.py` `apply_edits()` embedded fuzzy-matched lines from UNREDACTED
+  source (`difflib.get_close_matches` over the whole file) into the `find-occurs-0-times` rejection
+  message, and `packages/fixer/patch_gen.py` `generate_patch_edits()` forwarded that message verbatim as
+  retry feedback to the model - leaking arbitrary sensitive source content (API keys) into retry
+  requests and `PatchGenResult.reasons` (and from there into ladder escalation explanations and the
+  fix report's `patch_reasons`).
+- Fix: `packages/fixer/edits.py` only - rejection diagnostics now use safe structured reason codes
+  (`SEARCH_BLOCK_NOT_FOUND`, `AMBIGUOUS_SEARCH_BLOCK`, `INVALID_EDIT_TARGET`, `EDIT_VALIDATION_FAILED`)
+  with NO source text, no candidate lines, no find/replace strings, no unredacted exception messages.
+  Does not rely on regex key-format detection. Deterministic rejection, bounded retries, source
+  immutability on failed edits, approval requirement, and independent verification all preserved.
+- Verification (`.venv\Scripts\python.exe`): new regression tests `tests/unit/test_fixer_edit_secret_leak.py`
+  (7 tests) - pre-fix 4 failed / 3 passed (exit 1; canary `sk-FAKE1234...90abcdefghij` leaked in
+  plaintext into the retry request body); post-fix 7 passed (exit 0). Fixer suite 53 passed. CLI +
+  report tests exit 0. Full fast loop `pytest -q -m "not slow"`: exit 0, 1202 collected, 0 failed.
+  `ruff check .`: All checks passed! `git diff --check`: exit 0. Forbidden paths vs main: empty diff.
+  Default patch_format remains "diff". Live edit-vs-diff comparison NOT RUN (mocked model client only;
+  needs main-repo evaluation with credentials/budget controls).
+
+## Task 21D: structured edit fix — git-apply + retry-feedback repair (2026-11-01)
+- Branch `work/ds`, commits on top of `d10d8b7`: `packages/fixer/edits.py` fix, plus new
+  `tests/unit/test_fixer_edit_git_apply.py` and `tasks/OVERNIGHT_MASTER_LEDGER.md`.
+- Root cause: `apply_edits()` built its unified diff by joining difflib output lines (produced with
+  `keepends=True`, so each line already carries its `\n`) with `"\n".join(...)`, emitting a double
+  newline between every line. The model-proposed patch was therefore malformed and `git apply`
+  rejected it ("corrupt patch at line 11").
+- Fix: `packages/fixer/edits.py` only - diff lines are now terminated with the file's real line ending
+  (`\r\n` for CRLF, `\n` otherwise) and joined directly; the `\ No newline at end of file` marker is
+  emitted when a file lacks a trailing newline. Invalid-target diagnostics no longer interpolate the
+  raw model-supplied path (safe `INVALID_EDIT_TARGET` codes instead). An unexpected validator error
+  returns `EDIT_VALIDATION_FAILED` without leaking exception text. Deterministic rejection, bounded
+  retries, source immutability on failed edits, approval requirement, and independent verification
+  all preserved.
+- Verification (`.venv\Scripts\python.exe`): new regression tests
+  `tests/unit/test_fixer_edit_git_apply.py` (7 tests) - LF file, no-final-newline (marker + content
+  preserved), CRLF file (`apply_edits` preserves CRLF), multi-line edit, multi-hunk edit (2 hunks),
+  multi-file edit, and full `generate_patch_edits` → `validate_diff` → `check_applies` → `apply_diff`
+  end-to-end with the original source dir untouched. All 7 pass. Fixer suite 67 passed. CLI +
+  report tests exit 0. Full fast loop `pytest -q -m "not slow"`: exit 0, 1209 collected, 0 failed.
+  `ruff check .`: All checks passed! `git diff --check`: exit 0. Forbidden paths vs main: empty diff.
+  Default patch_format remains "diff". Live edit-vs-diff comparison NOT RUN (mocked model client only;
+  needs main-repo evaluation with credentials/budget controls).
+- Limitation: CRLF `git apply` on Windows rejects CRLF line endings in patch files ("corrupt patch")
+  regardless of `core.autocrlf` - a `git apply`/Windows limitation, not an `apply_edits` bug.
+  `apply_edits` output (CRLF new_contents + CRLF diff) is correct; on Linux CRLF patches apply
+  cleanly.
