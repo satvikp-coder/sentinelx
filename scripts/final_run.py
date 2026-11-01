@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sentinelx.model_clients import estimate_cost, load_models_config
 from sentinelx.policy import redaction as _redact
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,21 @@ def _build_child_env(live: bool) -> dict[str, str]:
                 if re.search(r"(KEY|TOKEN|SECRET)", k, re.IGNORECASE):
                     env[k] = "[REDACTED]"
     return env
+
+
+def _worst_case_usd_pure(step: PlannedStep) -> str | None:
+    if not step.live or not step.profile:
+        return None
+    try:
+        cfg = load_models_config()
+        prof = cfg.profiles.get(step.profile)
+        if prof is None:
+            return None
+        per_call = estimate_cost(prof, step.est_tokens_in, step.est_tokens_out)
+        total = per_call * step.est_calls
+        return f"{total:.4f}"
+    except Exception:
+        return None
 
 
 @dataclass
@@ -220,6 +236,46 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
               f"{', '.join(s.name for s in steps)}", file=sys.stderr)
         return 2
 
+    # Early dry-run path: print plan with pure-Python worst-case estimates, no subprocess
+    if dry_run:
+        print("DRY-RUN PLAN")
+        for step in steps:
+            if only and step.name != only:
+                continue
+            if step.live:
+                live_desc = f"LIVE model={step.profile} expected_calls={step.est_calls}"
+            else:
+                live_desc = "offline (no model)"
+            print(f"  {step.name}: {live_desc}")
+            for cmd in step.commands:
+                print(f"      $ {' '.join(cmd)}")
+            if step.live:
+                worst = _worst_case_usd_pure(step)
+                if worst is not None:
+                    print(f"      worst-case estimate: ${worst}")
+                else:
+                    print("      worst-case estimate: not computed in dry-run")
+        # Build records for manifest without launching anything
+        for step in steps:
+            if only and step.name != only:
+                continue
+            rec = StepRecord(step.name, step.commands)
+            if step.note:
+                rec.skipped_reason = step.note
+            else:
+                rec.skipped_reason = "dry-run: not executed"
+                if step.live:
+                    worst = _worst_case_usd_pure(step)
+                    rec.estimated = {"profile": step.profile,
+                                     "expected_model_calls": step.est_calls,
+                                     "worst_case_usd": worst,
+                                     "guard_exit_code": None}
+            records.append(rec)
+        _write_manifest(manifest_path, started, records, dry_run=True)
+        print(f"\ndry-run finished; manifest: {manifest_path.as_posix()}", flush=True)
+        return 0
+
+    started_labs = False
     for step in steps:
         if only and step.name != only:
             continue
@@ -242,7 +298,8 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
                       file=sys.stderr, flush=True)
                 records.append(record)
                 _write_manifest(manifest_path, started, records, dry_run=dry_run)
-                shutdown_labs()
+                if started_labs:
+                    shutdown_labs()
                 return 3
             print(f"--- {step.name}: spend guard OK (worst case ${worst}, "
                   f"{step.est_calls} expected calls)", flush=True)
@@ -252,11 +309,8 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
         for cmd in step.commands:
             redacted_cmd = _redact_cmd(cmd)
             print(f"--- {step.name}: $ {' '.join(redacted_cmd)}", flush=True)
-        if dry_run:
-            record.skipped_reason = "dry-run: not executed"
-            records.append(record)
-            continue
 
+        started_labs = True
         started_at = time.monotonic()
         last: subprocess.CompletedProcess | None = None
         failed = False
@@ -283,13 +337,16 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
             _write_manifest(manifest_path, started, records, dry_run=dry_run)
             print(f"STEP FAILED: {step.name} (exit {record.exit_code})", file=sys.stderr,
                   flush=True)
-            shutdown_labs()
+            if started_labs:
+                shutdown_labs()
             if not continue_on_error:
                 return 1
 
     _write_manifest(manifest_path, started, records, dry_run=dry_run)
     print(f"\nplan {'(dry-run) ' if dry_run else ''}finished; manifest: "
           f"{manifest_path.as_posix()}", flush=True)
+    if started_labs:
+        shutdown_labs()
     return 0
 
 
