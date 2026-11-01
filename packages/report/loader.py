@@ -312,6 +312,7 @@ class FixResult:
     verification_status: str | None
     failed_checks: list[tuple[str, str]]
     explanation: str | None
+    patch_format: str | None  # absent in older reports; never invented
 
 
 @dataclass(frozen=True)
@@ -335,7 +336,7 @@ def _build_fix(d: dict[str, Any], src: str) -> FixData:
             finding_id=str(r.get("finding_id")), lab=str(r.get("lab")),
             status=status, patch_status=r.get("patch_status"),
             verification_status=r.get("verification_status"), failed_checks=failed,
-            explanation=r.get("explanation")))
+            explanation=r.get("explanation"), patch_format=r.get("patch_format")))
     spend = d.get("spend") if isinstance(d.get("spend"), dict) else None
     return FixData(counts, results, spend, model_label(d.get("provenance") or {}))
 

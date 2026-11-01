@@ -133,7 +133,10 @@ def _fix(args) -> int:
     print(f"fixing {args.target_id} from {report}")
     print("note: the fix engine works on a disposable copy of the lab source "
           "(--repo validated only)")
-    return run_script("run_fix.py", ["--target", args.target_id, "--scan-report", str(report)])
+    argv = ["--target", args.target_id, "--scan-report", str(report)]
+    if getattr(args, "patch_format", None):
+        argv += ["--patch-format", args.patch_format]
+    return run_script("run_fix.py", argv)
 
 
 def _guard(args) -> int:

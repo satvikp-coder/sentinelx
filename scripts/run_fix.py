@@ -31,6 +31,9 @@ def main() -> int:
     ap.add_argument("--max", type=int, default=6)
     ap.add_argument("--approve")
     ap.add_argument("--reviewer", default="developer")
+    ap.add_argument("--patch-format", choices=["edits", "diff"], default=None,
+                    help="Patch format for this run (default: the configured "
+                         "patch_format in configs/fix/policy.yaml, currently 'diff')")
     ap.add_argument("--db", default=str(DEFAULT_DB))
     args = ap.parse_args()
 
@@ -70,7 +73,8 @@ def main() -> int:
             cand = f["candidate"]
             outcome = run_fix(f, lab=args.target, conn=conn, client=client, policy=policy,
                              original_findings=findings, models_config=models_config,
-                             profile_name=routed.profile_name)
+                             profile_name=routed.profile_name,
+                             patch_format=args.patch_format)
             print(f"{cand['id']} ({cand['vuln_class']}): {outcome.status} "
                  f"patch={outcome.patch_id} ticket={outcome.ticket_id} "
                  f"retries={outcome.retries_used}")

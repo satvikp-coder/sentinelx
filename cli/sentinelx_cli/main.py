@@ -54,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_fix = site_sub.add_parser("fix", help="Run fixes for a target")
     p_fix.add_argument("target_id", help="Target ID")
     p_fix.add_argument("--repo", required=True, help="Path to local repository")
+    p_fix.add_argument("--patch-format", choices=["diff", "edits"], default=None,
+                       help="Patch format for this run (default: configured patch_format, "
+                            "currently 'diff')")
     p_fix.set_defaults(func=lambda args: site_cmd(args, "fix"))
 
     p_guard = site_sub.add_parser("guard", help="Run shield proxy in front of a target")

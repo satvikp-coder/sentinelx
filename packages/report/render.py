@@ -245,7 +245,8 @@ def render_fix(section: Section) -> str:
                                  "OBSERVED"))
     parts.append('<div class="grid">' + "".join(cards) + "</div>")
     parts.append("<table><tr><th>lab</th><th>finding</th><th>state</th>"
-                 "<th>verification verdict</th><th>patch</th><th>rejected: failing check</th>"
+                 "<th>patch format</th><th>verification verdict</th><th>patch</th>"
+                 "<th>rejected: failing check</th>"
                  "</tr>")
     for r in data.results:
         if r.verification_status == "REJECTED" and r.failed_checks:
@@ -255,8 +256,10 @@ def render_fix(section: Section) -> str:
         else:
             reason = ""
         patch = r.patch_status if r.patch_status else NO_PATCH
+        fmt = r.patch_format if r.patch_format else NOT_RECORDED
         parts.append(f"<tr><td>{esc(r.lab)}</td><td>{esc(r.finding_id)}</td>"
-                     f"<td>{esc(r.status)}</td><td>{esc(r.verification_status or 'not run')}"
+                     f"<td>{esc(r.status)}</td><td>{esc(fmt)}</td>"
+                     f"<td>{esc(r.verification_status or 'not run')}"
                      f"</td><td>{esc(patch)}</td><td>{esc(reason)}</td></tr>")
     parts.append("</table>")
     parts.append("<h3>model's description of its proposed patch (not verified)</h3>")
