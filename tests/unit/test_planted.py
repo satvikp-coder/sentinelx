@@ -1,8 +1,9 @@
 """Ground truth of the two labs: PLANTED.json validity, coverage and reference-copy differences,
-plus the rule that nothing under packages/ may read the *_reference copies."""
+plus the rule that nothing under packages/ or scripts/ may read a lab clean copy or PLANTED.json."""
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from collections import Counter
@@ -77,27 +78,84 @@ def test_summary_counts_for_the_report() -> None:
 
 
 # ------------------------------------------------------------------ reference isolation
-def test_nothing_under_packages_references_the_reference_copies() -> None:
-    """No package may mention a *_reference copy, ever. `labs[/\\\\]` is the same blanket ban
-    EXCEPT in packages/fixer, which by design (Prompt 9 Part A) reads a lab's OWN source
-    directory from disk - its own, separate static test (test_fixer_safety.py) is what
-    actually proves it never reaches PLANTED.json or a *_reference copy."""
+def _clean_suffix() -> str:
+    """Built from parts so this test file never spells the suffix as one literal."""
+    return "_" + "reference"
+
+
+_PLANTED_NAME = "PLANTED" + ".json"
+_SANCTIONED = (
+    # the ONE sanctioned PLANTED.json reader: it scores a FINISHED scan against ground
+    # truth, never during scanning; its own tests cover it (docs/DECISIONS.md).
+    ROOT / "packages" / "evaluation" / "scan_scoring.py",
+)
+
+
+def _file_reaches_reference(tree: ast.AST) -> bool:
+    """True when a parsed module builds or uses a PATH into labs/<clean copy> or PLANTED.json.
+    Identifiers, docstrings and evaluations/ artifact names that merely contain the word are
+    NOT offenced."""
+    suffix = _clean_suffix()
+    consts = [n.value.replace("\\", "/") for n in ast.walk(tree)
+              if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    if any("labs/" in c.lower() and suffix in c for c in consts):
+        return True  # a literal path into a lab clean copy
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):  # open()/read_text()/glob() on a literal PLANTED path
+            args = [*node.args, *(kw.value for kw in node.keywords)]
+            if any(isinstance(a, ast.Constant) and isinstance(a.value, str)
+                   and _PLANTED_NAME in a.value for a in args):
+                return True
+        if isinstance(node, ast.BinOp):  # Path(...) / "PLANTED.json"
+            for operand in (node.left, node.right):
+                if isinstance(operand, ast.Constant) and isinstance(operand.value, str) \
+                        and _PLANTED_NAME in operand.value:
+                    return True
+    has_labs_root = any(c.rstrip("/").lower().endswith("labs") for c in consts)
+    has_clean_fragment = any(c == suffix or c.endswith("/" + suffix) for c in consts)
+    return has_labs_root and has_clean_fragment  # a path built from parts
+
+
+def _reference_path_offenders(root: Path) -> list[str]:
     offenders: list[str] = []
-    for path in (ROOT / "packages").rglob("*"):
-        if not path.is_file() or path.suffix in {".pyc", ".db"} or "__pycache__" in path.parts:
+    for base in (root / "packages", root / "scripts"):
+        if not base.is_dir():
             continue
-        try:
-            text = path.read_text("utf-8")
-        except UnicodeDecodeError:
-            continue
-        if re.search(r"_reference\b", text):
-            offenders.append(str(path.relative_to(ROOT)))
-            continue
-        if "fixer" in path.parts:
-            continue
-        if re.search(r"labs[/\\]", text):
-            offenders.append(str(path.relative_to(ROOT)))
-    assert offenders == [], f"packages/ must not read lab or reference paths: {offenders}"
+        for path in sorted(base.rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            if any(path == s or s in path.parents for s in _SANCTIONED):
+                continue
+            try:
+                tree = ast.parse(path.read_text("utf-8"))
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            if _file_reaches_reference(tree):
+                offenders.append(path.relative_to(root).as_posix())
+    return offenders
+
+
+def test_nothing_under_packages_or_scripts_reaches_a_clean_copy_or_planted() -> None:
+    """No file under packages/ or scripts/ may build or use a path into a lab clean copy or
+    to PLANTED.json. The one sanctioned PLANTED reader (which scores a FINISHED scan) is
+    exempt; no other reader may exist. A mere word in an identifier or an evaluations/
+    artifact name is not an offence."""
+    offenders = _reference_path_offenders(ROOT)
+    assert offenders == [], f"clean-copy/PLANTED path use: {offenders}"
+
+
+def test_guard_flags_a_file_that_opens_a_clean_copy(tmp_path: Path) -> None:
+    bad = tmp_path / "packages" / "bad_module.py"
+    bad.parent.mkdir(parents=True)
+    bad.write_text(f'open("labs/vibe_notes_node{_clean_suffix()}/server.js").read()\n',
+                   encoding="utf-8")
+    assert _reference_path_offenders(tmp_path) == ["packages/bad_module.py"]
+
+
+def test_guard_does_not_flag_the_report_loader() -> None:
+    loader = ROOT / "packages" / "report" / "loader.py"
+    tree = ast.parse(loader.read_text("utf-8"))
+    assert not _file_reaches_reference(tree)
 
 
 def test_reference_copies_are_not_importable_as_packages_data() -> None:
