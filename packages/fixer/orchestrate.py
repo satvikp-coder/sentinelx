@@ -22,7 +22,7 @@ from .apply import ApplyError, apply_diff
 from .diagnose import DiagnosedLocation, DiagnosisFailure, diagnose
 from .ladder import LadderOutcome, decide, escalate
 from .models import FixPolicy, RepoScope
-from .patch_gen import PatchGenResult, generate_patch
+from .patch_gen import PatchGenResult, generate_patch, generate_patch_edits
 from .scope import create_scope, destroy_scope
 from .verify import TimedCheck, VerificationReport, verify_patch
 
@@ -108,10 +108,16 @@ def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPo
                                 "Have a human write the fix directly."])
                     return FixOutcome(finding_id, vuln_class, "ESCALATED", ticket_id=ticket_id,
                                      diagnosis=diag, retries_used=retries)
-            patch = generate_patch(scope, diag, vuln_class=vuln_class, method=candidate["method"],
-                                   endpoint=candidate["endpoint"], summary=candidate["summary"],
-                                   client=client, allowed_files={diag.file},
-                                   usage_sink=model_results)
+            if getattr(policy, "patch_format", "diff") == "edits":
+                patch = generate_patch_edits(
+                    scope, diag, vuln_class=vuln_class, method=candidate["method"],
+                    endpoint=candidate["endpoint"], summary=candidate["summary"],
+                    client=client, allowed_files={diag.file}, usage_sink=model_results)
+            else:
+                patch = generate_patch(
+                    scope, diag, vuln_class=vuln_class, method=candidate["method"],
+                    endpoint=candidate["endpoint"], summary=candidate["summary"],
+                    client=client, allowed_files={diag.file}, usage_sink=model_results)
             verification = None
             if patch.status == "VALIDATED":
                 # each attempt starts from the unpatched baseline, never stacked on a

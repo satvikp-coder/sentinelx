@@ -4,7 +4,7 @@
 # never auto-applied). Written from general, standard security remediation practice; this file
 # must not be derived from, or aligned to, any lab's PLANTED.json (the fixer never reads it).
 policy_version: fix-policy-1
-
+patch_format: diff
 entries:
   sql_injection:
     fix_category: parameterized_query
