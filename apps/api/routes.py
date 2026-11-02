@@ -458,14 +458,21 @@ async def create_run(
     payload: RunCreate,
     user: str = Depends(_require_auth),
 ):
+    sid = payload.session_id
     async with store.lock:
-        if payload.session_id not in store.sessions:
+        if sid not in store.sessions:
             raise HTTPException(status_code=404, detail="session not found")
+        session = store.sessions[sid]
+        if session["state"] != RunState.PENDING:
+            raise HTTPException(
+                status_code=400,
+                detail=f"session is in {session['state']} state, cannot start run",
+            )
         rid = _new_id()
         now = _now()
         run = {
             "id": rid,
-            "session_id": payload.session_id,
+            "session_id": sid,
             "state": RunState.RUNNING,
             "model_mode": payload.model_mode,
             "created_at": now,
@@ -476,6 +483,13 @@ async def create_run(
             "actions_blocked": 0,
         }
         store.runs[rid] = run
+        # Transition session to RUNNING state
+        session["state"] = RunState.RUNNING
+        state = _SESSION_STATE.get(sid)
+        if state is not None:
+            state["steps_taken"] = 0
+            state["last_step"] = None
+            state["request_timestamps"] = []
     await events.event_stream.append(
         EventKind.RUN_STARTED,
         {"run_id": str(rid), "session_id": str(payload.session_id), "arm": ""},
