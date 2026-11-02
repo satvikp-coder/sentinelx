@@ -18,6 +18,7 @@ from .integrity import IntegrityReport
 from .loader import (
     RECALL_LABEL,
     AgentGuardRun,
+    ExplanationsData,
     FixData,
     Metric,
     Section,
@@ -386,6 +387,53 @@ def render_limitations(section: Section) -> str:
     return "".join(parts)
 
 
+# ------------------------------------------------------------------ explanations
+def render_explanations(section: Section) -> str:
+    if not section.ok:
+        return section_na("Model-written report explanations", section)
+    data: ExplanationsData = section.data
+    parts = ["<h2>Model-written report explanations</h2>"]
+    parts.append(
+        f"<div class='muted'>run_dir {esc(data.run_dir)} · "
+        f"cases {', '.join(esc(c) for c in data.cases)} · "
+        f"{len(data.findings)} findings</div>")
+    for finding in data.findings:
+        mode_chip = label_chip(finding.mode.upper() if finding.mode else "UNKNOWN")
+        state_chip = label_chip(finding.state.upper() if finding.state else "UNKNOWN")
+        parts.append(f"<h3>{esc(finding.case)} / {esc(finding.arm)} {mode_chip} {state_chip}</h3>")
+        parts.append(
+            f"<div class='muted'>session {esc(finding.session_id)} · "
+            f"valid: {esc(str(finding.run_valid))} · "
+            f"severity: {esc(finding.severity)} · "
+            f"fidelity: {finding.numerator}/{finding.denominator}</div>")
+        parts.append(f"<p>{esc(finding.summary)}</p>")
+        if finding.note:
+            parts.append(f"<div class='muted'>note: {esc(finding.note)}</div>")
+        if finding.mitigations:
+            parts.append(f"<div class='muted'>mitigations: "
+                         f"{', '.join(esc(m) for m in finding.mitigations)}</div>")
+        if finding.model_call:
+            mc = finding.model_call
+            parts.append(
+                f"<div class='muted'>model {esc(str(mc.get('provider', '')))} / "
+                f"{esc(str(mc.get('model', '')))} · mode {esc(str(mc.get('mode', '')))} · "
+                f"calls {esc(str(mc.get('http_calls', '')))} · tokens "
+                f"{esc(str(mc.get('tokens_in', '')))} / {esc(str(mc.get('tokens_out', '')))} · "
+                f"latency {esc(str(mc.get('latency_ms', '')))}ms · "
+                f"error {esc(str(mc.get('error', '')))}</div>")
+        parts.append(
+            "<table><tr><th>claim</th><th>kind</th><th>passed</th><th>code</th>"
+            "<th>cited events</th><th>confidence</th><th>text</th></tr>")
+        for c in finding.claims:
+            cited = ", ".join(esc(e) for e in c.cited_event_ids)
+            parts.append(
+                f"<tr><td>{esc(c.claim_id)}</td><td>{esc(c.kind)}</td><td>{esc(str(c.passed))}</td>"
+                f"<td>{esc(c.code)}</td><td>{cited}</td><td>{esc(c.confidence or '-')}</td>"
+                f"<td>{esc(c.text)}</td></tr>")
+        parts.append("</table>")
+    return "".join(parts)
+
+
 # ------------------------------------------------------------------ (9) provenance
 def render_provenance(sections: list[Section]) -> str:
     parts = ["<h2>Provenance</h2>"]
@@ -441,6 +489,8 @@ def render_index(sections: dict[str, Section], integrity: IntegrityReport,
         render_integrity(integrity),
         render_limitations(sections.get("limitations", Section("limitations", "NOT AVAILABLE",
                                                                "", "not loaded"))),
+        render_explanations(sections.get("explanations", Section("explanations", "NOT AVAILABLE",
+                                                                 "", "not loaded"))),
         render_provenance([s for name, s in sorted(sections.items())
                            if name.startswith("provenance:")]),
     ]
