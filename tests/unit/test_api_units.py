@@ -171,7 +171,7 @@ def test_guard_allow_running_session(client):
     sid = _make_running_session(client)
     r = client.post("/api/v1/guard/decide",
                     json={"session_id": sid, "tool": "navigate",
-                          "arguments": {"url": "http://127.0.0.1/"}},
+                          "arguments": {"url": "http://orders.lab.test/"}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
@@ -188,7 +188,7 @@ def test_guard_pending_session_blocked(client):
     sid = r.json()["id"]  # state is PENDING
     r = client.post("/api/v1/guard/decide",
                     json={"session_id": sid, "tool": "navigate",
-                          "arguments": {"url": "http://127.0.0.1/"}},
+                          "arguments": {"url": "http://orders.lab.test/"}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
@@ -208,18 +208,18 @@ def test_guard_block_no_args(client):
     assert d["blocked"] is True
 
 
-def test_guard_confirm_with_args(client):
-    """send to an allowed host with arguments receives CONFIRM (high-impact)."""
+def test_guard_send_tool_not_in_scenario_blocked(client):
+    """send is a high-impact tool but is NOT in S1's allowed_actions → BLOCK."""
     sid = _make_running_session(client)
     r = client.post("/api/v1/guard/decide",
                     json={"session_id": sid, "tool": "send",
-                          "arguments": {"url": "http://127.0.0.1/", "body": "hello"}},
+                          "arguments": {"url": "http://orders.lab.test/", "body": "hello"}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
-    assert d["decision"] == "CONFIRM"
-    assert d["blocked"] is False
-    assert d["requires_human"] is True
+    assert d["decision"] == "BLOCK"
+    assert d["blocked"] is True
+    assert d["reason_code"] == "TOOL_NOT_IN_SCENARIO"
 
 
 def test_guard_external_navigation_blocked(client):
@@ -284,7 +284,7 @@ def test_policy_decide_read_allow(client):
     sid = _make_running_session(client)
     r = client.post("/api/v1/policy/decide",
                     json={"session_id": sid, "tool": "navigate",
-                          "arguments": {"url": "http://127.0.0.1/"},
+                          "arguments": {"url": "http://orders.lab.test/"},
                           "allowed_hosts": []},
                     headers=AUTH)
     assert r.status_code == 200

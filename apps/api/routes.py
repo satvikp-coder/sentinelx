@@ -33,7 +33,7 @@ from sentinelx.policy import (
 
 from . import events
 from .auth import require_demo_auth
-from .events import sse_response
+from .events import event_stream, sse_response
 from .schemas import (
     ApprovalRecordResponse,
     CancelResponse,
@@ -73,44 +73,76 @@ router = APIRouter()
 _POLICY_PATH = Path(__file__).resolve().parents[2] / "configs" / "policy" / "default.yaml"
 _POLICY: LoadedPolicy = load_policy(_POLICY_PATH)
 
-# Server-owned scenario built from session data (never from client input).
-# Allowed hosts are limited to localhost/lab addresses; external navigation is
-# rejected by the gateway unless explicitly allowed in a server-owned scenario.
-_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
+# ------------------------------------------------------------------ scenario registry
+# Trusted scenario definitions loaded from fixtures/scenarios/*.json at startup.
+# These are immutable and content-addressed; the API never fabricates a scenario
+# from client input. A session is bound to exactly one scenario at creation time.
+_SCENARIOS: dict[str, ScenarioSpec] = {}
+
+
+def _load_scenarios() -> dict[str, ScenarioSpec]:
+    """Load all trusted scenario definitions from fixtures/scenarios/*.json.
+
+    Raises at import time if any scenario file is invalid, so a corrupted or
+    missing scenario definition never silently degrades into a fabricated one.
+    """
+    scenarios: dict[str, ScenarioSpec] = {}
+    fixtures_dir = Path(__file__).resolve().parents[2] / "fixtures" / "scenarios"
+    if not fixtures_dir.is_dir():
+        raise RuntimeError(f"scenarios directory not found: {fixtures_dir}")
+    for path in sorted(fixtures_dir.glob("*.json")):
+        spec = ScenarioSpec.model_validate_json(path.read_text(encoding="utf-8"))
+        scenarios[spec.id] = spec
+    return scenarios
+
+
+_SCENARIOS = _load_scenarios()
+
+# Per-session trusted scenario binding. Populated at session creation time and
+# never rewritten. Used by _session_scenario() to look up the exact authorized
+# hosts/actions for the session's scenario.
+_SESSION_SCENARIOS: dict[UUID, ScenarioSpec] = {}
+
+# Per-session runtime state tracking (step counters, rate-limit windows,
+# kill-switch, user restrictions, approvals). Populated at session creation
+# and updated on each decision. Never derived from client input.
+_SESSION_STATE: dict[UUID, dict[str, Any]] = {}
 
 
 def _session_scenario(session: dict[str, Any]) -> ScenarioSpec:
-    """Build a server-owned :class:`ScenarioSpec` from session data.
+    """Return the trusted scenario bound to this session at creation time.
 
-    Client-supplied fields (e.g. ``allowed_hosts`` on the request) are never
-    trusted. The scenario's allowed actions come from all tools that the loaded
-    policy knows about (``tool_argument_rules``), not just the read-only
-    ``allowed_tools`` subset. Allowed hosts are limited to lab addresses.
+    The scenario_id stored on the session is only a reference; the actual
+    authorized hosts/actions come from the immutable registry lookup. If the
+    session has no bound scenario (legacy or malformed), fail closed.
     """
-    return ScenarioSpec.model_validate(
-        {
-            "id": session["scenario_id"],
-            "seed": 0,
-            "fixture_id": session.get("lab", "demo"),
-            "fixture_version": "1",
-            "goal": "api action",
-            "allowed_hosts": list(_API_ALLOWED_HOSTS),
-            "allowed_actions": [r.tool for r in _POLICY.config.tool_argument_rules],
-            "attack_surface": "api",
-            "attack_payload_id": "api",
-            "forbidden_outcome": {"type": "none", "endpoint": "none"},
-            "goal_assertion": {"type": "none", "expected": None},
-        }
-    )
+    sid = session["id"]
+    spec = _SESSION_SCENARIOS.get(sid)
+    if spec is None:
+        raise HTTPException(
+            status_code=404,
+            detail="session has no trusted scenario binding",
+        )
+    return spec
 
 
 def _session_context(session: dict[str, Any]) -> SessionContext:
     """Build a server-owned :class:`SessionContext` from session data.
 
-    The session state is taken from the server-side store, never from the
+    All fields come from the server-side per-session state, never from the
     client request. The API ``RunState`` enum uses lowercase values while the
     policy ``SessionState`` enum uses uppercase values, so we normalize here.
+    Step counters, rate-limit windows, kill-switch state, user restrictions,
+    and approvals are tracked per-session and updated on each decision.
     """
+    sid = session["id"]
+    state = _SESSION_STATE.get(sid)
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail="session has no runtime state",
+        )
+
     state_val = session.get("state", "PENDING")
     if hasattr(state_val, "value"):
         state_str = state_val.value
@@ -120,31 +152,42 @@ def _session_context(session: dict[str, Any]) -> SessionContext:
         session_state = SessionState(state_str.upper())
     except ValueError:
         session_state = SessionState.CREATED
+
+    # Prune request timestamps older than one minute.
+    now_ts = datetime.now(UTC)
+    window_start = now_ts.timestamp() - 60.0
+    timestamps = [
+        t for t in state["request_timestamps"] if t > window_start
+    ]
+    state["request_timestamps"] = timestamps
+
     return SessionContext.model_validate(
         {
             "session_id": str(session["id"]),
             "state": session_state,
-            "last_step": None,
-            "steps_taken": 0,
-            "requests_last_minute": 0,
-            "kill_switch": False,
-            "page_origin": None,
-            "user_restrictions": {},
-            "approvals": [],
+            "last_step": state["last_step"],
+            "steps_taken": state["steps_taken"],
+            "requests_last_minute": len(timestamps),
+            "kill_switch": state["kill_switch"],
+            "page_origin": state["page_origin"],
+            "user_restrictions": state["user_restrictions"],
+            "approvals": state["approvals"],
             "untrusted_texts": [],
         }
     )
 
 
-def _gateway_decide(
+async def _gateway_decide(
     session_id: UUID, tool: str, arguments: dict[str, Any]
 ) -> PolicyDecision:
     """Route a single action decision through the real policy gateway.
 
     Validates that the session exists in the server-side store, builds a
-    server-owned scenario and session context, and calls
-    ``sentinelx.policy.evaluate``. Raises HTTP 404 when the session does not
-    exist. Never returns ALLOW for a nonexistent or invalid session.
+    server-owned scenario and session context from the trusted per-session
+    state, calls ``sentinelx.policy.evaluate``, records the decision as an
+    ACTION_DECIDED evidence event, and updates per-session step/rate-limit
+    counters. Raises HTTP 404 when the session does not exist. Never returns
+    ALLOW for a nonexistent or invalid session.
     """
     session = store.sessions.get(session_id)
     if session is None:
@@ -153,10 +196,14 @@ def _gateway_decide(
     scenario = _session_scenario(session)
     ctx = _session_context(session)
 
+    # Step number is strictly increasing per session.
+    state = _SESSION_STATE[session_id]
+    next_step = (state["last_step"] or 0) + 1
+
     action_request = ActionRequest.model_validate(
         {
             "session_id": str(session_id),
-            "step": 1,
+            "step": next_step,
             "action_id": f"api-{uuid4().hex[:12]}",
             "timestamp": datetime.now(UTC),
             "actor": "api",
@@ -165,7 +212,31 @@ def _gateway_decide(
         }
     )
 
-    return evaluate(action_request, scenario, _POLICY, ctx)
+    decision = evaluate(action_request, scenario, _POLICY, ctx)
+
+    # Record the decision as an ACTION_DECIDED evidence event.
+    await event_stream.append(
+        EventKind.ACTION_DECIDED,
+        {
+            "session_id": str(session_id),
+            "action_id": action_request.action_id,
+            "tool": tool,
+            "decision": decision.decision.value,
+            "reason_code": decision.reason_code,
+            "rule_ids": decision.rule_ids,
+            "requires_human": decision.requires_human,
+            "policy_version": decision.policy_version,
+            "scenario_id": session["scenario_id"],
+        },
+        run_id=None,
+    )
+
+    # Update per-session runtime state after the decision is recorded.
+    state["steps_taken"] = state["steps_taken"] + 1
+    state["last_step"] = next_step
+    state["request_timestamps"].append(datetime.now(UTC).timestamp())
+
+    return decision
 
 
 # Map gateway decisions to the API's Decision enum (same StrEnum values).
@@ -254,6 +325,15 @@ async def create_session(
 ):
     if idempotency_key and idempotency_key in store.idempotency:
         return store.idempotency[idempotency_key]
+    # Validate the scenario_id against the trusted registry before creating
+    # the session. Unknown scenarios fail closed — we never fabricate a
+    # scenario from client input.
+    spec = _SCENARIOS.get(payload.scenario_id)
+    if spec is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"unknown scenario: {payload.scenario_id}",
+        )
     async with store.lock:
         sid = _new_id()
         now = _now()
@@ -268,6 +348,23 @@ async def create_session(
             "updated_at": now,
         }
         store.sessions[sid] = session
+        # Bind the trusted scenario to this session. Authorized hosts/actions
+        # come only from this immutable spec.
+        _SESSION_SCENARIOS[sid] = spec
+        # Initialize per-session runtime state for the gateway context.
+        _SESSION_STATE[sid] = {
+            "steps_taken": 0,
+            "last_step": None,
+            "request_timestamps": [],  # timestamps of requests in the last minute
+            "kill_switch": False,
+            "user_restrictions": {
+                "forbidden_tools": (),
+                "forbidden_arguments": (),
+                "blocked_destinations": (),
+            },
+            "approvals": [],
+            "page_origin": None,
+        }
         if idempotency_key:
             store.idempotency[idempotency_key] = session
     await events.event_stream.append(
@@ -407,7 +504,7 @@ async def policy_decide(
     # Route through the real deterministic policy gateway. Client-supplied
     # ``allowed_hosts`` is intentionally ignored — only server-owned scenario
     # data is used. A nonexistent session cannot receive ALLOW.
-    gw = _gateway_decide(payload.session_id, payload.tool, payload.arguments)
+    gw = await _gateway_decide(payload.session_id, payload.tool, payload.arguments)
     return PolicyDecisionResponse(
         decision=_api_decision(gw.decision),
         reason_code=gw.reason_code,
@@ -685,7 +782,7 @@ async def guard_decide(
     # ONLY authority for allow/block/confirm — the API never grants
     # authorization independently. A nonexistent session cannot receive ALLOW,
     # and external navigation to a forbidden host returns BLOCK.
-    gw = _gateway_decide(payload.session_id, payload.tool, payload.arguments)
+    gw = await _gateway_decide(payload.session_id, payload.tool, payload.arguments)
     blocked = gw.decision is _CommonDecision.BLOCK
     return GuardDecideResponse(
         decision=_api_decision(gw.decision),
