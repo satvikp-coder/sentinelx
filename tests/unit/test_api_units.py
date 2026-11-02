@@ -7,8 +7,7 @@ evidence integrity, model-unavailable handling.
 
 from __future__ import annotations
 
-import json
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -140,11 +139,39 @@ def test_run_unknown_session(client):
     assert r.status_code == 404
 
 
-# ------------------------------------------------------------------ guard sidecar (allow / block / confirm)
+# ------------------------------------------------------------------ guard sidecar
 
-def test_guard_allow(client):
+import apps.api.routes as _routes_mod  # noqa: E402  (store access for test setup)
+
+
+def _make_running_session(client):
+    """Create a session and set its state to RUNNING in the server-side store.
+    Returns the session ID as a string (for JSON bodies)."""
+    r = client.post("/api/v1/sessions",
+                    json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    sid_str = r.json()["id"]
+    sid = UUID(sid_str)
+    _routes_mod.store.sessions[sid]["state"] = "running"
+    return sid_str
+
+
+def test_guard_nonexistent_session_returns_404(client):
+    """A nonexistent session must never receive ALLOW."""
     r = client.post("/api/v1/guard/decide",
-                    json={"session_id": str(uuid4()), "tool": "navigate", "arguments": {}},
+                    json={"session_id": str(uuid4()), "tool": "navigate",
+                          "arguments": {"url": "http://127.0.0.1/"}},
+                    headers=AUTH)
+    assert r.status_code == 404
+
+
+def test_guard_allow_running_session(client):
+    """Valid RUNNING session with an allowed read action receives ALLOW."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/guard/decide",
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://127.0.0.1/"}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
@@ -153,9 +180,27 @@ def test_guard_allow(client):
     assert d["requires_human"] is False
 
 
-def test_guard_block_no_args(client):
+def test_guard_pending_session_blocked(client):
+    """A PENDING (not RUNNING) session receives BLOCK, not ALLOW."""
+    r = client.post("/api/v1/sessions",
+                    json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                    headers=AUTH)
+    sid = r.json()["id"]  # state is PENDING
     r = client.post("/api/v1/guard/decide",
-                    json={"session_id": str(uuid4()), "tool": "http_request", "arguments": {}},
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://127.0.0.1/"}},
+                    headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["decision"] == "BLOCK"
+    assert d["blocked"] is True
+
+
+def test_guard_block_no_args(client):
+    """http_request with no arguments is BLOCKED (missing required url arg)."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/guard/decide",
+                    json={"session_id": sid, "tool": "http_request", "arguments": {}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
@@ -164,9 +209,11 @@ def test_guard_block_no_args(client):
 
 
 def test_guard_confirm_with_args(client):
+    """send to an allowed host with arguments receives CONFIRM (high-impact)."""
+    sid = _make_running_session(client)
     r = client.post("/api/v1/guard/decide",
-                    json={"session_id": str(uuid4()), "tool": "http_request",
-                          "arguments": {"url": "http://127.0.0.1:8080/"}},
+                    json={"session_id": sid, "tool": "send",
+                          "arguments": {"url": "http://127.0.0.1/", "body": "hello"}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
@@ -175,9 +222,12 @@ def test_guard_confirm_with_args(client):
     assert d["requires_human"] is True
 
 
-def test_guard_unknown_tool(client):
+def test_guard_external_navigation_blocked(client):
+    """External navigation to a forbidden host is BLOCKED (not ALLOW)."""
+    sid = _make_running_session(client)
     r = client.post("/api/v1/guard/decide",
-                    json={"session_id": str(uuid4()), "tool": "nuclear_launch", "arguments": {}},
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://evil.com/steal"}},
                     headers=AUTH)
     assert r.status_code == 200
     d = r.json()
@@ -185,7 +235,102 @@ def test_guard_unknown_tool(client):
     assert d["blocked"] is True
 
 
-# ------------------------------------------------------------------ shield rules (broad rejection)
+def test_guard_hostname_confusion_blocked(client):
+    """Hostname confusion (userinfo @ trick) is BLOCKED by the gateway."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/guard/decide",
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://orders.lab.test@evil.com/"}},
+                    headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["decision"] == "BLOCK"
+    assert d["blocked"] is True
+
+
+def test_guard_unknown_tool_blocked(client):
+    """Unknown tool is BLOCKED."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/guard/decide",
+                    json={"session_id": sid, "tool": "nuclear_launch", "arguments": {}},
+                    headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["decision"] == "BLOCK"
+    assert d["blocked"] is True
+
+
+def test_guard_missing_session_id(client):
+    """Missing session_id in the request body is rejected (422)."""
+    r = client.post("/api/v1/guard/decide",
+                    json={"tool": "navigate", "arguments": {}},
+                    headers=AUTH)
+    assert r.status_code == 422
+
+
+# ------------------------------------------------------------------ policy decide (gateway-backed)
+
+def test_policy_decide_nonexistent_session(client):
+    """A nonexistent session cannot receive ALLOW from policy/decide."""
+    r = client.post("/api/v1/policy/decide",
+                    json={"session_id": str(uuid4()), "tool": "navigate",
+                          "arguments": {}, "allowed_hosts": []},
+                    headers=AUTH)
+    assert r.status_code == 404
+
+
+def test_policy_decide_read_allow(client):
+    """Valid RUNNING session with allowed read action receives ALLOW."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/policy/decide",
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://127.0.0.1/"},
+                          "allowed_hosts": []},
+                    headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["decision"] == "ALLOW"
+
+
+def test_policy_decide_external_navigation_blocked(client):
+    """External navigation to a forbidden host is BLOCKED even if the client
+    supplies allowed_hosts that include it (client-supplied hosts are ignored)."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/policy/decide",
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://evil.com/steal"},
+                          "allowed_hosts": ["http://evil.com/"]},
+                    headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["decision"] == "BLOCK"
+
+
+def test_policy_decide_api_vs_gateway_consistency(client):
+    """policy/decide and guard/decide return the same decision for the same input."""
+    sid = _make_running_session(client)
+    payload = {"session_id": sid, "tool": "navigate",
+               "arguments": {"url": "http://evil.com/"},
+               "allowed_hosts": ["http://evil.com/"]}
+    r1 = client.post("/api/v1/policy/decide", json=payload, headers=AUTH)
+    r2 = client.post("/api/v1/guard/decide",
+                     json={"session_id": sid, "tool": "navigate",
+                           "arguments": {"url": "http://evil.com/"}},
+                     headers=AUTH)
+    d1, d2 = r1.json(), r2.json()
+    assert d1["decision"] == d2["decision"] == "BLOCK"
+
+
+def test_policy_decide_state_change_no_hosts_block(client):
+    """state-changing action without an allowed destination is BLOCKED."""
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/policy/decide",
+                    json={"session_id": sid, "tool": "http_request",
+                          "arguments": {}, "allowed_hosts": []},
+                    headers=AUTH)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["decision"] == "BLOCK"
 
 def test_shield_rule_broad_rejected(client):
     for pattern in ("/", "*"):
@@ -280,28 +425,6 @@ def test_scan_unknown_target(client):
     assert r.status_code == 404
 
 
-# ------------------------------------------------------------------ policy decide
-
-def test_policy_decide_read_allow(client):
-    r = client.post("/api/v1/policy/decide",
-                    json={"session_id": str(uuid4()), "tool": "navigate",
-                          "arguments": {}, "allowed_hosts": []},
-                    headers=AUTH)
-    assert r.status_code == 200
-    d = r.json()
-    assert d["decision"] == "ALLOW"
-
-
-def test_policy_decide_state_change_no_hosts_block(client):
-    r = client.post("/api/v1/policy/decide",
-                    json={"session_id": str(uuid4()), "tool": "http_request",
-                          "arguments": {}, "allowed_hosts": []},
-                    headers=AUTH)
-    assert r.status_code == 200
-    d = r.json()
-    assert d["decision"] == "BLOCK"
-
-
 # ------------------------------------------------------------------ events list
 
 def test_list_events(client):
@@ -313,8 +436,9 @@ def test_list_events(client):
 # ------------------------------------------------------------------ SSE event stream
 
 def test_sse_stream_route_exists(client):
-    from apps.api.main import app as fastapi_app
     from fastapi.routing import APIRoute
+
+    from apps.api.main import app as fastapi_app
 
     def collect_paths(routes, prefix=""):
         found = []
@@ -364,7 +488,7 @@ def test_evidence_verify_invalid_id(client):
     assert r.status_code == 400
 
 
-# ------------------------------------------------------------------ findings / patches / approvals / escalations (empty lists)
+# ---- findings / patches / approvals / escalations
 
 def test_empty_collections(client):
     for path in ("/api/v1/findings", "/api/v1/patches",

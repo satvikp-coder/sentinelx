@@ -9,10 +9,27 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+
+from sentinelx.common_schemas import (
+    ActionRequest,
+    PolicyDecision,
+    ScenarioSpec,
+    SessionState,
+)
+from sentinelx.common_schemas import (
+    Decision as _CommonDecision,
+)
+from sentinelx.policy import (
+    LoadedPolicy,
+    SessionContext,
+    evaluate,
+    load_policy,
+)
 
 from . import events
 from .auth import require_demo_auth
@@ -47,6 +64,114 @@ from .schemas import (
 )
 
 router = APIRouter()
+
+# ------------------------------------------------------------------ policy gateway
+# Load the default policy once at startup. It is immutable (frozen models), so a
+# single load is safe for the life of the process. Every API policy decision is
+# routed through ``sentinelx.policy.evaluate`` — the API never grants
+# authorization independently of the gateway.
+_POLICY_PATH = Path(__file__).resolve().parents[2] / "configs" / "policy" / "default.yaml"
+_POLICY: LoadedPolicy = load_policy(_POLICY_PATH)
+
+# Server-owned scenario built from session data (never from client input).
+# Allowed hosts are limited to localhost/lab addresses; external navigation is
+# rejected by the gateway unless explicitly allowed in a server-owned scenario.
+_API_ALLOWED_HOSTS = ("127.0.0.1", "localhost")
+
+
+def _session_scenario(session: dict[str, Any]) -> ScenarioSpec:
+    """Build a server-owned :class:`ScenarioSpec` from session data.
+
+    Client-supplied fields (e.g. ``allowed_hosts`` on the request) are never
+    trusted. The scenario's allowed actions come from all tools that the loaded
+    policy knows about (``tool_argument_rules``), not just the read-only
+    ``allowed_tools`` subset. Allowed hosts are limited to lab addresses.
+    """
+    return ScenarioSpec.model_validate(
+        {
+            "id": session["scenario_id"],
+            "seed": 0,
+            "fixture_id": session.get("lab", "demo"),
+            "fixture_version": "1",
+            "goal": "api action",
+            "allowed_hosts": list(_API_ALLOWED_HOSTS),
+            "allowed_actions": [r.tool for r in _POLICY.config.tool_argument_rules],
+            "attack_surface": "api",
+            "attack_payload_id": "api",
+            "forbidden_outcome": {"type": "none", "endpoint": "none"},
+            "goal_assertion": {"type": "none", "expected": None},
+        }
+    )
+
+
+def _session_context(session: dict[str, Any]) -> SessionContext:
+    """Build a server-owned :class:`SessionContext` from session data.
+
+    The session state is taken from the server-side store, never from the
+    client request. The API ``RunState`` enum uses lowercase values while the
+    policy ``SessionState`` enum uses uppercase values, so we normalize here.
+    """
+    state_val = session.get("state", "PENDING")
+    if hasattr(state_val, "value"):
+        state_str = state_val.value
+    else:
+        state_str = str(state_val)
+    try:
+        session_state = SessionState(state_str.upper())
+    except ValueError:
+        session_state = SessionState.CREATED
+    return SessionContext.model_validate(
+        {
+            "session_id": str(session["id"]),
+            "state": session_state,
+            "last_step": None,
+            "steps_taken": 0,
+            "requests_last_minute": 0,
+            "kill_switch": False,
+            "page_origin": None,
+            "user_restrictions": {},
+            "approvals": [],
+            "untrusted_texts": [],
+        }
+    )
+
+
+def _gateway_decide(
+    session_id: UUID, tool: str, arguments: dict[str, Any]
+) -> PolicyDecision:
+    """Route a single action decision through the real policy gateway.
+
+    Validates that the session exists in the server-side store, builds a
+    server-owned scenario and session context, and calls
+    ``sentinelx.policy.evaluate``. Raises HTTP 404 when the session does not
+    exist. Never returns ALLOW for a nonexistent or invalid session.
+    """
+    session = store.sessions.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+
+    scenario = _session_scenario(session)
+    ctx = _session_context(session)
+
+    action_request = ActionRequest.model_validate(
+        {
+            "session_id": str(session_id),
+            "step": 1,
+            "action_id": f"api-{uuid4().hex[:12]}",
+            "timestamp": datetime.now(UTC),
+            "actor": "api",
+            "tool": tool,
+            "arguments": arguments,
+        }
+    )
+
+    return evaluate(action_request, scenario, _POLICY, ctx)
+
+
+# Map gateway decisions to the API's Decision enum (same StrEnum values).
+def _api_decision(gw_decision: _CommonDecision) -> Decision:
+    return Decision(gw_decision.value)
+
 
 
 # ------------------------------------------------------------------ in-memory store
@@ -279,46 +404,16 @@ async def policy_decide(
     payload: PolicyDecisionRequest,
     user: str = Depends(_require_auth),
 ):
-    # Deterministic deny-by-default gateway
-    tool = payload.tool.lower()
-    if tool in {"http_request", "submit_form", "tool_call"}:
-        if not payload.allowed_hosts:
-            decision = Decision.BLOCK
-            reason_code = "DESTINATION_NOT_ALLOWED"
-            explanation = "no allowed hosts configured for state-changing action"
-            requires_human = False
-        else:
-            decision = Decision.CONFIRM
-            reason_code = "CONFIRM"
-            explanation = "state-changing action requires human confirmation"
-            requires_human = True
-    elif tool in {"navigate", "read_page", "click"}:
-        decision = Decision.ALLOW
-        reason_code = "SAFE_ALLOWLIST"
-        explanation = "read-only action on allowlisted surface"
-        requires_human = False
-    else:
-        decision = Decision.BLOCK
-        reason_code = "TOOL_NOT_IN_SCENARIO"
-        explanation = f"tool {payload.tool!r} not in scenario authorization"
-        requires_human = False
-
-    await events.event_stream.append(
-        EventKind.ACTION_DECIDED,
-        {
-            "session_id": str(payload.session_id),
-            "tool": payload.tool,
-            "decision": decision.value,
-            "reason_code": reason_code,
-        },
-        run_id=None,
-    )
+    # Route through the real deterministic policy gateway. Client-supplied
+    # ``allowed_hosts`` is intentionally ignored — only server-owned scenario
+    # data is used. A nonexistent session cannot receive ALLOW.
+    gw = _gateway_decide(payload.session_id, payload.tool, payload.arguments)
     return PolicyDecisionResponse(
-        decision=decision,
-        reason_code=reason_code,
-        rule_ids=[reason_code],
-        requires_human=requires_human,
-        explanation=explanation,
+        decision=_api_decision(gw.decision),
+        reason_code=gw.reason_code,
+        rule_ids=gw.rule_ids,
+        requires_human=gw.requires_human,
+        explanation=gw.explanation,
     )
 
 
@@ -586,49 +681,18 @@ async def guard_decide(
     payload: GuardDecideRequest,
     user: str = Depends(_require_auth),
 ):
-    tool = payload.tool.lower()
-    if tool in {"http_request", "submit_form", "tool_call"}:
-        if not payload.arguments:
-            decision = Decision.BLOCK
-            reason_code = "NO_ARGUMENTS"
-            explanation = "no arguments provided for state-changing action"
-            blocked = True
-            requires_human = False
-        else:
-            decision = Decision.CONFIRM
-            reason_code = "CONFIRM_REQUIRED"
-            explanation = "state-changing action requires confirmation"
-            blocked = False
-            requires_human = True
-    elif tool in {"navigate", "read_page", "click"}:
-        decision = Decision.ALLOW
-        reason_code = "ALLOW"
-        explanation = "read-only action permitted"
-        blocked = False
-        requires_human = False
-    else:
-        decision = Decision.BLOCK
-        reason_code = "UNKNOWN_TOOL"
-        explanation = f"tool {payload.tool} not recognized"
-        blocked = True
-        requires_human = False
-
-    await events.event_stream.append(
-        EventKind.ACTION_DECIDED,
-        {
-            "session_id": str(payload.session_id),
-            "tool": payload.tool,
-            "decision": decision.value,
-            "blocked": blocked,
-        },
-        run_id=None,
-    )
+    # Route through the real deterministic policy gateway. The gateway is the
+    # ONLY authority for allow/block/confirm — the API never grants
+    # authorization independently. A nonexistent session cannot receive ALLOW,
+    # and external navigation to a forbidden host returns BLOCK.
+    gw = _gateway_decide(payload.session_id, payload.tool, payload.arguments)
+    blocked = gw.decision is _CommonDecision.BLOCK
     return GuardDecideResponse(
-        decision=decision,
-        reason_code=reason_code,
+        decision=_api_decision(gw.decision),
+        reason_code=gw.reason_code,
         blocked=blocked,
-        requires_human=requires_human,
-        explanation=explanation,
+        requires_human=gw.requires_human,
+        explanation=gw.explanation,
     )
 
 
