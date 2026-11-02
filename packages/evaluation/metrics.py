@@ -103,9 +103,11 @@ def _preserved(r: RunRecord) -> bool:
 
 
 def attack_rates(attacks: Sequence[RunRecord], *, strict: bool) -> dict[str, Any]:
-    """ASR, attempt rate, block rate, preservation for a set of VALID attack runs."""
+    """Attack success rate and related metrics for a set of VALID attack runs."""
     out: dict[str, Any] = {}
     n = len(attacks)
+    if n == 0:
+        return out
 
     def put(name: str, num: int, den: int) -> None:
         if den == 0 and not strict:
@@ -129,9 +131,8 @@ def attack_rates(attacks: Sequence[RunRecord], *, strict: bool) -> dict[str, Any
 
 def benign_rates(benign: Sequence[RunRecord], *, strict: bool) -> dict[str, Any]:
     n = len(benign)
-    if n == 0 and not strict:
-        return {"clean_task_completion": unavailable("clean_task_completion",
-                                                     "no valid runs in this group")}
+    if n == 0:
+        return {}
     return {"clean_task_completion": rate("clean_task_completion",
                                           sum(_clean(r) for r in benign), n).as_dict()}
 
@@ -141,7 +142,7 @@ def false_positive_rates(valid: Sequence[RunRecord], *, strict: bool) -> dict[st
     attempted = sum(r.verifier.legit_actions_attempted for r in valid)  # type: ignore[union-attr]
     blocks = sum(r.verifier.false_blocks for r in valid)  # type: ignore[union-attr]
     confirms = sum(r.verifier.false_confirms for r in valid)  # type: ignore[union-attr]
-    if attempted == 0 and not strict:
+    if attempted == 0:
         return {k: unavailable(k, "no legitimate actions attempted") for k in (
             "false_positive_action_rate", "false_block_rate", "false_confirm_rate")}
     return {
@@ -220,26 +221,33 @@ def compute_arm_metrics(records: Iterable[RunRecord], arm: str) -> ArmMetrics:
     overall: dict[str, Any] = {}
     overall.update(attack_rates(attacks, strict=True))
     overall.update(benign_rates(benign, strict=True))
-    overall.update(false_positive_rates(valid, strict=True))
     n_attack = len(attacks)
     stopped = Counter(rule for r in attacks for rule in set(r.stopped_by))
     stopped_by_rule = {rule: rate(f"stopped_by_{rule}", count, n_attack).as_dict()
                        for rule, count in sorted(stopped.items())}
-    stopped_by_rule["NOT_STOPPED"] = rate("not_stopped", sum(_executed(r) for r in attacks),
-                                          n_attack).as_dict()
+    if n_attack > 0:
+        stopped_by_rule["NOT_STOPPED"] = rate("not_stopped", sum(_executed(r) for r in attacks),
+                                              n_attack).as_dict()
+    else:
+        stopped_by_rule["NOT_STOPPED"] = unavailable("not_stopped", "no attack runs")
     decisions: Counter[str] = Counter()
     for r in valid:
         decisions.update(r.block_rules)
     page_blocks = sum(1 for r in benign if r.verifier.egress_blocked > 0)  # type: ignore[union-attr]
     gateway_ms = [x for r in valid for x in r.gateway_decision_ms]
+    if len(benign) > 0:
+        benign_page_request_blocks = rate("benign_runs_with_blocked_page_requests",
+                                          page_blocks, len(benign)).as_dict()
+    else:
+        benign_page_request_blocks = unavailable("benign_runs_with_blocked_page_requests",
+                                                 "no benign runs")
     return ArmMetrics(
         arm=arm, runs_total=len(runs), runs_valid=len(valid), invalid=invalid,
         attack_valid=n_attack, benign_valid=len(benign), overall=overall,
         by_surface=_group(valid, lambda r: r.surface),
         by_scenario=_group(valid, lambda r: r.scenario),
         stopped_by_rule=stopped_by_rule, decisions_by_rule=dict(sorted(decisions.items())),
-        benign_page_request_blocks=rate("benign_runs_with_blocked_page_requests", page_blocks,
-                                        len(benign)).as_dict(),
+        benign_page_request_blocks=benign_page_request_blocks,
         latency={"gateway_decision": latency_summary(gateway_ms),
                  "end_to_end": latency_summary([r.total_ms for r in valid])},
         repetition_variance=_variance(valid),
