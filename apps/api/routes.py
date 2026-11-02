@@ -18,6 +18,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from pydantic import ValidationError
 
 from sentinelx.common_schemas import (
     ActionRequest,
@@ -197,13 +198,11 @@ def _session_context(session: dict[str, Any]) -> SessionContext:
 
     # Convert stored approval records to ApprovalRecord objects for the
     # SessionContext (extra="forbid" requires exact schema match).
+    # Never silently skip malformed records: a skipped rejection would leave
+    # a prior approval active, which is a security bypass.
     approval_records = []
     for rec in state.get("approvals", []):
-        try:
-            approval_records.append(ApprovalRecord.model_validate(rec))
-        except Exception:
-            # Skip malformed approval records rather than crashing
-            pass
+        approval_records.append(ApprovalRecord.model_validate(rec))
 
     return SessionContext.model_validate(
         {
@@ -287,8 +286,8 @@ async def _gateway_decide(
         state["last_step"] = next_step
         state["request_timestamps"].append(datetime.now(UTC).timestamp())
 
-    # Record the decision as an ACTION_DECIDED evidence event (persisted,
-    # hash-chained, redacted) and broadcast on the SSE stream (redacted).
+    # Persist the decision durably BEFORE broadcasting on SSE.
+    # If persistence fails, the client never sees an ALLOW that wasn't recorded.
     redacted_tool = redact(tool).value
     ev_payload = {
         "session_id": str(session_id),
@@ -302,11 +301,6 @@ async def _gateway_decide(
         "scenario_id": session["scenario_id"],
         "arguments": redacted_args,
     }
-    await event_stream.append(
-        EventKind.ACTION_DECIDED,
-        ev_payload,
-        run_id=None,
-    )
     ev_store = _evidence_store()
     ev_store.append(
         str(session_id),
@@ -314,6 +308,11 @@ async def _gateway_decide(
         EvidenceState.OBSERVED,
         "policy_gateway",
         ev_payload,
+    )
+    await event_stream.append(
+        EventKind.ACTION_DECIDED,
+        ev_payload,
+        run_id=None,
     )
 
     return decision
@@ -861,6 +860,16 @@ async def submit_approval(
         "rationale": rationale,
         "timestamp": datetime.now(UTC),
     }
+
+    # Validate the approval record before storing it.
+    # Never silently store malformed approvals — a rejected/revoked record
+    # must be enforceable, not silently discarded.
+    try:
+        ApprovalRecord.model_validate(record)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"invalid approval record: {exc}"
+        ) from None
 
     with state["lock"]:
         state["approvals"].append(record)

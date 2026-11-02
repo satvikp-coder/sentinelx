@@ -17,7 +17,7 @@ from typing import Any
 from sentinelx.verifier import VERIFIER_VERSION
 
 from .manifest import ARM_DESCRIPTIONS, REPO_ROOT, Manifest
-from .metrics import MetricError, compute_arm_metrics, latency_summary
+from .metrics import MetricError, compute_arm_metrics, latency_summary, unavailable
 from .records import PlannerInfo, RunRecord
 
 LIMITATIONS = [
@@ -78,7 +78,9 @@ def git_info() -> dict[str, Any]:
         return {"commit": "unknown", "dirty": None}
 
 
-def _unavailable_arm(arm: str, reason: str) -> Any:
+def _unavailable_arm(arm: str, reason: str, runs_total: int = 0,
+                     runs_valid: int = 0, invalid: list | None = None,
+                     attack_valid: int = 0, benign_valid: int = 0) -> Any:
     """Return an arm metrics object for an arm that cannot be computed
     (e.g. no attack runs so ASR is undefined)."""
     from dataclasses import dataclass
@@ -132,8 +134,15 @@ def _unavailable_arm(arm: str, reason: str) -> Any:
 
     return _UnavailableMetrics(
         arm=arm,
+        runs_total=runs_total,
+        runs_valid=runs_valid,
+        invalid=invalid,
+        attack_valid=attack_valid,
+        benign_valid=benign_valid,
         overall={"_unavailable": {"name": "_unavailable", "numerator": 0,
                                   "denominator": 0, "value": None, "note": reason}},
+        benign_page_request_blocks=unavailable("benign_runs_with_blocked_page_requests",
+                                               reason),
     )
 
 
@@ -147,13 +156,25 @@ def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
     planner = records[0].planner
     arms: dict[str, Any] = {}
     for arm in manifest.arms:
+        arm_records = [r for r in records if r.arm == arm]
         try:
             arms[arm] = compute_arm_metrics(records, arm)
         except MetricError as exc:
             # An arm with no attack runs cannot report overall rates
             # (e.g. attack_success_rate undefined). Record the arm as
-            # unavailable rather than crashing the whole report.
-            arms[arm] = _unavailable_arm(arm, str(exc))
+            # unavailable rather than crashing the whole report, but
+            # preserve actual run counts and invalid-run reasons.
+            invalid = [{"run_id": r.run_id, "case_id": r.case_id, "rep": r.rep,
+                        "reason": r.invalid_reason or "unknown"}
+                       for r in arm_records if not r.valid or r.verifier is None]
+            attack_valid = sum(1 for r in arm_records if r.valid and r.label == "attack")
+            benign_valid = sum(1 for r in arm_records if r.valid and r.label == "benign")
+            arms[arm] = _unavailable_arm(arm, str(exc),
+                                         runs_total=len(arm_records),
+                                         runs_valid=len(arm_records) - len(invalid),
+                                         invalid=invalid,
+                                         attack_valid=attack_valid,
+                                         benign_valid=benign_valid)
     policy_versions = sorted(
         {r.policy_version for r in records if r.policy_version and r.arm == "B"})
     verifier_versions = sorted({r.verifier_version for r in records if r.verifier_version})
@@ -284,8 +305,10 @@ def render_csv(report: dict[str, Any]) -> str:
 
 
 def _fmt(m: dict[str, Any]) -> str:
+    if not isinstance(m, dict) or "denominator" not in m:
+        return str(m)
     if m["denominator"] == 0:
-        return f"n/a ({m['note']})"
+        return f"n/a ({m.get('note', '')})"
     return f"{m['numerator']}/{m['denominator']} = {m['value']:.3f}"
 
 
