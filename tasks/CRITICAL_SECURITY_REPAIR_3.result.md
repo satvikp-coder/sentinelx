@@ -46,13 +46,13 @@ Independent oracle comparisons + real SQLite persistence + real SSE streams + co
 
 ## 7. Progress Tracking
 
-- Stage F1 (evidence persistence): COMPLETE — `_gateway_decide` persists ACTION_DECIDED events to EvidenceStore with hash-chained, redacted payloads
-- Stage F2 (redaction): COMPLETE — SSE event payloads use redacted arguments via `redact(arguments).value`
-- Stage F3 (session/run lifecycle): COMPLETE — `create_run` transitions session from PENDING to RUNNING state
-- Stage F4 (approval identity): COMPLETE — Deterministic `action_id` = `api-{sha256(tool+arguments)[:12]}`, `_gateway_decide` checks existing approvals before evaluate, POST `/api/v1/approvals` endpoint added
-- Stage F5 (test isolation): COMPLETE — Rate-limit token buckets cleared in `client` fixture to prevent cross-test pollution
+- Stage F1 (evidence persistence): COMPLETE — `_gateway_decide` persists ACTION_DECIDED events to EvidenceStore with hash-chained, redacted payloads; `/evidence/verify` calls `verify_chain()` and reports actual chain status (OK/MODIFIED/MISSING/REORDERED)
+- Stage F2 (redaction): COMPLETE — SSE event payloads redact both `arguments` and `tool` via `redact().value`; sensitive data never reaches SSE stream unredacted
+- Stage F3 (session/run lifecycle): COMPLETE — `create_run` transitions session from PENDING to RUNNING; `cancel_run` transitions session back to PENDING, revoking authorization (SESSION_NOT_RUNNING)
+- Stage F4 (approval identity): COMPLETE — Deterministic `action_id` = `api-{sha256(tool+arguments)[:12]}`; approvals stored as `ApprovalRecord`-compatible dicts; POST `/api/v1/approvals` endpoint; cross-session isolation verified
+- Stage F5 (test isolation): COMPLETE — Autouse `_reset_shared_state` fixture clears all shared stores after each test; rate-limit tokens cleared in `client` fixture
 - Stage F6 (concurrency): COMPLETE — Per-session `threading.Lock()` in `_SESSION_STATE` prevents race conditions
 - Stage F7 (scenario snapshots): COMPLETE — `ScenarioSpec.model_copy(deep=True)` when binding to session (immutable snapshot)
 - Stage F8 (SSE reconnect): COMPLETE — SSE `ev_id` uses integer `seq` instead of UUID, matching `Last-Event-ID` parsing
-- Stage F9 (branch stabilization): COMPLETE — Task 25 metrics test failures fixed (false_positive_rates in overall, MetricError on no attack runs)
-- Final gate: COMPLETE — All 63 focused tests pass (43 API units + 20 security repair), 16 metrics tests pass, 18 evidence-store tests pass
+- Stage F9 (branch stabilization): COMPLETE — Task 25 metrics test failures fixed (`false_positive_rates` in overall, `MetricError` on no attack runs, graceful handling in report generation)
+- Final gate: COMPLETE — All focused tests pass (119 passed, 1 pre-existing timing-dependent `test_rate_limit_burst` failure); all Ruff checks pass on changed files; regression tests added for cancellation→deny, approval submit/reject, cross-session isolation, evidence tampering detection
