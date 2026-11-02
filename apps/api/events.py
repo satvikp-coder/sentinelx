@@ -120,7 +120,7 @@ async def sse_stream_generator(request: Request, after_seq: int = 0):
             payload=ev.payload,
             timestamp=ev.timestamp.isoformat(),
         )
-        yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.id))
+        yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))
 
     # Then stream new events until the client disconnects.
     q = await event_stream.subscribe()
@@ -143,7 +143,7 @@ async def sse_stream_generator(request: Request, after_seq: int = 0):
                 payload=ev.payload,
                 timestamp=ev.timestamp.isoformat(),
             )
-            yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.id))
+            yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))
     finally:
         await event_stream.unsubscribe(q)
 

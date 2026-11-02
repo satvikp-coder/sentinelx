@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from apps.api.main import app
+from apps.api.main import _rate_tokens, app
 
 AUTH = {"Authorization": "Bearer sentinelx-demo-local-only"}
 BAD_AUTH = {"Authorization": "Bearer wrong-token"}
@@ -22,6 +22,9 @@ BAD_AUTH = {"Authorization": "Bearer wrong-token"}
 
 @pytest.fixture()
 def client():
+    # Clear shared rate-limit token buckets so tests are isolated from each
+    # other (F5: test contamination between test files via global rate state).
+    _rate_tokens.clear()
     return TestClient(app)
 
 

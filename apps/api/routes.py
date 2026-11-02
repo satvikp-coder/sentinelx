@@ -462,8 +462,9 @@ async def create_session(
         }
         store.sessions[sid] = session
         # Bind the trusted scenario to this session. Authorized hosts/actions
-        # come only from this immutable spec.
-        _SESSION_SCENARIOS[sid] = spec
+        # come only from this immutable spec. Deep-copy so that later
+        # mutations to the registry cannot alter existing session authorization.
+        _SESSION_SCENARIOS[sid] = spec.model_copy(deep=True)
         # Initialize per-session runtime state for the gateway context.
         _SESSION_STATE[sid] = {
             "steps_taken": 0,
