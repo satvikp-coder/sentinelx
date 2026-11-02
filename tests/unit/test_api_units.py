@@ -10,6 +10,7 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 import pytest
+import time
 from fastapi.testclient import TestClient
 
 from apps.api.main import _rate_tokens, app
@@ -553,10 +554,31 @@ def test_export_report(client):
 # ------------------------------------------------------------------ rate limiting (burst)
 
 def test_rate_limit_burst(client):
-    # Make many rapid authenticated requests; expect rate limiting (429)
-    # once the burst (200) is exceeded.
-    codes = []
-    for _ in range(250):
-        r = client.get("/api/v1/sessions", headers=AUTH)
-        codes.append(r.status_code)
-    assert 429 in codes, f"expected rate limiting, got codes {set(codes)}"
+    # Deterministic burst test: directly fill the rate-limit bucket to the
+    # limit, then verify the HTTP path returns 429. This avoids relying on
+    # 250 sequential requests finishing within one second (timing-dependent).
+    from apps.api.main import _rate_limited, _rate_tokens, RATE_LIMIT_BURST
+
+    _rate_tokens.clear()
+
+    # Probe to discover the client key used by the test client.
+    probe = client.get("/api/v1/sessions", headers=AUTH)
+    assert probe.status_code == 200
+
+    used_key = next(k for k, v in _rate_tokens.items() if v)
+
+    # Fill the bucket to the burst limit with current timestamps
+    # (all within the 1-second window).
+    now = time.monotonic()
+    _rate_tokens[used_key].clear()
+    for _ in range(RATE_LIMIT_BURST):
+        _rate_tokens[used_key].append(now)
+
+    # Bucket is full: next request must be rate limited.
+    r = client.get("/api/v1/sessions", headers=AUTH)
+    assert r.status_code == 429, f"expected 429 after filling burst, got {r.status_code}"
+
+    # Clear the bucket: requests work again.
+    _rate_tokens.clear()
+    r = client.get("/api/v1/sessions", headers=AUTH)
+    assert r.status_code == 200
