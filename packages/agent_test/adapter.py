@@ -10,8 +10,7 @@ well-defined `Adapter` protocol. It never touches the gateway, the policy, or th
 verifier directly - those decisions are made by the runner.
 
 Adapters:
-  * ScriptedAdapter  - wraps the existing ScriptedNaivePlanner (deterministic,
-    no network, pure Python)
+  * ScriptedAdapter  - deterministic, no network, pure Python scripted planner
   * ExecutableAdapter - runs an external executable with explicit argv
     (no shell=True, no shell interpretation of user input)
   * HttpAdapter       - sends HTTP requests to a local HTTP endpoint
@@ -23,8 +22,11 @@ from __future__ import annotations
 import json
 import subprocess
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
+
+from sentinelx.agent_runtime.types import HistoryEntry, Observation
 
 
 @dataclass(frozen=True)
@@ -54,57 +56,65 @@ class AdapterResult:
 
 
 class Adapter(ABC):
-    """Protocol for edit-based patch generation.
+    """Protocol for agent-test adapters.
 
-    Implementations propose the next patch given the current excerpt and history.
-    They are pure functions of the excerpt - they never touch the gateway,
-    policy, or verifier directly.
+    Implementations propose the next action given the current observation and
+    history. They are pure functions of the observation - they never touch the
+    gateway, policy, or verifier directly.
     """
 
     name: str
+    kind: str = "SIMULATED_ADAPTER"
 
     @abstractmethod
-    def generate_patch(
-        self, scope: Any, loc: Any, *, vuln_class: str, method: str,
-        endpoint: str, summary: str, client: Any,
-        allowed_files: set[str] | None = None,
-        usage_sink: list | None = None,
-    ) -> Any:
-        """Propose an edit-based patch given the diagnosed location and context.
+    def next_action(
+        self, observation: Observation, history: Sequence[HistoryEntry]
+    ) -> AdapterResult:
+        """Propose the next action given the current observation and history.
 
-        Returns a PatchGenResult with either a validated patch or a rejection.
+        Returns an AdapterResult describing an action to execute, a finish,
+        or an error.
         """
         ...
 
     def reset(self) -> None:
         """Reset adapter state between runs (e.g. between arms of a paired test)."""
-        # Default no-op reset; subclasses may override.
         _ = None  # placeholder to satisfy B027 (non-empty body)
 
 
 class ScriptedAdapter(Adapter):
-    """Wrap the existing PatchGenOutput as an adapter.
+    """A deterministic, scripted adapter with no network and no model.
 
-    This is the reference implementation: deterministic, no network, pure Python.
-    It demonstrates the adapter contract and serves as the baseline for paired
-    unprotected/protected runs.
+    Follows a fixed, per-scenario script of actions. Serves as the baseline for
+    paired unprotected/protected runs and demonstrates the adapter contract.
     """
 
     def __init__(self, scenario_id: str, lab_port: int) -> None:
-        self._patch_gen = None
+        self.scenario_id = scenario_id
+        self.lab_port = lab_port
+        self._step = 0
         self.name = "scripted_naive"
+        self.kind = "SIMULATED_ADAPTER:scripted_naive"
+        # Simple script: navigate -> read_page -> finish
+        self._script: list[tuple[str, dict[str, Any]]] = [
+            ("navigate", {"url": f"http://127.0.0.1:{lab_port}/"}),
+            ("read_page", {}),
+            ("finish", {"answer": "task completed"}),
+        ]
 
-    def generate_patch(
-        self, scope: Any, loc: Any, *, vuln_class: str, method: str,
-        endpoint: str, summary: str, client: Any,
-        allowed_files: set[str] | None = None,
-        usage_sink: list | None = None,
-    ) -> Any:
-        return self._patch_gen
+    def next_action(
+        self, observation: Observation, history: Sequence[HistoryEntry]
+    ) -> AdapterResult:
+        if self._step >= len(self._script):
+            return AdapterResult.finish_result("task completed", self.name)
+        tool, args = self._script[self._step]
+        self._step += 1
+        if tool == "finish":
+            return AdapterResult.finish_result(args.get("answer", "task completed"), self.name)
+        return AdapterResult.action_result(tool, args, self.name)
 
     def reset(self) -> None:
-        """No state to reset - PatchGenOutput is recreated per run."""
-        ...
+        self._step = 0
 
 
 class ExecutableAdapter(Adapter):
@@ -128,32 +138,28 @@ class ExecutableAdapter(Adapter):
         self.argv = list(argv)
         self.timeout = timeout
         self._proc: Any = None
-        self._stdin: Any = None
-        self._stdout: Any = None
         self.name = f"executable:{' '.join(argv)}"
+        self.kind = f"EXECUTABLE_ADAPTER:{' '.join(argv)}"
 
-    def generate_patch(
-        self, scope: Any, loc: Any, *, vuln_class: str, method: str,
-        endpoint: str, summary: str, client: Any,
-        allowed_files: set[str] | None = None,
-        usage_sink: list | None = None,
-    ) -> Any:
+    def next_action(
+        self, observation: Observation, history: Sequence[HistoryEntry]
+    ) -> AdapterResult:
         if self._proc is None:
             self._start()
         obs_dict = {
-            "scope": str(scope.work_dir),
-            "loc": {
-                "file": loc.file,
-                "line_start": loc.line_start,
-                "line_end": loc.line_end,
-                "reasoning": loc.reasoning,
-            },
-            "vuln_class": vuln_class,
-            "method": method,
-            "endpoint": endpoint,
-            "summary": summary,
+            "type": "observation",
+            "session_id": observation.session_id,
+            "step": observation.step,
+            "now": observation.now.isoformat(),
+            "url": observation.url,
+            "text": observation.text,
+            "outcome": observation.outcome,
+            "blocked_reason": observation.blocked_reason,
+            "tool_result": observation.tool_result,
+            "event_id": observation.event_id,
+            "structure": observation.structure,
         }
-        line = json.dumps({"type": "observation", **obs_dict})
+        line = json.dumps(obs_dict)
         try:
             assert self._proc.stdin is not None
             self._proc.stdin.write(line + "\n")
@@ -161,18 +167,22 @@ class ExecutableAdapter(Adapter):
             assert self._proc.stdout is not None
             resp_line = self._proc.stdout.readline()
         except (BrokenPipeError, OSError) as exc:
-            return self._error_result(f"adapter process error: {exc}")
+            return AdapterResult.error_result(f"adapter process error: {exc}", self.name)
         if not resp_line:
-            return self._error_result("adapter process closed unexpectedly")
+            return AdapterResult.error_result("adapter process closed unexpectedly", self.name)
         try:
             resp = json.loads(resp_line)
         except json.JSONDecodeError as exc:
-            return self._error_result(f"adapter returned invalid JSON: {exc}")
+            return AdapterResult.error_result(f"adapter returned invalid JSON: {exc}", self.name)
         if "error" in resp:
-            return self._error_result(resp["error"])
-        if resp.get("diff"):
-            return self._patch_result(resp["diff"], resp.get("explanation", ""))
-        return self._error_result("adapter did not return a diff")
+            return AdapterResult.error_result(resp["error"], self.name)
+        if resp.get("finish"):
+            return AdapterResult.finish_result(resp.get("answer", ""), self.name)
+        if resp.get("action"):
+            return AdapterResult.action_result(
+                resp["action"], resp.get("arguments", {}), self.name
+            )
+        return AdapterResult.error_result("adapter did not return an action", self.name)
 
     def reset(self) -> None:
         """Terminate the current process; next call starts a fresh one."""
@@ -183,8 +193,6 @@ class ExecutableAdapter(Adapter):
             except Exception:  # noqa: S110 - best effort cleanup
                 pass
             self._proc = None
-            self._stdin = None
-            self._stdout = None
 
     def _start(self) -> None:
         self._proc = subprocess.Popen(
@@ -196,30 +204,16 @@ class ExecutableAdapter(Adapter):
         )
         assert self._proc.stdin is not None
         assert self._proc.stdout is not None
-        self._stdin = self._proc.stdin
-        self._stdout = self._proc.stdout
 
-    def _error_result(self, error: str) -> Any:
-        from sentinelx.fixer.patch_gen import PatchGenResult
-        return PatchGenResult("MODEL_UNAVAILABLE", reasons=[error])
-
-    def _patch_result(self, diff: str, explanation: str) -> Any:
-        from sentinelx.fixer.models import FixCategory
-        from sentinelx.fixer.patch_gen import PatchGenResult
-        return PatchGenResult(
-            "VALIDATED",
-            diff=diff,
-            explanation=explanation,
-            fix_category=FixCategory.PARAMETERIZED_QUERY,
-            retries_used=0,
-        )
+    def _error_result(self, error: str) -> AdapterResult:
+        return AdapterResult.error_result(error, self.name)
 
 
 class HttpAdapter(Adapter):
     """Send HTTP requests to a local adapter endpoint (127.0.0.1 only).
 
     Each observation is POSTed as JSON to the adapter's endpoint, and the adapter
-    replies with JSON describing the next patch or a finish.
+    replies with JSON describing the next action or a finish.
     """
 
     def __init__(self, url: str, timeout: float = 30.0) -> None:
@@ -228,76 +222,64 @@ class HttpAdapter(Adapter):
         parts = urlsplit(url)
         if parts.scheme != "http" or parts.hostname not in ("127.0.0.1", "localhost"):
             raise ValueError(
-            f"http adapter URL must be http://127.0.0.1 or http://localhost, got {url!r}"
-        )
+                f"http adapter URL must be http://127.0.0.1 or http://localhost, got {url!r}"
+            )
         self.url = url
         self.timeout = timeout
         self.name = f"http:{url}"
+        self.kind = f"HTTP_ADAPTER:{url}"
 
-    def generate_patch(
-        self, scope: Any, loc: Any, *, vuln_class: str, method: str,
-        endpoint: str, summary: str, client: Any,
-        allowed_files: set[str] | None = None,
-        usage_sink: list | None = None,
-    ) -> Any:
+    def next_action(
+        self, observation: Observation, history: Sequence[HistoryEntry]
+    ) -> AdapterResult:
         import httpx
 
         obs_dict = {
-            "scope": str(scope.work_dir),
-            "loc": {
-                "file": loc.file,
-                "line_start": loc.line_start,
-                "line_end": loc.line_end,
-                "reasoning": loc.reasoning,
-            },
-            "vuln_class": vuln_class,
-            "method": method,
-            "endpoint": endpoint,
-            "summary": summary,
+            "type": "observation",
+            "session_id": observation.session_id,
+            "step": observation.step,
+            "now": observation.now.isoformat(),
+            "url": observation.url,
+            "text": observation.text,
+            "outcome": observation.outcome,
+            "blocked_reason": observation.blocked_reason,
+            "tool_result": observation.tool_result,
+            "event_id": observation.event_id,
+            "structure": observation.structure,
         }
         try:
             resp = httpx.post(
                 self.url,
-                json={"type": "observation", **obs_dict},
+                json=obs_dict,
                 timeout=self.timeout,
             )
         except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-            return self._error_result(f"http adapter error: {exc}")
+            return AdapterResult.error_result(f"http adapter error: {exc}", self.name)
         try:
             data = resp.json()
         except ValueError as exc:
-            return self._error_result(f"http adapter returned invalid JSON: {exc}")
+            msg = f"http adapter returned invalid JSON: {exc}"
+            return AdapterResult.error_result(msg, self.name)
         if "error" in data:
-            return self._error_result(data["error"])
-        if resp.get("diff"):
-            return self._patch_result(resp["diff"], resp.get("explanation", ""))
-        return self._error_result("adapter did not return a diff")
+            return AdapterResult.error_result(data["error"], self.name)
+        if data.get("finish"):
+            return AdapterResult.finish_result(data.get("answer", ""), self.name)
+        if data.get("action"):
+            return AdapterResult.action_result(
+                data["action"], data.get("arguments", {}), self.name
+            )
+        return AdapterResult.error_result("adapter did not return an action", self.name)
 
     def reset(self) -> None:
         """HTTP adapter is stateless; nothing to reset."""
         ...
-
-    def _error_result(self, error: str) -> Any:
-        from sentinelx.fixer.patch_gen import PatchGenResult
-        return PatchGenResult("MODEL_UNAVAILABLE", reasons=[error])
-
-    def _patch_result(self, diff: str, explanation: str) -> Any:
-        from sentinelx.fixer.models import FixCategory
-        from sentinelx.fixer.patch_gen import PatchGenResult
-        return PatchGenResult(
-            "VALIDATED",
-            diff=diff,
-            explanation=explanation,
-            fix_category=FixCategory.PARAMETERIZED_QUERY,
-            retries_used=0,
-        )
 
 
 def load_adapter(spec: str) -> Adapter:
     """Load an adapter from a specification string.
 
     Supported formats:
-      * ``scripted:<scenario_id>:<port>``  - ScriptedNaivePlanner wrapper
+      * ``scripted:<scenario_id>:<port>``  - ScriptedAdapter (deterministic)
       * ``exec:<arg1> <arg2> ...``         - ExecutableAdapter with argv
       * ``http://127.0.0.1:<port>/...``   - HttpAdapter
     """

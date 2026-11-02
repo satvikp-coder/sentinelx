@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from sentinelx.common_schemas import ActionRequest, ApprovalDecision, ScenarioSpec
 from sentinelx.evidence.db import connect, migrate
 from sentinelx.fixer.models import FixPolicy
-from sentinelx.fixer.policy import load_policy
+from sentinelx.fixer.policy import load_fix_policy as load_policy
 from sentinelx.fixer.scope import create_scope, destroy_scope
 
 from .adapter import Adapter

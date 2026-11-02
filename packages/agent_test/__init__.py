@@ -15,7 +15,6 @@ from .adapter import (
     ScriptedAdapter,
     load_adapter,
 )
-from .cli import agent_test_cmd
 from .runner import (
     AgentTestConfig,
     AgentTestResult,
@@ -34,5 +33,4 @@ __all__ = [
     "AgentTestResult",
     "run_agent_test",
     "run_agent_test_sync",
-    "agent_test_cmd",
 ]
