@@ -7,7 +7,7 @@ Every numeric field is bounded; every string field is length-bounded.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -23,7 +23,7 @@ class APIModel(BaseModel):
 
 # ---------------------------------------------------------------- enums
 
-class RunState(str, Enum):
+class RunState(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -31,26 +31,26 @@ class RunState(str, Enum):
     FAILED = "failed"
 
 
-class ShieldMode(str, Enum):
+class ShieldMode(StrEnum):
     MONITOR = "monitor"
     RECOMMEND = "recommend"
     ENFORCE = "enforce"
 
 
-class Decision(str, Enum):
+class Decision(StrEnum):
     ALLOW = "ALLOW"
     BLOCK = "BLOCK"
     CONFIRM = "CONFIRM"
 
 
-class EvidenceState(str, Enum):
+class EvidenceState(StrEnum):
     OBSERVED = "OBSERVED"
     INFERRED = "INFERRED"
     SIMULATED = "SIMULATED"
     VERIFIED = "VERIFIED"
 
 
-class LabelMode(str, Enum):
+class LabelMode(StrEnum):
     LIVE = "LIVE"
     RECORDED = "RECORDED"
     SIMULATED = "SIMULATED"
@@ -134,7 +134,7 @@ class CancelResponse(APIModel):
 
 # ---------------------------------------------------------------- events
 
-class EventKind(str, Enum):
+class EventKind(StrEnum):
     RUN_STARTED = "RUN_STARTED"
     ACTION_PROPOSED = "ACTION_PROPOSED"
     ACTION_DECIDED = "ACTION_DECIDED"

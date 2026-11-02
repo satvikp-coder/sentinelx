@@ -6,11 +6,10 @@ The harness is verified against the existing sentinelx.evaluation infrastructure
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-import json
 import pytest
-from datetime import UTC, datetime
 
 from sentinelx.evaluation.harness import HarnessConfig, HarnessError, run_harness
 from sentinelx.evaluation.manifest import (
@@ -19,7 +18,6 @@ from sentinelx.evaluation.manifest import (
 )
 from sentinelx.evaluation.metrics import MetricError, rate
 from sentinelx.evaluation.records import RunRecord, VerifierResult
-
 
 # ---------------------------------------------------------------------------
 # Manifest tests

@@ -201,11 +201,38 @@ def assert_loopback_only(name: str) -> dict[str, object]:
         if not pf.exists():
             raise LabError(f"{name}: not started by labctl")
         proc = psutil.Process(int(pf.read_text(encoding="utf-8")))
-        listening = {f"{c.laddr.ip}:{c.laddr.port}" for c in proc.net_connections(kind="inet")
-                     if c.status == psutil.CONN_LISTEN}
-        if listening != {f"127.0.0.1:{lab.port}"}:
-            raise LabError(f"{name}: listening on {listening}, expected only 127.0.0.1:{lab.port}")
-        published = listening
+        # Verify the recorded process is our node server (not a stray process).
+        cmdline = proc.cmdline()
+        if "server.js" not in " ".join(cmdline):
+            raise LabError(f"{name}: pid {proc.pid} is not the lab server: {cmdline}")
+        # psutil.net_connections() does not reliably report LISTEN sockets on
+        # Windows, so prove loopback-only binding with socket bind tests:
+        #   - binding to 127.0.0.1:port must fail (already in use => loopback bound)
+        #   - binding to 0.0.0.0:port must succeed (not bound on all interfaces)
+        loopback_bound = False
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2.0)
+        try:
+            s.bind(("127.0.0.1", lab.port))
+        except OSError:
+            loopback_bound = True
+        finally:
+            s.close()
+        if not loopback_bound:
+            raise LabError(f"{name}: not bound to 127.0.0.1:{lab.port}")
+        all_interfaces_free = False
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2.0)
+        try:
+            s.bind(("0.0.0.0", lab.port))
+            all_interfaces_free = True
+        except OSError:
+            all_interfaces_free = False
+        finally:
+            s.close()
+        if not all_interfaces_free:
+            raise LabError(f"{name}: also bound to 0.0.0.0:{lab.port} (not loopback only)")
+        published = {f"127.0.0.1:{lab.port}"}
     refused: dict[str, str] = {}
     for ip in non_loopback_addresses():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

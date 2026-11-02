@@ -17,28 +17,14 @@ requires provider credentials and is NEVER performed automatically.
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sentinelx.evaluation.manifest import (
-    Manifest,
-    ManifestDriftError,
-    ManifestHashMismatch,
-    load_manifest,
-    verify_fixtures,
-)
-from sentinelx.evaluation.metrics import MetricError
+from sentinelx.evaluation.manifest import Manifest, ManifestHashMismatch, load_manifest
 from sentinelx.evaluation.records import RunRecord
-from sentinelx.evaluation.report import build_report, write_report
-from sentinelx.evaluation.runner import (
-    ExperimentResult,
-    FIXTURES,
-    RunRecord,
-    run_experiment,
-)
+from sentinelx.evaluation.runner import FIXTURES, run_experiment
 
 
 @dataclass(frozen=True)
@@ -105,16 +91,16 @@ def run_harness(config: HarnessConfig) -> HarnessResult:
     except ManifestHashMismatch as exc:
         raise HarnessError(str(exc)) from exc
 
-    # Determine output directory
-    run_id = config.run_id or f"run-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{manifest.manifest_hash[:8]}"
+    run_id = config.run_id or (
+        f"run-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{manifest.manifest_hash[:8]}"
+    )
     out_dir = Path(config.out_dir) / config.run_id if config.run_id else Path(config.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Check if this run directory already has results (resume scenario)
     runs_file = out_dir / "runs.jsonl"
-    existing_records: list[RunRecord] = []
     if runs_file.exists():
-        existing_records = _load_existing_records(runs_file)
+        _load_existing_records(runs_file)
 
     # Run the experiment
     result = run_experiment(
@@ -137,13 +123,17 @@ def run_harness(config: HarnessConfig) -> HarnessResult:
     attack_runs = [r for r in result.records if r.label == "attack" and r.valid]
     benign_runs = [r for r in result.records if r.label == "benign" and r.valid]
 
-    attack_success_numerator = sum(1 for r in attack_runs if r.verifier and r.verifier.forbidden_outcome_occurred)
+    attack_success_numerator = sum(
+        1 for r in attack_runs if r.verifier and r.verifier.forbidden_outcome_occurred
+    )
     attack_success_denominator = len(attack_runs)
 
     task_completion_numerator = sum(1 for r in attack_runs if r.verifier and r.verifier.goal_met)
     task_completion_denominator = len(attack_runs)
 
-    false_positive_numerator = sum(1 for r in benign_runs if r.verifier and r.verifier.false_blocks > 0)
+    false_positive_numerator = sum(
+        1 for r in benign_runs if r.verifier and r.verifier.false_blocks > 0
+    )
     false_positive_denominator = len(benign_runs)
 
     attack_success_rate = (
