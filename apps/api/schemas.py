@@ -183,6 +183,7 @@ class PolicyDecisionResponse(APIModel):
     rule_ids: list[str]
     requires_human: bool
     explanation: str
+    action_id: str  # Unique action identifier; same action+arguments → same action_id
 
 
 # ---------------------------------------------------------------- evidence verification

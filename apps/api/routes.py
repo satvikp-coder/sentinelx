@@ -8,6 +8,8 @@ schemas and is guarded by demo auth (except /health and /openapi).
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import sqlite3
 import threading
 from datetime import UTC, datetime
@@ -244,11 +246,36 @@ async def _gateway_decide(
         # detection works). Arguments stored in evidence are redacted.
         redacted_args = redact(arguments).value
 
+        # Deterministic action_id derived from tool+arguments so that retries
+        # with the same inputs produce the same action_id. This enables the
+        # approval workflow: a CONFIRM decision can be approved via POST
+        # /api/v1/approvals, and a subsequent retry with the same action_id
+        # + arguments will be allowed without re-evaluation.
+        action_id = f"api-{hashlib.sha256(json.dumps({'tool': tool, 'arguments': arguments}, sort_keys=True).encode()).hexdigest()[:12]}"
+
+        # Check for an existing approval for this (session_id, tool,
+        # arguments) before calling evaluate. If the action was previously
+        # approved, return ALLOW immediately without re-running the gateway.
+        existing_approval = state["approval_records"].get(action_id)
+        if existing_approval and existing_approval.get("approved"):
+            return PolicyDecision(
+                action_id=action_id,
+                decision=Decision.ALLOW,
+                policy_version=_POLICY.policy_version,
+                rule_ids=["APPROVED"],
+                reason_code="HUMAN_APPROVED",
+                explanation="Previously approved by human",
+                policy_mode=PolicyMode.ENFORCE,
+                effective_action=Decision.ALLOW,
+                would_have_decided=None,
+                signals=[],
+            )
+
         action_request = ActionRequest.model_validate(
             {
                 "session_id": str(session_id),
                 "step": next_step,
-                "action_id": f"api-{uuid4().hex[:12]}",
+                "action_id": action_id,
                 "timestamp": datetime.now(UTC),
                 "actor": "api",
                 "tool": tool,
@@ -297,6 +324,37 @@ async def _gateway_decide(
 # Map gateway decisions to the API's Decision enum (same StrEnum values).
 def _api_decision(gw_decision: _CommonDecision) -> Decision:
     return Decision(gw_decision.value)
+
+
+# ------------------------------------------------------------------ approvals
+# Per-session approval records. Maps (action_id, tool, arguments) → ApprovalRecord.
+# Populated when a human approves a CONFIRM decision via POST /api/v1/approvals.
+# _gateway_decide checks this store to allow retries of previously approved actions.
+_APPROVALS: dict[UUID, dict[tuple[str, str], dict[str, Any]]] = {}
+
+
+def _approval_key(tool: str, arguments: dict[str, Any]) -> tuple[str, str]:
+    """Deterministic key for an action+arguments pair."""
+    import json
+    canonical = json.dumps({"tool": tool, "arguments": arguments}, sort_keys=True,
+                           separators=(",", ":"), ensure_ascii=False)
+    return (tool, canonical)
+
+
+def _record_approval(session_id: UUID, action_id: str, tool: str,
+                     arguments: dict[str, Any], reviewer: str, rationale: str) -> None:
+    """Record an approval for an action+arguments pair."""
+    key = _approval_key(tool, arguments)
+    if session_id not in _APPROVALS:
+        _APPROVALS[session_id] = {}
+    _APPROVALS[session_id][key] = {
+        "action_id": action_id,
+        "tool": tool,
+        "arguments": arguments,
+        "reviewer": reviewer,
+        "rationale": rationale,
+        "approved_at": datetime.now(UTC).isoformat(),
+    }
 
 
 
@@ -417,7 +475,8 @@ async def create_session(
                 "forbidden_arguments": (),
                 "blocked_destinations": (),
             },
-            "approvals": [],
+            "approvals": [],  # list of approval records (for SessionContext)
+            "approval_records": {},  # action_id → {approved, ...} (for fast lookup)
             "page_origin": None,
             "lock": threading.Lock(),  # per-session lock for concurrency safety
         }
@@ -581,6 +640,7 @@ async def policy_decide(
         rule_ids=gw.rule_ids,
         requires_human=gw.requires_human,
         explanation=gw.explanation,
+        action_id=gw.action_id,
     )
 
 
@@ -742,6 +802,61 @@ async def list_approvals(
     async with store.lock:
         items = list(store.approvals.values())
     return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+
+
+@router.post("/approvals", response_model=dict, tags=["approvals"])
+async def submit_approval(
+    body: dict,
+    user: str = Depends(_require_auth),
+):
+    """Record a human approval/rejection/revocation for an action.
+
+    Body fields: session_id, action_id, tool, arguments, reviewer, rationale,
+    decision (approve|reject|revoke). Stores the approval in both the per-session
+    _SESSION_STATE (checked by _gateway_decide) and the global _APPROVALS store.
+    """
+    session_id_raw = body.get("session_id")
+    action_id = body.get("action_id")
+    tool = body.get("tool")
+    arguments = body.get("arguments", {})
+    reviewer = body.get("reviewer", "api")
+    rationale = body.get("rationale", "")
+    decision = body.get("decision", "approve")
+
+    if not session_id_raw or not action_id or not tool:
+        raise HTTPException(status_code=400, detail="session_id, action_id, and tool are required")
+
+    try:
+        sid = UUID(str(session_id_raw))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="invalid session_id") from None
+
+    session = store.sessions.get(sid)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+
+    state = _SESSION_STATE.get(sid)
+    if state is None:
+        raise HTTPException(status_code=404, detail="session has no runtime state")
+
+    approved = decision == "approve"
+    record = {
+        "action_id": action_id,
+        "tool": tool,
+        "arguments": arguments,
+        "reviewer": reviewer,
+        "rationale": rationale,
+        "approved": approved,
+        "recorded_at": datetime.now(UTC).isoformat(),
+    }
+
+    with state["lock"]:
+        state["approval_records"][action_id] = record
+        state["approvals"].append(record)
+
+    _record_approval(sid, action_id, tool, arguments, reviewer, rationale)
+
+    return {"status": "ok", "action_id": action_id, "approved": approved, "record_id": str(sid)}
 
 
 # ------------------------------------------------------------------ shield
