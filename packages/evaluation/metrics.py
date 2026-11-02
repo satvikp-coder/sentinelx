@@ -218,9 +218,12 @@ def compute_arm_metrics(records: Iterable[RunRecord], arm: str) -> ArmMetrics:
                 "reason": r.invalid_reason or "unknown"} for r in runs if r not in valid]
     attacks = [r for r in valid if r.label == "attack"]
     benign = [r for r in valid if r.label == "benign"]
+    if not attacks:
+        raise MetricError(f"arm {arm}: no attack runs; attack success rate is undefined")
     overall: dict[str, Any] = {}
     overall.update(attack_rates(attacks, strict=True))
     overall.update(benign_rates(benign, strict=True))
+    overall.update(false_positive_rates(valid, strict=True))
     n_attack = len(attacks)
     stopped = Counter(rule for r in attacks for rule in set(r.stopped_by))
     stopped_by_rule = {rule: rate(f"stopped_by_{rule}", count, n_attack).as_dict()
