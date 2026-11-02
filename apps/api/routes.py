@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from sentinelx.common_schemas import (
     ActionRequest,
+    ApprovalRecord,
     EvidenceState,
     PolicyDecision,
     ScenarioSpec,
@@ -37,6 +38,7 @@ from sentinelx.policy import (
     evaluate,
     load_policy,
 )
+from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
 
 from . import events
@@ -193,6 +195,16 @@ def _session_context(session: dict[str, Any]) -> SessionContext:
     ]
     state["request_timestamps"] = timestamps
 
+    # Convert stored approval records to ApprovalRecord objects for the
+    # SessionContext (extra="forbid" requires exact schema match).
+    approval_records = []
+    for rec in state.get("approvals", []):
+        try:
+            approval_records.append(ApprovalRecord.model_validate(rec))
+        except Exception:
+            # Skip malformed approval records rather than crashing
+            pass
+
     return SessionContext.model_validate(
         {
             "session_id": str(session["id"]),
@@ -203,7 +215,7 @@ def _session_context(session: dict[str, Any]) -> SessionContext:
             "kill_switch": state["kill_switch"],
             "page_origin": state["page_origin"],
             "user_restrictions": state["user_restrictions"],
-            "approvals": state["approvals"],
+            "approvals": tuple(approval_records),
             "untrusted_texts": [],
         }
     )
@@ -250,26 +262,11 @@ async def _gateway_decide(
         # with the same inputs produce the same action_id. This enables the
         # approval workflow: a CONFIRM decision can be approved via POST
         # /api/v1/approvals, and a subsequent retry with the same action_id
-        # + arguments will be allowed without re-evaluation.
-        action_id = f"api-{hashlib.sha256(json.dumps({'tool': tool, 'arguments': arguments}, sort_keys=True).encode()).hexdigest()[:12]}"
-
-        # Check for an existing approval for this (session_id, tool,
-        # arguments) before calling evaluate. If the action was previously
-        # approved, return ALLOW immediately without re-running the gateway.
-        existing_approval = state["approval_records"].get(action_id)
-        if existing_approval and existing_approval.get("approved"):
-            return PolicyDecision(
-                action_id=action_id,
-                decision=Decision.ALLOW,
-                policy_version=_POLICY.policy_version,
-                rule_ids=["APPROVED"],
-                reason_code="HUMAN_APPROVED",
-                explanation="Previously approved by human",
-                policy_mode=PolicyMode.ENFORCE,
-                effective_action=Decision.ALLOW,
-                would_have_decided=None,
-                signals=[],
-            )
+        # + arguments will be allowed by the gateway (which checks
+        # SessionContext.approvals).
+        canonical = json.dumps({"tool": tool, "arguments": arguments},
+                               sort_keys=True)
+        action_id = f"api-{hashlib.sha256(canonical.encode()).hexdigest()[:12]}"
 
         action_request = ActionRequest.model_validate(
             {
@@ -292,10 +289,11 @@ async def _gateway_decide(
 
     # Record the decision as an ACTION_DECIDED evidence event (persisted,
     # hash-chained, redacted) and broadcast on the SSE stream (redacted).
+    redacted_tool = redact(tool).value
     ev_payload = {
         "session_id": str(session_id),
         "action_id": action_request.action_id,
-        "tool": tool,
+        "tool": redacted_tool,
         "decision": decision.decision.value,
         "reason_code": decision.reason_code,
         "rule_ids": decision.rule_ids,
@@ -342,19 +340,24 @@ def _approval_key(tool: str, arguments: dict[str, Any]) -> tuple[str, str]:
 
 
 def _record_approval(session_id: UUID, action_id: str, tool: str,
-                     arguments: dict[str, Any], reviewer: str, rationale: str) -> None:
+                     arguments: dict[str, Any], reviewer: str, rationale: str,
+                     approved: bool = True) -> None:
     """Record an approval for an action+arguments pair."""
     key = _approval_key(tool, arguments)
     if session_id not in _APPROVALS:
         _APPROVALS[session_id] = {}
+    subject = approval_subject_id(action_id, tool, arguments)
     _APPROVALS[session_id][key] = {
-        "action_id": action_id,
-        "tool": tool,
-        "arguments": arguments,
+        "id": f"appr-{uuid4().hex[:12]}",
+        "subject_type": "action",
+        "subject_id": subject,
         "reviewer": reviewer,
+        "decision": "approve" if approved else "reject",
         "rationale": rationale,
-        "approved_at": datetime.now(UTC).isoformat(),
+        "timestamp": datetime.now(UTC),
     }
+    # Also store in per-session state for SessionContext (as list of dicts)
+    # that get converted to ApprovalRecord objects.
 
 
 
@@ -476,8 +479,7 @@ async def create_session(
                 "forbidden_arguments": (),
                 "blocked_destinations": (),
             },
-            "approvals": [],  # list of approval records (for SessionContext)
-            "approval_records": {},  # action_id → {approved, ...} (for fast lookup)
+            "approvals": [],  # list of ApprovalRecord-compatible dicts
             "page_origin": None,
             "lock": threading.Lock(),  # per-session lock for concurrency safety
         }
@@ -588,6 +590,13 @@ async def cancel_run(run_id: UUID, user: str = Depends(_require_auth)):
             raise HTTPException(status_code=400, detail="run cannot be cancelled")
         r["state"] = RunState.CANCELLED
         r["updated_at"] = _now()
+        # Revoke session authorization: transition session back to PENDING
+        # so that subsequent policy decisions return SESSION_NOT_RUNNING.
+        sid = r["session_id"]
+        session = store.sessions.get(sid)
+        if session is not None:
+            session["state"] = RunState.PENDING
+            session["updated_at"] = _now()
     await events.event_stream.append(
         EventKind.RUN_CANCELLED,
         {"run_id": str(run_id)},
@@ -661,13 +670,15 @@ async def verify_evidence(
         raise HTTPException(status_code=400, detail="invalid session_id") from None
     sid_str = str(sid)
     ev_store = _evidence_store()
-    events = ev_store.list_session(sid_str)
+    chain = ev_store.verify_chain(sid_str)
     return {
         "session_id": sid_str,
-        "events_checked": len(events),
-        "ok": True,
-        "first_broken_event_id": None,
-        "detail": "evidence chain intact (persisted evidence store)",
+        "events_checked": chain.events_checked,
+        "ok": chain.ok,
+        "first_broken_event_id": chain.first_broken_event_id,
+        "first_broken_seq": chain.first_broken_seq,
+        "detail": chain.detail,
+        "chain_status": chain.status.value,
     }
 
 
@@ -842,20 +853,20 @@ async def submit_approval(
 
     approved = decision == "approve"
     record = {
-        "action_id": action_id,
-        "tool": tool,
-        "arguments": arguments,
+        "id": f"appr-{uuid4().hex[:12]}",
+        "subject_type": "action",
+        "subject_id": approval_subject_id(action_id, tool, arguments),
         "reviewer": reviewer,
+        "decision": "approve" if approved else "reject",
         "rationale": rationale,
-        "approved": approved,
-        "recorded_at": datetime.now(UTC).isoformat(),
+        "timestamp": datetime.now(UTC),
     }
 
     with state["lock"]:
-        state["approval_records"][action_id] = record
         state["approvals"].append(record)
 
-    _record_approval(sid, action_id, tool, arguments, reviewer, rationale)
+    _record_approval(sid, action_id, tool, arguments, reviewer, rationale,
+                     approved=approved)
 
     return {"status": "ok", "action_id": action_id, "approved": approved, "record_id": str(sid)}
 

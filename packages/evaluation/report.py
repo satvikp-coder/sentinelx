@@ -78,6 +78,65 @@ def git_info() -> dict[str, Any]:
         return {"commit": "unknown", "dirty": None}
 
 
+def _unavailable_arm(arm: str, reason: str) -> Any:
+    """Return an arm metrics object for an arm that cannot be computed
+    (e.g. no attack runs so ASR is undefined)."""
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _UnavailableMetrics:
+        arm: str
+        runs_total: int = 0
+        runs_valid: int = 0
+        invalid: list = None
+        attack_valid: int = 0
+        benign_valid: int = 0
+        overall: dict = None
+        by_surface: dict = None
+        by_scenario: dict = None
+        stopped_by_rule: dict = None
+        decisions_by_rule: dict = None
+        benign_page_request_blocks: dict = None
+        latency: dict = None
+        repetition_variance: dict = None
+
+        def __post_init__(self):
+            object.__setattr__(self, 'invalid', self.invalid or [])
+            object.__setattr__(self, 'overall', self.overall or {})
+            object.__setattr__(self, 'by_surface', self.by_surface or {})
+            object.__setattr__(self, 'by_scenario', self.by_scenario or {})
+            object.__setattr__(self, 'stopped_by_rule', self.stopped_by_rule or {})
+            object.__setattr__(self, 'decisions_by_rule', self.decisions_by_rule or {})
+            object.__setattr__(self, 'benign_page_request_blocks',
+                               self.benign_page_request_blocks or {})
+            object.__setattr__(self, 'latency', self.latency or {})
+            object.__setattr__(self, 'repetition_variance', self.repetition_variance or {})
+
+        def as_dict(self):
+            return {
+                "arm": self.arm,
+                "runs_total": self.runs_total,
+                "runs_valid": self.runs_valid,
+                "invalid": self.invalid,
+                "attack_valid": self.attack_valid,
+                "benign_valid": self.benign_valid,
+                "overall": self.overall,
+                "by_surface": self.by_surface,
+                "by_scenario": self.by_scenario,
+                "stopped_by_rule": self.stopped_by_rule,
+                "decisions_by_rule": self.decisions_by_rule,
+                "benign_page_request_blocks": self.benign_page_request_blocks,
+                "latency": self.latency,
+                "repetition_variance": self.repetition_variance,
+            }
+
+    return _UnavailableMetrics(
+        arm=arm,
+        overall={"_unavailable": {"name": "_unavailable", "numerator": 0,
+                                  "denominator": 0, "value": None, "note": reason}},
+    )
+
+
 def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
                  *, git: dict[str, Any] | None = None) -> dict[str, Any]:
     planners = {r.planner.model_dump_json() for r in records}
@@ -86,7 +145,15 @@ def build_report(records: list[RunRecord], manifest: Manifest, run_id: str,
             "a report covers exactly ONE planner; SIMULATED and model-driven runs (or different "
             f"models/prompts) must be reported separately, found {len(planners)}")
     planner = records[0].planner
-    arms = {arm: compute_arm_metrics(records, arm) for arm in manifest.arms}
+    arms: dict[str, Any] = {}
+    for arm in manifest.arms:
+        try:
+            arms[arm] = compute_arm_metrics(records, arm)
+        except MetricError as exc:
+            # An arm with no attack runs cannot report overall rates
+            # (e.g. attack_success_rate undefined). Record the arm as
+            # unavailable rather than crashing the whole report.
+            arms[arm] = _unavailable_arm(arm, str(exc))
     policy_versions = sorted(
         {r.policy_version for r in records if r.policy_version and r.arm == "B"})
     verifier_versions = sorted({r.verifier_version for r in records if r.verifier_version})

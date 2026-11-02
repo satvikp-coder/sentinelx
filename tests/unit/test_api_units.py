@@ -13,6 +13,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.main import _rate_tokens, app
+from apps.api.routes import (
+    _APPROVALS,
+    _SESSION_SCENARIOS,
+    _SESSION_STATE,
+    store,
+)
 
 AUTH = {"Authorization": "Bearer sentinelx-demo-local-only"}
 BAD_AUTH = {"Authorization": "Bearer wrong-token"}
@@ -26,6 +32,28 @@ def client():
     # other (F5: test contamination between test files via global rate state).
     _rate_tokens.clear()
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    """Reset shared in-memory stores after each test to prevent cross-test
+    contamination (F5). Clears sessions, runs, scenario bindings, runtime
+    state, and approvals so each test starts from a clean slate."""
+    yield
+    store.sessions.clear()
+    store.runs.clear()
+    store.events_log.clear()
+    store.findings.clear()
+    store.patches.clear()
+    store.approvals.clear()
+    store.shield_rules.clear()
+    store.escalations.clear()
+    store.scans.clear()
+    store.targets.clear()
+    store.idempotency.clear()
+    _SESSION_STATE.clear()
+    _SESSION_SCENARIOS.clear()
+    _APPROVALS.clear()
 
 
 # ------------------------------------------------------------------ health (no auth)
