@@ -583,3 +583,26 @@ def test_security_evidence_tampering_detected(client):
     assert r.status_code == 200
     assert r.json()["ok"] is False
     assert r.json()["chain_status"] == "MODIFIED"
+
+
+# ----- REGRESSION: Error responses never echo sensitive caller input -----
+
+def test_security_error_no_sensitive_echo(client):
+    """Invalid approval request must not reflect raw caller input in 400 body (F4)."""
+    sid = _make_session_with_state(client, "S1", "running")
+
+    # Submit an approval with reviewer as a wrong type (list instead of str)
+    # containing a synthetic credential. Validation must fail but the
+    # 400 body must not echo the raw input.
+    r = client.post("/api/v1/approvals",
+                    json={"session_id": sid, "action_id": "api-x",
+                          "tool": "navigate",
+                          "arguments": {"url": "http://orders.lab.test/"},
+                          "reviewer": ["synth_tok_abcdef12"],  # wrong type: list not str
+                          "rationale": "test",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 400
+    body = r.text
+    assert "synth_tok_abcdef12" not in body, "sensitive input must not be echoed"
+    assert "invalid approval record" in body.lower()

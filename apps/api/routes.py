@@ -864,11 +864,13 @@ async def submit_approval(
     # Validate the approval record before storing it.
     # Never silently store malformed approvals — a rejected/revoked record
     # must be enforceable, not silently discarded.
+    # Never echo the raw ValidationError in the response: it may reflect
+    # caller-supplied secrets back to the client.
     try:
         ApprovalRecord.model_validate(record)
-    except ValidationError as exc:
+    except ValidationError:
         raise HTTPException(
-            status_code=400, detail=f"invalid approval record: {exc}"
+            status_code=400, detail="invalid approval record"
         ) from None
 
     with state["lock"]:
