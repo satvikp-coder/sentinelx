@@ -24,7 +24,7 @@ Columns: Task ID | Feature | Original requirement | Starting state | Files chang
 | 30 | External scanner QA harness | Opt-in Strix/PentAGI lab-only | NOT_STARTED | packages/external_scanner/*.py, tests/unit/test_external_scanner.py | tests/unit/test_external_scanner.py (16) | tasks/30.result.md | d8e680a | VERIFIED_LOCAL | none | none |
 | 31 | Evaluation/report/final-run integration | scripts/final_run.py + reports | NOT_STARTED | scripts/final_run.py (existing), tests/unit/test_final_run.py | tests/unit/test_final_run.py (9) | tasks/31.result.md | d9c2ad4 | VERIFIED_LOCAL | none | none |
 | 32 | Security hardening & release readiness | Self-audit, secret scan, packaging | NOT_STARTED | none | none | none | none | NOT_STARTED | none | public visibility = human |
-| 33 | Demo & submission pack | docs/DEMO_SCRIPT.md, docs/SUBMISSION_DRAFT.md | NOT_STARTED | none | none | none | none | NOT_STARTED | submission = human | human |
+| 33 | Demo & submission pack | docs/DEMO_SCRIPT.md, docs/SUBMISSION_DRAFT.md | NOT_STARTED | docs/DEMO_SCRIPT.md, docs/SUBMISSION_DRAFT.md, docs/DEMO_CHECKLIST.md, docs/RELEASE_CHECKLIST.md | none (docs only) | tasks/33.result.md | none | NOT_STARTED | submission = human | human |
 
 Notes:
 - Statuses are VERIFIED_LOCAL only when the existing implementation and relevant tests were checked and pass.
