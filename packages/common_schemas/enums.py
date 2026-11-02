@@ -97,6 +97,7 @@ class VulnClass(StrEnum):
 
     SQL_INJECTION = "sql_injection"
     REFLECTED_XSS = "reflected_xss"
+    XSS_STORED = "stored_xss"
     BROKEN_OBJECT_AUTHORIZATION = "broken_object_authorization"
     MISSING_AUTHENTICATION = "missing_authentication"
     SENSITIVE_FILE_EXPOSURE = "sensitive_file_exposure"
