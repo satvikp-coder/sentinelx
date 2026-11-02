@@ -201,3 +201,32 @@ Prompt 9 is complete end to end (Part 0 housekeeping, the Baseten provider and s
   regardless of `core.autocrlf` - a `git apply`/Windows limitation, not an `apply_edits` bug.
   `apply_edits` output (CRLF new_contents + CRLF diff) is correct; on Linux CRLF patches apply
   cleanly.
+
+## Task 22: shield intent accuracy and injection protection (2026-11-01)
+- Branch `work/ds`, on top of `9244d60` (21D).
+- Root cause: `map_intent()` used first-signal-wins, ignoring all but the first fired signal; no
+  EXFIL_ATTEMPT signals existed; no distinction between rapid vs repeated failed logins; confidence
+  was per-signal with no aggregation across multiple signals.
+- Fix in `packages/shield/intent.py`, `packages/shield/detect.py`, `packages/shield/proxy.py`:
+  - `intent.py`: added `aggregate_intent()` — confidence-weighted voting across all fired signals
+    (sum confidences per intent, highest total wins, capped at 1.0); added 7 new signals
+    (rapid_failed_logins, nosqli_probe, command_injection, directory_traversal,
+    sensitive_admin_path, data_transfer_large, directory_listing); `map_intent` kept for backward
+    compatibility.
+  - `detect.py`: added `rapid_failed_logins` behavior window signal (>= 10 failed logins, conf 0.9,
+    distinct from `repeated_failed_logins` >= 5 at conf 0.8).
+  - `proxy.py`: `_handle()` and `model_assess()` now call `aggregate_intent()` instead of
+    `map_intent()`.
+- Intent labels remain INFERRED (never OBSERVED) and cite real evidence event ids.
+- Verification (`.venv\Scripts\python.exe`): new regression tests
+  `tests/unit/test_shield_intent_aggregate.py` (22 tests) - fixed labeled dataset/confusion matrix
+  covering all 6 intent labels; benign search traffic not misclassified; injection/admin probe/
+  object enumeration/rate limiting classified correctly; evidence citation validation; rule compiler
+  rejects broad routes and missing intent events; rule TTL expiry and manual removal; human approval
+  re-runs benign-replay gate; proxy fail-open and kill switch; taxonomy coverage; unknown signals
+  ignored. All 22 pass. Full shield suite 106 passed. Full fast loop `pytest -q -m "not slow"`:
+  exit 0. `ruff check .`: All checks passed! `git diff --check`: exit 0. Forbidden paths vs main:
+  empty diff.
+- Limitation: live shield end-to-end test against a real lab server NOT RUN (requires Docker/lab
+  server); shield logic tested in-process. CRLF `git apply` on Windows limitation from Task 21D
+  remains.

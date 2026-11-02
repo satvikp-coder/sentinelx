@@ -115,7 +115,9 @@ class ClientWindow:
         not_found = sum(1 for _, s in self.statuses if s == 404)
         if total >= 20 and not_found / max(total, 1) >= 0.5:
             out.append(("high_404_rate", f"{not_found}/{total} 404s in window", 0.6))
-        if len(self.failed_logins) >= 5:
+        if len(self.failed_logins) >= 10:
+            out.append(("rapid_failed_logins", f"{len(self.failed_logins)} failed logins", 0.9))
+        elif len(self.failed_logins) >= 5:
             out.append(("repeated_failed_logins", f"{len(self.failed_logins)} failed logins", 0.8))
         if len(self.admin_hits) >= 5:
             out.append(("admin_probe", f"{len(self.admin_hits)} admin hits", 0.8))
