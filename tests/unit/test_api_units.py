@@ -7,10 +7,10 @@ evidence integrity, model-unavailable handling.
 
 from __future__ import annotations
 
+import time
 from uuid import UUID, uuid4
 
 import pytest
-import time
 from fastapi.testclient import TestClient
 
 from apps.api.main import _rate_tokens, app
@@ -557,7 +557,7 @@ def test_rate_limit_burst(client):
     # Deterministic burst test: directly fill the rate-limit bucket to the
     # limit, then verify the HTTP path returns 429. This avoids relying on
     # 250 sequential requests finishing within one second (timing-dependent).
-    from apps.api.main import _rate_limited, _rate_tokens, RATE_LIMIT_BURST
+    from apps.api.main import RATE_LIMIT_BURST, _rate_tokens
 
     _rate_tokens.clear()
 
