@@ -131,6 +131,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("--policy", required=True, help="Policy YAML file")
     p_check.add_argument("--action", required=True, help="Action JSON file")
     p_check.set_defaults(func=agent_cmd)
+    p_test = agent_sub.add_parser("test", help="Run agent test against a lab")
+    p_test.add_argument("--adapter", required=True, help="Adapter spec (scripted:..., exec:..., http://...)")
+    p_test.add_argument("--lab", required=True, help="Lab name")
+    p_test.add_argument("--scenario", required=True, help="Scenario ID")
+    p_test.set_defaults(func=lambda args: agent_cmd(args, "test"))
 
     # report
     p_report = subparsers.add_parser("report", help="Build the static results report")
