@@ -1,6 +1,24 @@
 {
   "name": "@sentinelx/sdk",
+  "version": "0.1.0",
+  "description": "Sentinel X TypeScript Agent Guard SDK",
   "private": true,
-  "version": "0.0.0",
-  "description": "Sentinel X TypeScript SDK (placeholder, planned)"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "lint": "echo 'lint: not configured'",
+    "test": "echo 'test: not configured'",
+    "prepack": "npm run build"
+  },
+  "keywords": ["sentinelx", "agent-guard", "security", "policy"],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
