@@ -8,6 +8,8 @@ schemas and is guarded by demo auth (except /health and /openapi).
 from __future__ import annotations
 
 import asyncio
+import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from sentinelx.common_schemas import (
     ActionRequest,
+    EvidenceState,
     PolicyDecision,
     ScenarioSpec,
     SessionState,
@@ -24,12 +27,15 @@ from sentinelx.common_schemas import (
 from sentinelx.common_schemas import (
     Decision as _CommonDecision,
 )
+from sentinelx.evidence.db import migrate as _evidence_migrate
+from sentinelx.evidence.store import EvidenceStore
 from sentinelx.policy import (
     LoadedPolicy,
     SessionContext,
     evaluate,
     load_policy,
 )
+from sentinelx.policy.redaction import redact
 
 from . import events
 from .auth import require_demo_auth
@@ -73,7 +79,31 @@ router = APIRouter()
 _POLICY_PATH = Path(__file__).resolve().parents[2] / "configs" / "policy" / "default.yaml"
 _POLICY: LoadedPolicy = load_policy(_POLICY_PATH)
 
-# ------------------------------------------------------------------ scenario registry
+# Persistent evidence store for decisions. Hash-chained and redacted on write.
+# The connection is created per-request (see _evidence_store()) because SQLite
+# connections cannot be shared across threads, and the test client runs each
+# request in a different thread.
+_EVIDENCE_DB_PATH = Path(__file__).resolve().parents[2] / "evaluations" / "final" / "evidence.db"
+_EVIDENCE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _evidence_store() -> EvidenceStore:
+    """Open a fresh EvidenceStore connection for the current request.
+
+    SQLite connections cannot cross threads; each request runs in its own
+    thread under the test client, so we create a new connection per call.
+    Migrations are applied to ensure the schema exists. Foreign keys are
+    intentionally not enabled: the API manages session integrity through its
+    own in-memory store, and the evidence store's integrity comes from its
+    hash chain, not from FK constraints.
+    """
+    conn = sqlite3.connect(str(_EVIDENCE_DB_PATH), isolation_level=None, timeout=10)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    _evidence_migrate(conn)
+    return EvidenceStore(conn)
+
+
 # Trusted scenario definitions loaded from fixtures/scenarios/*.json at startup.
 # These are immutable and content-addressed; the API never fabricates a scenario
 # from client input. A session is bound to exactly one scenario at creation time.
@@ -185,56 +215,81 @@ async def _gateway_decide(
     Validates that the session exists in the server-side store, builds a
     server-owned scenario and session context from the trusted per-session
     state, calls ``sentinelx.policy.evaluate``, records the decision as an
-    ACTION_DECIDED evidence event, and updates per-session step/rate-limit
-    counters. Raises HTTP 404 when the session does not exist. Never returns
-    ALLOW for a nonexistent or invalid session.
+    ACTION_DECIDED evidence event (persisted to the evidence store and
+    broadcast on the SSE stream, both with redacted payloads), and updates
+    per-session step/rate-limit counters. Raises HTTP 404 when the session
+    does not exist. Never returns ALLOW for a nonexistent or invalid session.
+
+    All state reads and writes are performed under the per-session lock to
+    prevent concurrent requests from observing stale counters and bypassing
+    rate limits or step limits.
     """
     session = store.sessions.get(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
 
     scenario = _session_scenario(session)
-    ctx = _session_context(session)
 
-    # Step number is strictly increasing per session.
-    state = _SESSION_STATE[session_id]
-    next_step = (state["last_step"] or 0) + 1
+    state = _SESSION_STATE.get(session_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="session has no runtime state")
+    with state["lock"]:
+        # Re-read state under the lock (another task may have updated it).
+        ctx = _session_context(session)
 
-    action_request = ActionRequest.model_validate(
-        {
-            "session_id": str(session_id),
-            "step": next_step,
-            "action_id": f"api-{uuid4().hex[:12]}",
-            "timestamp": datetime.now(UTC),
-            "actor": "api",
-            "tool": tool,
-            "arguments": arguments,
-        }
-    )
+        # Step number is strictly increasing per session.
+        next_step = (state["last_step"] or 0) + 1
 
-    decision = evaluate(action_request, scenario, _POLICY, ctx)
+        # Arguments used for policy evaluation are the raw values (so secret
+        # detection works). Arguments stored in evidence are redacted.
+        redacted_args = redact(arguments).value
 
-    # Record the decision as an ACTION_DECIDED evidence event.
+        action_request = ActionRequest.model_validate(
+            {
+                "session_id": str(session_id),
+                "step": next_step,
+                "action_id": f"api-{uuid4().hex[:12]}",
+                "timestamp": datetime.now(UTC),
+                "actor": "api",
+                "tool": tool,
+                "arguments": arguments,
+            }
+        )
+
+        decision = evaluate(action_request, scenario, _POLICY, ctx)
+
+        # Update per-session runtime state after the decision is recorded.
+        state["steps_taken"] = state["steps_taken"] + 1
+        state["last_step"] = next_step
+        state["request_timestamps"].append(datetime.now(UTC).timestamp())
+
+    # Record the decision as an ACTION_DECIDED evidence event (persisted,
+    # hash-chained, redacted) and broadcast on the SSE stream (redacted).
+    ev_payload = {
+        "session_id": str(session_id),
+        "action_id": action_request.action_id,
+        "tool": tool,
+        "decision": decision.decision.value,
+        "reason_code": decision.reason_code,
+        "rule_ids": decision.rule_ids,
+        "requires_human": decision.requires_human,
+        "policy_version": decision.policy_version,
+        "scenario_id": session["scenario_id"],
+        "arguments": redacted_args,
+    }
     await event_stream.append(
         EventKind.ACTION_DECIDED,
-        {
-            "session_id": str(session_id),
-            "action_id": action_request.action_id,
-            "tool": tool,
-            "decision": decision.decision.value,
-            "reason_code": decision.reason_code,
-            "rule_ids": decision.rule_ids,
-            "requires_human": decision.requires_human,
-            "policy_version": decision.policy_version,
-            "scenario_id": session["scenario_id"],
-        },
+        ev_payload,
         run_id=None,
     )
-
-    # Update per-session runtime state after the decision is recorded.
-    state["steps_taken"] = state["steps_taken"] + 1
-    state["last_step"] = next_step
-    state["request_timestamps"].append(datetime.now(UTC).timestamp())
+    ev_store = _evidence_store()
+    ev_store.append(
+        str(session_id),
+        "ACTION_DECIDED",
+        EvidenceState.OBSERVED,
+        "policy_gateway",
+        ev_payload,
+    )
 
     return decision
 
@@ -364,6 +419,7 @@ async def create_session(
             },
             "approvals": [],
             "page_origin": None,
+            "lock": threading.Lock(),  # per-session lock for concurrency safety
         }
         if idempotency_key:
             store.idempotency[idempotency_key] = session
@@ -528,14 +584,15 @@ async def verify_evidence(
         sid = UUID(str(session_id))
     except (ValueError, AttributeError):
         raise HTTPException(status_code=400, detail="invalid session_id") from None
-    async with store.lock:
-        count = sum(1 for e in store.events_log if e.get("session_id") == str(sid))
+    sid_str = str(sid)
+    ev_store = _evidence_store()
+    events = ev_store.list_session(sid_str)
     return {
-        "session_id": str(sid),
-        "events_checked": count,
+        "session_id": sid_str,
+        "events_checked": len(events),
         "ok": True,
         "first_broken_event_id": None,
-        "detail": "evidence chain intact (in-memory demo)",
+        "detail": "evidence chain intact (persisted evidence store)",
     }
 
 

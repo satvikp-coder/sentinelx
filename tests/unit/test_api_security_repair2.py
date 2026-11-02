@@ -18,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import apps.api.routes as _routes_mod
+from apps.api import main as _main_app
 from apps.api.main import app
 from apps.api.routes import _SESSION_SCENARIOS, _SESSION_STATE
 from sentinelx.common_schemas import ActionRequest, ScenarioSpec, SessionState
@@ -30,6 +31,12 @@ AUTH = {"Authorization": "Bearer sentinelx-demo-local-only"}
 @pytest.fixture()
 def client():
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limit():
+    """Reset the rate limit counter before each test to ensure test isolation."""
+    _main_app._rate_tokens.clear()
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "scenarios"
 _POLICY = load_policy(Path(__file__).resolve().parents[2] / "configs" / "policy" / "default.yaml")
@@ -46,7 +53,7 @@ def _load_trusted_scenario(scenario_id: str) -> ScenarioSpec:
     return ScenarioSpec.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-def _make_session_with_state(client, scenario_id: str, state_value: str = "RUNNING"):
+def _make_session_with_state(client, scenario_id: str, state_value: str = "running"):
     """Create a session and set its state in the server-side store.
     Returns the session ID as a string.
     """
