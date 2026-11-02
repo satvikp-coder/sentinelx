@@ -46,13 +46,13 @@ Independent oracle comparisons + real SQLite persistence + real SSE streams + co
 
 ## 7. Progress Tracking
 
-- Stage F1 (evidence persistence): PENDING
-- Stage F2 (redaction): PENDING
-- Stage F3 (session/run lifecycle): PENDING
-- Stage F4 (approval identity): PENDING
-- Stage F5 (test isolation): PENDING
-- Stage F6 (concurrency): PENDING
-- Stage F7 (scenario snapshots): PENDING
-- Stage F8 (SSE reconnect): PENDING
-- Stage F9 (branch stabilization): PENDING
-- Final gate: PENDING
+- Stage F1 (evidence persistence): COMPLETE — `_gateway_decide` persists ACTION_DECIDED events to EvidenceStore with hash-chained, redacted payloads
+- Stage F2 (redaction): COMPLETE — SSE event payloads use redacted arguments via `redact(arguments).value`
+- Stage F3 (session/run lifecycle): COMPLETE — `create_run` transitions session from PENDING to RUNNING state
+- Stage F4 (approval identity): COMPLETE — Deterministic `action_id` = `api-{sha256(tool+arguments)[:12]}`, `_gateway_decide` checks existing approvals before evaluate, POST `/api/v1/approvals` endpoint added
+- Stage F5 (test isolation): COMPLETE — Rate-limit token buckets cleared in `client` fixture to prevent cross-test pollution
+- Stage F6 (concurrency): COMPLETE — Per-session `threading.Lock()` in `_SESSION_STATE` prevents race conditions
+- Stage F7 (scenario snapshots): COMPLETE — `ScenarioSpec.model_copy(deep=True)` when binding to session (immutable snapshot)
+- Stage F8 (SSE reconnect): COMPLETE — SSE `ev_id` uses integer `seq` instead of UUID, matching `Last-Event-ID` parsing
+- Stage F9 (branch stabilization): COMPLETE — Task 25 metrics test failures fixed (false_positive_rates in overall, MetricError on no attack runs)
+- Final gate: COMPLETE — All 63 focused tests pass (43 API units + 20 security repair), 16 metrics tests pass, 18 evidence-store tests pass
