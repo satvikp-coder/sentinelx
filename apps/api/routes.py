@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from fastapi import (
     APIRouter,
@@ -189,6 +189,20 @@ _TARGET_LABS: dict[str, str] = {}
 # Maps target_id -> dict with verification_token_hash and verified_at.
 # Only populated for lab targets registered through the API.
 _TARGET_AUTHZ: dict[str, dict[str, Any]] = {}
+
+# Namespace UUID for deterministically mapping native scanner session IDs
+# (ses_<hex>) to public UUIDs for FindingResponse.session_id. This preserves
+# the evidence linkage without fabricating unrelated random UUIDs.
+_SCAN_SESSION_NAMESPACE = uuid5(NAMESPACE_URL, "sentinelx.scanner.session")
+
+# Internal mapping from native scanner session ID (ses_<hex>) to API UUID.
+# Populated when a scan completes and its findings are persisted.
+_NATIVE_SESSION_TO_API: dict[str, UUID] = {}
+
+# Thread-safe lock for cross-thread scan state access. Background worker
+# threads (not the ASGI event loop) update scan records, so asyncio.Lock
+# is unsafe here; threading.Lock is required.
+_SCAN_STATE_LOCK = threading.Lock()
 
 # Scan lab name mapping - internal metadata not exposed in public responses.
 # Maps scan_id -> lab directory name for scan execution.
@@ -461,6 +475,21 @@ def _now() -> datetime:
 
 def _new_id() -> UUID:
     return uuid4()
+
+
+def _native_session_to_api_uuid(native_session_id: str) -> UUID:
+    """Convert a native scanner session ID (ses_<hex>) to a deterministic UUID.
+
+    Native scanner session IDs are not UUIDs (e.g. "ses_<hex>"). This maps them
+    deterministically to UUIDv5 values so they can be serialized in
+    FindingResponse.session_id without fabricating unrelated random UUIDs or
+    discarding findings. The mapping preserves the native evidence linkage.
+    """
+    if native_session_id in _NATIVE_SESSION_TO_API:
+        return _NATIVE_SESSION_TO_API[native_session_id]
+    api_uuid = uuid5(_SCAN_SESSION_NAMESPACE, native_session_id)
+    _NATIVE_SESSION_TO_API[native_session_id] = api_uuid
+    return api_uuid
 
 
 # ------------------------------------------------------------------ helpers
@@ -804,9 +833,24 @@ async def list_findings(
     offset: int = Query(0, ge=0),
     user: str = Depends(_require_auth),
 ):
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         items = list(store.findings.values())
-    return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+    # Explicitly serialize to FindingResponse so internal fields
+    # (native_session_id, scan_id) never leak into the public response.
+    return [
+        FindingResponse(
+            id=f["id"],
+            session_id=f["session_id"],
+            state=f["state"],
+            severity=f["severity"],
+            summary=f["summary"],
+            mode=f["mode"],
+            model_provider=f["model_provider"],
+            model_name=f["model_name"],
+            created_at=f["created_at"],
+        )
+        for f in items
+    ]
 
 
 # ------------------------------------------------------------------ containment
@@ -910,7 +954,11 @@ async def create_scan(
             detail="target has no associated lab",
         )
 
-    async with store.lock:
+    # Load scan profile to report the correct budget (scanner default 500,
+    # not the legacy hardcoded 100).
+    profile = _load_scan_profile()
+
+    with _SCAN_STATE_LOCK:
         sid = _new_id()
         cancel_event = threading.Event()
         _SCAN_CANCEL_EVENTS[sid] = cancel_event
@@ -922,7 +970,7 @@ async def create_scan(
             "state": RunState.PENDING,
             "findings_count": 0,
             "requests_used": 0,
-            "request_budget": 100,
+            "request_budget": profile.request_budget,
             "note": "Scan queued",
         }
 
@@ -966,7 +1014,7 @@ async def get_scan(
     Unknown scan IDs return 404. Returns the scan record with its current
     state (PENDING, RUNNING, COMPLETED, FAILED, CANCELLED).
     """
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         scan = store.scans.get(scan_id)
     if scan is None:
         raise HTTPException(status_code=404, detail="scan not found")
@@ -987,10 +1035,11 @@ async def _run_scan_background(
     cancel_event: threading.Event,
 ) -> None:
     """Run a scan in the background and update the scan record with results.
-    Any exception is caught and recorded as a FAILED state."""
+    Any exception is caught and recorded as a FAILED state unless the scan
+    was already cancelled, in which case CANCELLED is preserved."""
     lab_name = _SCAN_LABS.get(scan_id)
     if not lab_name:
-        async with store.lock:
+        with _SCAN_STATE_LOCK:
             scan = store.scans.get(scan_id)
             if scan is not None:
                 scan["state"] = RunState.FAILED
@@ -999,27 +1048,36 @@ async def _run_scan_background(
         return
 
     # Mark the scan as RUNNING before starting execution.
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         scan = store.scans.get(scan_id)
         if scan is not None:
             scan["state"] = RunState.RUNNING
+            scan["note"] = "Scan running"
 
     try:
         result = await asyncio.to_thread(
             _execute_scan, scan_id, target_entry, lab_name, cancel_event
         )
     except Exception as exc:
-        async with store.lock:
+        with _SCAN_STATE_LOCK:
             scan = store.scans.get(scan_id)
-            if scan is not None:
+            if scan is not None and scan["state"] != RunState.CANCELLED:
                 scan["state"] = RunState.FAILED
-            _SCAN_META[scan_id] = {"error": str(exc)[:300]}
+                scan["error"] = str(exc)[:300]
+            elif scan is not None:
+                # Worker raised after cancellation: preserve CANCELLED,
+                # record the worker error separately without fabricating
+                # a new terminal outcome.
+                _SCAN_META[scan_id] = {
+                    **_SCAN_META.get(scan_id, {}),
+                    "worker_error": str(exc)[:300],
+                }
         _SCAN_CANCEL_EVENTS.pop(scan_id, None)
         return
 
-    # Update scan record with results. Check cancellation first so a
-    # cancelled scan is not overwritten by a background result.
-    async with store.lock:
+    # Update scan record with results. Serialize terminal state transitions
+    # so cancellation is not overwritten by a background result.
+    with _SCAN_STATE_LOCK:
         scan = store.scans.get(scan_id)
         if scan is None:
             _SCAN_CANCEL_EVENTS.pop(scan_id, None)
@@ -1027,20 +1085,14 @@ async def _run_scan_background(
             _SCAN_META.pop(scan_id, None)
             return
 
-        # If the scan was cancelled, keep the CANCELLED state and do not
-        # overwrite with the background result (the scan may have already
-        # stopped at a check boundary).
-        if scan["state"] == RunState.CANCELLED:
-            _SCAN_CANCEL_EVENTS.pop(scan_id, None)
-            _SCAN_LABS.pop(scan_id, None)
-            _SCAN_META.pop(scan_id, None)
-            return
-
+        # If the scan was cancelled, preserve CANCELLED but still record
+        # the actual work completed before cancellation (requests, findings,
+        # stop reason, timing). Do not overwrite with FAILED.
         stop_reason = result.stop_reason.lower()
-        if stop_reason == "completed":
-            scan["state"] = RunState.COMPLETED
-        elif stop_reason == "cancelled":
+        if stop_reason == "cancelled" or scan["state"] == RunState.CANCELLED:
             scan["state"] = RunState.CANCELLED
+        elif stop_reason == "completed":
+            scan["state"] = RunState.COMPLETED
         else:
             scan["state"] = RunState.FAILED
 
@@ -1052,13 +1104,18 @@ async def _run_scan_background(
             "stop_reason": result.stop_reason,
             "duration_ms": result.duration_ms,
         })
+        scan["note"] = f"Scan {scan['state'].lower()} ({result.stop_reason})"
 
         # Persist findings associated with this scan
         for finding in result.findings:
             fid = _new_id()
+            native_session_id = result.session_id
+            api_session_id = _native_session_to_api_uuid(native_session_id)
             store.findings[fid] = {
                 "id": fid,
-                "session_id": result.session_id,
+                "session_id": api_session_id,
+                "native_session_id": native_session_id,
+                "scan_id": scan_id,
                 "state": finding.verification.state,
                 "severity": finding.candidate.severity.value,
                 "summary": finding.candidate.summary,
@@ -1139,7 +1196,7 @@ async def cancel_scan(
     """Request cancellation of a running scan. Sets the cancel event that
     run_scan() checks between checks. The scan stops at the next check
     boundary and leaves honest evidence of what was completed."""
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         scan = store.scans.get(scan_id)
         if scan is None:
             raise HTTPException(status_code=404, detail="scan not found")
@@ -1152,6 +1209,7 @@ async def cancel_scan(
         if cancel_event is not None:
             cancel_event.set()
         scan["state"] = RunState.CANCELLED
+        scan["note"] = "Scan cancelled"
 
     return {"scan_id": scan_id, "state": RunState.CANCELLED}
 
@@ -1169,7 +1227,7 @@ async def get_scan_findings(
     findings yet (scan execution not yet integrated); completed scans
     return their actual findings.
     """
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         scan = store.scans.get(scan_id)
     if scan is None:
         raise HTTPException(status_code=404, detail="scan not found")
@@ -1177,9 +1235,24 @@ async def get_scan_findings(
     # Unknown scan: 404 (raised above). Known scan in any state returns its
     # findings (if any). Completed scans return all findings; PENDING,
     # RUNNING, FAILED, CANCELLED scans return findings collected so far.
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         items = [f for f in store.findings.values() if f.get("scan_id") == scan_id]
-    return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+    # Explicitly serialize to FindingResponse so internal fields
+    # (native_session_id, scan_id) never leak into the public response.
+    return [
+        FindingResponse(
+            id=f["id"],
+            session_id=f["session_id"],
+            state=f["state"],
+            severity=f["severity"],
+            summary=f["summary"],
+            mode=f["mode"],
+            model_provider=f["model_provider"],
+            model_name=f["model_name"],
+            created_at=f["created_at"],
+        )
+        for f in items
+    ]
 
 
 # ------------------------------------------------------------------ patches

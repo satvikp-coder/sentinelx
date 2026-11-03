@@ -1,8 +1,8 @@
 # Sentinel X — Project Blockers
 
-**Audit date:** 2026-11-03
+**Audit date:** 2026-11-04
 **Worker branch:** work/ds
-**Worker SHA:** 16a6a7c
+**Worker SHA:** ea875f3
 
 ---
 
@@ -30,6 +30,12 @@
 | Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
 | Shield list: no pagination | _paginate applied before serialization |
 | Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
+| Scan: findings always empty | Internal findings store scan_id; per-scan filtering works |
+| Scan: global findings 500 | Native session IDs mapped to deterministic UUIDv5; explicit FindingResponse serialization |
+| Scan: cancellation discards accounting | CANCELLED preserved across worker return/exception; actual work recorded |
+| Scan: worker exception overwrites CANCELLED | Terminal state serialized across success/error/cancel paths |
+| Scan: concurrency unsafe | threading.Lock for cross-thread scan state |
+| Scan: budget mismatch | API reports scanner profile budget (500) |
 
 ---
 
@@ -153,3 +159,9 @@
 | Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
 | Shield list: no pagination | _paginate applied before serialization |
 | Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
+| Scan: findings always empty | Internal findings store scan_id; per-scan filtering works |
+| Scan: global findings 500 | Native session IDs mapped to deterministic UUIDv5; explicit FindingResponse serialization |
+| Scan: cancellation discards accounting | CANCELLED preserved across worker return/exception; actual work recorded |
+| Scan: worker exception overwrites CANCELLED | Terminal state serialized across success/error/cancel paths |
+| Scan: concurrency unsafe | threading.Lock for cross-thread scan state |
+| Scan: budget mismatch | API reports scanner profile budget (500) |

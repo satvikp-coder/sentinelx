@@ -1,8 +1,8 @@
 # STATUS
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
-## Environment report (observed 2026-11-03, Windows 11)
+## Environment report (observed 2026-11-04, Windows 11)
 
 | Tool | Result |
 |------|--------|
@@ -22,10 +22,10 @@ Last updated: 2026-11-03
 | Item | Value |
 |------|-------|
 | Branch | work/ds |
-| Worker SHA | 16a6a7c |
+| Worker SHA | ea875f3 |
 | Main SHA | e035f379b246a0d5dbcb7ae57ffc2ab642718052 |
 | Origin/main SHA | e035f379b246a0d5dbcb7ae57ffc2ab642718052 |
-| Ahead of main | 10 commits |
+| Ahead of main | 11 commits |
 | Behind main | 0 commits |
 | Worktree status | clean |
 | Merged | NO |
@@ -44,6 +44,7 @@ Last updated: 2026-11-03
 | 1ed9a7f | Implement gated shield activation |
 | 7a7ab19 | Add scanner/shield regression tests and fix dashboard Tailwind |
 | 16a6a7c | Fix scanner execution and restore fail-closed shield approval |
+| ea875f3 | Fix scanner findings, session IDs, cancellation, budget |
 
 ## Verified Results (current session)
 
@@ -59,6 +60,7 @@ Last updated: 2026-11-03
 | `pytest tests/unit/test_shield_intent_aggregate.py` | focused tests passed, exit 0 |
 | Dashboard `npm run build` (apps/web) | success, no warnings |
 | `git diff --check` | clean |
+| Scanner integration (disposable local server) | 99 real requests, 6 findings, completed state, budget=500 |
 
 ## Security Repair 3 (F1-F9) — COMPLETE
 
@@ -79,12 +81,17 @@ Last updated: 2026-11-03
 | Area | Fix | Status |
 |------|-----|--------|
 | CI packaging | `pip install -e sdk/python` added to CI workflow | COMPLETE |
-| Scanner API execution | `create_scan` runs `run_scan()` in background daemon thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted, separate scan evidence DB | COMPLETE |
-| Shield approval | Fail-closed: `approve_shield_rule` rejects all activations with 400, rules stay PROPOSED | COMPLETE (fail-closed, not actual activation) |
-| Scan findings endpoint | GET /scans/{scan_id}/findings returns 404 for unknown, findings for any state (filtered by scan_id) | COMPLETE |
+| Scanner API execution | `create_scan` runs `run_scan()` in background daemon thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted | COMPLETE |
+| Shield approval | Fail-closed: `approve_shield_rule` rejects all activations with 400 | COMPLETE |
+| Scan findings endpoint | GET /scans/{scan_id}/findings returns findings filtered by scan_id | COMPLETE |
 | Scan status endpoint | GET /scans/{scan_id} returns current scan state | COMPLETE |
+| Global findings endpoint | GET /findings returns all findings with explicit serialization | COMPLETE |
 | Shield list serialization | Explicit ShieldRuleResponse conversion, pagination applied before serialization | COMPLETE |
 | Dashboard Tailwind | Replaced unprocessed @tailwind directives with plain CSS utility classes | COMPLETE |
+| Finding session IDs | Native scanner session IDs (ses_<hex>) mapped to deterministic UUIDv5 | COMPLETE |
+| Scanner budget | API reports scanner profile budget (500) instead of hardcoded 100 | COMPLETE |
+| Cancellation | CANCELLED state preserved across worker return/exception, actual work recorded | COMPLETE |
+| Concurrency | threading.Lock for cross-thread scan state (asyncio.Lock unsafe across threads) | COMPLETE |
 
 ## Implemented Features
 
@@ -119,8 +126,15 @@ Last updated: 2026-11-03
 | Blocker | Resolution |
 |---------|------------|
 | CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
-| Shield: no gated activation | Fail-closed: approve_shield_rule rejects all activations with 400 |
+| Shield: unsafe gated activation | Removed unsafe shortcut; restored fail-closed (400 rejection) |
 | Scan: no execution pipeline | create_scan runs run_scan() in background daemon thread |
+| Scan: invalid TargetAuthorization | Target registration stores verification_token_hash and verified_at |
+| Scan: findings always empty | Internal findings store scan_id; per-scan filtering works |
+| Scan: global findings 500 | Native session IDs mapped to deterministic UUIDv5; explicit FindingResponse serialization |
+| Scan: cancellation discards accounting | CANCELLED preserved across worker return/exception; actual work recorded |
+| Scan: worker exception overwrites CANCELLED | Terminal state serialized across success/error/cancel paths |
+| Scan: concurrency unsafe | threading.Lock for cross-thread scan state |
+| Scan: budget mismatch | API reports scanner profile budget (500) |
 | Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
 | Shield list: no pagination | _paginate applied before serialization |
 | Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
