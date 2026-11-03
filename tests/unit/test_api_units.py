@@ -439,7 +439,7 @@ def test_target_public_rejected(client):
 
 def test_create_scan(client):
     client.post("/api/v1/targets",
-                json={"target_id": "t-scan", "url": "http://127.0.0.1:8080/", "lab": True},
+                json={"target_id": "t-scan", "url": "http://127.0.0.1:18081/", "lab": True},
                 headers=AUTH)
     r = client.post("/api/v1/scans",
                     json={"target_id": "t-scan", "model": False},

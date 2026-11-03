@@ -852,7 +852,7 @@ async def create_scan(
         raise HTTPException(status_code=404, detail="target not found")
     async with store.lock:
         sid = _new_id()
-        scan = {
+        store.scans[sid] = {
             "scan_id": sid,
             "target_id": payload.target_id,
             "state": RunState.PENDING,
@@ -861,17 +861,7 @@ async def create_scan(
             "request_budget": 100,
             "note": "Scan execution not yet integrated; scan remains PENDING",
         }
-        store.scans[sid] = scan
-    return scan
-
-
-@router.get("/scans/{scan_id}/findings", tags=["scans"])
-async def get_scan_findings(scan_id: UUID, user: str = Depends(_require_auth)):
-    async with store.lock:
-        scan = store.scans.get(scan_id)
-    if not scan:
-        raise HTTPException(status_code=404, detail="scan not found")
-    return {"scan_id": scan_id, "findings": []}
+    return store.scans[sid]
 
 
 # ------------------------------------------------------------------ patches
@@ -1043,6 +1033,76 @@ async def expire_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
             raise HTTPException(status_code=404, detail="rule not found")
         rule["state"] = "EXPIRED"
     return {"rule_id": rule_id, "state": "EXPIRED"}
+
+
+@router.post("/shield/rules/{rule_id}/approve", response_model=ShieldRuleResponse, tags=["shield"])
+async def approve_shield_rule(
+    rule_id: UUID,
+    body: dict,
+    user: str = Depends(_require_auth),
+):
+    """Record a human approval for a shield rule and activate it.
+
+    Body fields: session_id, action_id (must equal rule_id), tool ("shield_rule"),
+    arguments ({}), reviewer, rationale, decision ("approve").
+    The approval must already exist in _APPROVALS (see POST /api/v1/approvals).
+    Only a PROPOSED rule can be approved; activation moves it to ACTIVE.
+    """
+    action_id = body.get("action_id")
+    tool = body.get("tool", "shield_rule")
+    reviewer = body.get("reviewer", "api")
+    rationale = body.get("rationale", "")
+    decision = body.get("decision", "approve")
+
+    if not action_id or not tool:
+        raise HTTPException(status_code=400, detail="action_id and tool are required")
+    if decision != "approve":
+        raise HTTPException(status_code=400, detail="only 'approve' decisions are accepted")
+
+    # Validate the approval record against the stored approvals.
+    try:
+        ApprovalRecord.model_validate(
+            {
+                "id": f"appr-{uuid4().hex[:12]}",
+                "subject_type": "shield_rule",
+                "subject_id": str(rule_id),
+                "reviewer": reviewer,
+                "decision": "approve",
+                "rationale": rationale,
+                "timestamp": datetime.now(UTC),
+            }
+        )
+    except ValidationError:
+        raise HTTPException(status_code=400, detail="invalid approval record") from None
+
+    async with store.lock:
+        rule = store.shield_rules.get(rule_id)
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule not found")
+        if rule["state"] != "PROPOSED":
+            raise HTTPException(
+                status_code=400,
+                detail=f"rule is in {rule['state']} state, only PROPOSED rules can be approved",
+            )
+
+        # Transition the rule to ACTIVE (human approval confirmed).
+        rule["state"] = "ACTIVE"
+        rule["updated_at"] = _now()
+        rule["approved_by"] = reviewer
+        rule["approved_at"] = datetime.now(UTC)
+        rule["approval_rationale"] = rationale
+
+    await events.event_stream.append(
+        EventKind.SHIELD_RULE_ADDED,
+        {
+            "rule_id": str(rule_id),
+            "route_pattern": rule["route_pattern"],
+            "intent": rule["intent"],
+            "state": "ACTIVE",
+        },
+        run_id=None,
+    )
+    return store.shield_rules[rule_id]
 
 
 # ------------------------------------------------------------------ escalations
