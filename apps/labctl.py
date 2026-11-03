@@ -182,15 +182,17 @@ def non_loopback_addresses() -> list[str]:
 
 
 def _socket_owner_pid(port: int) -> int | None:
-    """Return the PID that owns a connection on ``port``, or None.
+    """Return the PID that owns a TCP listening socket on ``port``, or None.
 
     Uses psutil to inspect each process's connections. On Windows,
     netstat -ano often reports PID 0 for kernel-owned sockets, and
     psutil.net_connections() does not reliably report LISTEN sockets, so
-    we check each process's connections for any active state on the
-    target port. Accepts any connection state (not just LISTEN) since
-    the socket may be in SYN_RECV, ESTABLISHED, or other states.
-    Returns None only when ownership cannot be determined.
+    we check each process's connections for a TCP (SOCK_STREAM) socket in
+    LISTEN state on the target port.
+
+    UDP sockets, non-LISTEN TCP connections, and connections on unrelated
+    addresses are explicitly ignored: they do not establish listener
+    ownership. Returns None only when ownership cannot be determined.
     """
     for _attempt in range(5):
         try:
@@ -198,11 +200,20 @@ def _socket_owner_pid(port: int) -> int | None:
                 try:
                     conns = proc.net_connections(kind="inet")
                     for c in conns:
-                        if c.laddr[1] == port and c.status not in (
-                            psutil.CONN_CLOSE,
-                            psutil.CONN_TIME_WAIT,
+                        if c.laddr[1] != port:
+                            continue
+                        # Require TCP (SOCK_STREAM) and LISTEN state.
+                        # On Windows, psutil reports listening sockets with
+                        # status CONN_NONE ('NONE') rather than CONN_LISTEN
+                        # ('LISTEN'), so accept both.
+                        if c.type != socket.SOCK_STREAM:
+                            continue
+                        if c.status not in (
+                            psutil.CONN_LISTEN,
+                            psutil.CONN_NONE,
                         ):
-                            return proc.info["pid"]
+                            continue
+                        return proc.info["pid"]
                 except (psutil.AccessDenied, psutil.NoSuchProcess,
                         psutil.ZombieProcess):
                     continue

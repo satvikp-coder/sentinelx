@@ -332,10 +332,12 @@ async def _gateway_decide(
     )
     # Also mirror into the in-memory events log so the /events list endpoint
     # (and the evidence timeline UI) can surface persisted decisions.
+    # Use a proper UUID for the event id; keep action_request.action_id in the
+    # payload for cross-referencing with the decision that produced it.
     async with store.lock:
         store.events_log.append(
             {
-                "id": action_request.action_id,
+                "id": str(uuid4()),
                 "seq": state["last_step"],
                 "run_id": None,
                 "kind": EventKind.ACTION_DECIDED,

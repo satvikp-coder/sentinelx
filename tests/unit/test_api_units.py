@@ -520,6 +520,47 @@ def test_evidence_verify_invalid_id(client):
     assert r.status_code == 400
 
 
+def test_events_endpoint_returns_valid_event_response(client):
+    """GET /api/v1/events returns 200 with events that validate against
+    EventResponse. The event id must be a proper UUID (not an action_id
+    string like 'api-<hash>').
+    """
+    sid = _make_running_session(client)
+    r = client.post("/api/v1/guard/decide",
+                    json={"session_id": sid, "tool": "navigate",
+                          "arguments": {"url": "http://orders.lab.test/"}},
+                    headers=AUTH)
+    assert r.status_code == 200
+
+    r = client.get("/api/v1/events", headers=AUTH)
+    assert r.status_code == 200, f"GET /api/v1/events: {r.status_code} {r.text}"
+    events = r.json()
+    assert len(events) >= 1, "expected at least one ACTION_DECIDED event"
+
+    # Every event must validate against EventResponse (id is a UUID).
+    for ev in events:
+        assert isinstance(ev["id"], str)
+        # Must be a valid UUID.
+        UUID(ev["id"])
+        assert isinstance(ev["seq"], int)
+        assert ev["kind"] == "ACTION_DECIDED"
+        assert isinstance(ev["payload"], dict)
+        assert "timestamp" in ev
+
+    # The decision we just made must appear in the event log.
+    found = [ev for ev in events
+             if ev["payload"].get("session_id") == sid
+             and ev["payload"].get("action_id")
+             and ev["payload"].get("decision") == "ALLOW"]
+    assert len(found) >= 1, "expected at least one ACTION_DECIDED event for our decision"
+
+    ev = found[0]
+    assert ev["payload"]["session_id"] == sid
+    assert ev["payload"]["decision"] == "ALLOW"
+    assert ev["payload"]["reason_code"] == "SAFE_ALLOWLIST"
+    assert ev["payload"]["policy_version"] is not None
+
+
 # ---- findings / patches / approvals / escalations
 
 def test_empty_collections(client):
