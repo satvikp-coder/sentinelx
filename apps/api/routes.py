@@ -1556,24 +1556,23 @@ async def list_shield_rules(
     offset: int = Query(0, ge=0),
     user: str = Depends(_require_auth),
 ):
-    # Expire overdue rules in the shared store so list output is truthful,
-    # then mirror any newly-expired state into the API store.
-    expired_ids: set[str] = set()
+    # Expire overdue rules in the shared store, then mirror any lapsed TTL
+    # into the API store so list output is truthful (natural expiry contract).
+    now = datetime.now(UTC)
     try:
-        runtime = _shield_runtime()
-        before = {r.id for r in runtime.active_rules()}
-        runtime.expire_overdue(datetime.now(UTC))
-        after = {r.id for r in runtime.active_rules()}
-        expired_ids = before - after
+        _shield_runtime().expire_overdue(now)
     except Exception:  # noqa: BLE001
         pass
     async with store.lock:
-        for rid_str in expired_ids:
-            try:
-                entry = store.shield_rules.get(UUID(rid_str))
-            except (ValueError, AttributeError):
+        for entry in store.shield_rules.values():
+            if entry.get("state") != "ACTIVE":
                 continue
-            if entry is not None and entry.get("state") == "ACTIVE":
+            expires = entry.get("expires_at")
+            if expires is None:
+                continue
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=UTC)
+            if expires <= now:
                 entry["state"] = "EXPIRED"
         items = list(store.shield_rules.values())
     page = _paginate(items, Pagination(limit=limit, offset=offset))["items"]

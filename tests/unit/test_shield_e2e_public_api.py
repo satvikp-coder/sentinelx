@@ -29,7 +29,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import socket
+import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -538,3 +541,118 @@ def test_e2e_sse_activation_event_is_redacted(upstream, client):
         assert marker not in blob, "synthetic marker leaked into shield evidence"
     finally:
         _run(proxy.aclose())
+
+
+# ------------------------------------------------------------------ SH-02 subprocess
+
+
+def test_e2e02_separate_proxy_process_enforces_api_activation(upstream, tmp_path):
+    """SH-02/SH-08: the standalone proxy runs as a REAL separate process.
+
+    - A disposable upstream HTTP server (this process).
+    - `uvicorn sentinelx.shield.server:create_shield_app` in a subprocess with
+      SHIELD_MODE=enforce and a shared SHIELD_RUNTIME_DB.
+    - The public API workflow (this process) activates a rule.
+    - A real HTTP client proves the subprocess enforces (403) and forwards
+      benign traffic (200); removal through the API stops enforcement.
+
+    Only processes started by this test are terminated.
+    """
+    runtime_db = tmp_path / "runtime.db"
+    proxy_port = _free_port()
+
+    env = {
+        **os.environ,
+        "SHIELD_UPSTREAM": upstream,
+        "SHIELD_MODE": "enforce",
+        "SHIELD_LAB_MODE": "1",
+        "SHIELD_RUNTIME_DB": str(runtime_db),
+    }
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn",
+         "sentinelx.shield.server:create_shield_app",
+         "--host", "127.0.0.1", "--port", str(proxy_port), "--log-level", "warning"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env,
+    )
+    try:
+        # Wait for the standalone proxy to come up (bounded).
+        base = f"http://127.0.0.1:{proxy_port}"
+        ready = False
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                raise AssertionError("standalone shield proxy exited during startup")
+            try:
+                h = httpx.get(f"{base}/__shield/health", timeout=0.5)
+                if h.status_code == 200:
+                    ready = True
+                    break
+            except Exception:  # noqa: BLE001 - not up yet
+                time.sleep(0.25)
+        assert ready, "standalone shield proxy did not become ready"
+
+        # API process shares the same runtime DB.
+        os.environ["SHIELD_RUNTIME_DB"] = str(runtime_db)
+        os.environ["SHIELD_UPSTREAM"] = upstream
+        os.environ["SHIELD_MODE"] = "enforce"
+        _reset_shield_singletons()
+        from apps.api.main import _rate_tokens
+
+        _rate_tokens.clear()
+        client = TestClient(app)
+
+        # Before activation the proxy forwards the candidate path.
+        count = _UpstreamHandler.counter
+        r = httpx.get(f"{base}/api/procsecret", timeout=5)
+        assert r.status_code == 200
+        assert _UpstreamHandler.counter == count + 1
+
+        # Full public workflow in the API process.
+        r = client.post("/api/v1/sessions",
+                        json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                        headers=AUTH)
+        sid = r.json()["id"]
+        r = client.post("/api/v1/shield/rules",
+                        json={"route_pattern": "/api/procsecret", "intent": "recon",
+                              "mode": "enforce", "ttl_minutes": 60, "reason": "subprocess"},
+                        headers=AUTH)
+        assert r.status_code == 200, r.text
+        rid = r.json()["rule_id"]
+        r = client.post("/api/v1/approvals",
+                        json={"session_id": sid, "action_id": rid, "tool": "shield_rule",
+                              "arguments": {}, "reviewer": "human", "rationale": "subprocess",
+                              "decision": "approve"},
+                        headers=AUTH)
+        assert r.status_code == 200
+        r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                        json={"session_id": sid, "action_id": rid, "tool": "shield_rule",
+                              "arguments": {}, "reviewer": "human", "rationale": "subprocess",
+                              "decision": "approve"},
+                        headers=AUTH)
+        assert r.status_code == 200, r.text
+        assert r.json()["state"] == "ACTIVE"
+
+        # The SEPARATE proxy process now blocks the matching request.
+        count = _UpstreamHandler.counter
+        r = httpx.get(f"{base}/api/procsecret", timeout=5)
+        assert r.status_code == 403, "separate proxy process did not enforce"
+        assert _UpstreamHandler.counter == count, "blocked request reached upstream"
+
+        # Benign traffic is unaffected.
+        r = httpx.get(f"{base}/health", timeout=5)
+        assert r.status_code == 200
+
+        # Removal through the API stops enforcement in the separate process.
+        r = client.delete(f"/api/v1/shield/rules/{rid}", headers=AUTH)
+        assert r.status_code == 200
+        count = _UpstreamHandler.counter
+        r = httpx.get(f"{base}/api/procsecret", timeout=5)
+        assert r.status_code == 200, "removed rule still enforced in separate process"
+        assert _UpstreamHandler.counter == count + 1
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:  # pragma: no cover - best effort
+            proc.kill()
+            proc.wait(timeout=10)
