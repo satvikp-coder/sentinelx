@@ -82,7 +82,7 @@ Last updated: 2026-11-04
 |------|-----|--------|
 | CI packaging | `pip install -e sdk/python` added to CI workflow | COMPLETE |
 | Scanner API execution | `create_scan` runs `run_scan()` in background daemon thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted | COMPLETE |
-| Shield approval | Fail-closed: `approve_shield_rule` rejects all activations with 400 | COMPLETE |
+| Shield approval | Fail-closed: `approve_shield_rule` rejects all activations with 400; real activation not implemented | PARTIAL |
 | Scan findings endpoint | GET /scans/{scan_id}/findings returns findings filtered by scan_id | COMPLETE |
 | Scan status endpoint | GET /scans/{scan_id} returns current scan state | COMPLETE |
 | Global findings endpoint | GET /findings returns all findings with explicit serialization | COMPLETE |
@@ -100,7 +100,7 @@ Last updated: 2026-11-04
 | Policy gateway | POST /api/v1/policy/decide | PASS |
 | Session management | POST /api/v1/sessions | PASS |
 | Approval workflow | POST /api/v1/approvals | PASS |
-| Shield rules | POST/GET/POST-approve /api/v1/shield/rules | PASS (fail-closed, no actual activation) |
+| Shield rules | POST/GET/POST-approve /api/v1/shield/rules | PARTIAL (fail-closed; no actual activation) |
 | Scan execution | POST /api/v1/scans, GET /scans/{id}, GET /scans/{id}/findings, POST /scans/{id}/cancel | PASS |
 | Evidence verification | POST /evidence/verify | PASS |
 | SSE event stream | GET /api/v1/events/stream | PASS |
@@ -120,6 +120,9 @@ Last updated: 2026-11-04
 | LICENSE | Not chosen (owner decision) | HUMAN_ACTION |
 | Repository visibility | Not public (owner decision) | HUMAN_ACTION |
 | Actual shield activation | Fail-closed only; real activation needs proxy runtime, benign-replay gate, scoped approval | NOT_RUN (feature incomplete) |
+
+> **Important:** Shield approval fail-closed behavior (rejecting all activations with 400) is NOT feature completion. It is a safe disabling of the activation path until genuine runtime integration is implemented. Do not describe safe disabling as feature completion.
+
 
 ## Resolved Blockers
 
