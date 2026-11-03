@@ -38,7 +38,6 @@ from sentinelx.common_schemas import (
     ApprovalRecord,
     EvidenceState,
     PolicyDecision,
-    PolicyMode,
     ScenarioSpec,
     SessionState,
 )
@@ -288,33 +287,6 @@ async def _gateway_decide(
         canonical = json.dumps({"tool": tool, "arguments": arguments},
                                sort_keys=True)
         action_id = f"api-{hashlib.sha256(canonical.encode()).hexdigest()[:12]}"
-
-        # Check if this action has been previously approved.
-        # If so, return ALLOW immediately without re-running the gateway.
-        existing_approval = None
-        for _candidate_sid, candidate_state in _SESSION_STATE.items():
-            for record in candidate_state.get("approvals", []):
-                subject_id = record.get("subject_id", "")
-                if subject_id.startswith(action_id + ":") \
-                        and record.get("decision") == "approve":
-                    existing_approval = record
-                    break
-            if existing_approval is not None:
-                break
-        if existing_approval is not None:
-            if existing_approval.get("decision") == "approve":
-                return PolicyDecision(
-                    action_id=action_id,
-                    decision=Decision.ALLOW,
-                    policy_version=_POLICY.policy_version,
-                    rule_ids=["APPROVED"],
-                    reason_code="HUMAN_APPROVED",
-                    explanation="Previously approved by human",
-                    policy_mode=PolicyMode.ENFORCE,
-                    effective_action=Decision.ALLOW,
-                    would_have_decided=None,
-                    signals=[],
-                )
 
         action_request = ActionRequest.model_validate(
             {
@@ -1024,7 +996,23 @@ async def list_shield_rules(
 ):
     async with store.lock:
         items = list(store.shield_rules.values())
-    return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+    # Explicitly serialize each rule to ShieldRuleResponse so internal
+    # store fields (updated_at, approved_by, etc.) never leak into the
+    # public response and trigger a schema-validation 500.
+    return [
+        ShieldRuleResponse(
+            rule_id=rule["rule_id"],
+            route_pattern=rule["route_pattern"],
+            intent=rule["intent"],
+            mode=rule["mode"],
+            state=rule["state"],
+            ttl_minutes=rule["ttl_minutes"],
+            created_at=rule["created_at"],
+            expires_at=rule.get("expires_at"),
+            note=rule.get("note"),
+        )
+        for rule in items
+    ]
 
 
 @router.post("/shield/rules", response_model=ShieldRuleResponse, tags=["shield"])
@@ -1100,15 +1088,15 @@ async def approve_shield_rule(
 ):
     """Record a human approval for a shield rule and activate it.
 
-    Body fields: session_id, action_id (must equal rule_id), tool ("shield_rule"),
-    arguments ({}), reviewer, rationale, decision ("approve").
-    The approval must already exist in _APPROVALS (see POST /api/v1/approvals).
-    Only a PROPOSED rule can be approved; activation moves it to ACTIVE.
+    Shield activation is not yet integrated. This endpoint intentionally
+    fails closed: every approval request is rejected with 400 and the rule
+    remains PROPOSED. No ACTIVE state, no ACTIVE events, no proxy
+    activation, and no success metadata are ever produced until genuine
+    activation (scoped approval, benign-replay gate, proxy runtime, durable
+    evidence) is implemented.
     """
     action_id = body.get("action_id")
     tool = body.get("tool", "shield_rule")
-    reviewer = body.get("reviewer", "api")
-    rationale = body.get("rationale", "")
     decision = body.get("decision", "approve")
 
     if not action_id or not tool:
@@ -1118,63 +1106,12 @@ async def approve_shield_rule(
     if action_id != str(rule_id):
         raise HTTPException(status_code=400, detail="action_id must match rule_id")
 
-    # Validate the approval against stored approval records.
-    # The approval must have been previously recorded via POST /api/v1/approvals
-    # with the same action_id, tool, and arguments. We look up the approval
-    # in _SESSION_STATE[sid]["approvals"] list and verify the stored
-    # subject_id matches the action_id (subject_id is "action_id:digest")
-    # and the decision is "approve".
-    existing_approval = None
-    for _candidate_sid, candidate_state in _SESSION_STATE.items():
-        for record in candidate_state.get("approvals", []):
-            subject_id = record.get("subject_id", "")
-            if (subject_id == action_id or subject_id.startswith(action_id + ":")) \
-                    and record.get("decision") == "approve":
-                existing_approval = record
-                break
-        if existing_approval is not None:
-            break
-
-    if existing_approval is None:
-        raise HTTPException(status_code=400, detail="no valid approval found for this action_id")
-
-    async with store.lock:
-        rule = store.shield_rules.get(rule_id)
-        if not rule:
-            raise HTTPException(status_code=404, detail="rule not found")
-        if rule["state"] != "PROPOSED":
-            raise HTTPException(
-                status_code=400,
-                detail=f"rule is in {rule['state']} state, only PROPOSED rules can be approved",
-            )
-
-        # Transition the rule to ACTIVE (human approval confirmed).
-        rule["state"] = "ACTIVE"
-        rule["updated_at"] = _now()
-        rule["approved_by"] = reviewer
-        rule["approved_at"] = datetime.now(UTC)
-        rule["approval_rationale"] = rationale
-
-    await events.event_stream.append(
-        EventKind.SHIELD_RULE_ADDED,
-        {
-            "rule_id": str(rule_id),
-            "route_pattern": rule["route_pattern"],
-            "intent": rule["intent"],
-            "state": "ACTIVE",
-        },
-        run_id=None,
-    )
-    return ShieldRuleResponse(
-        rule_id=rule_id,
-        route_pattern=rule["route_pattern"],
-        intent=rule["intent"],
-        mode=rule["mode"],
-        state=rule["state"],
-        ttl_minutes=rule["ttl_minutes"],
-        created_at=rule["created_at"],
-        expires_at=rule.get("expires_at"),
-        note=rule.get("note"),
+    # Fail closed: shield activation is not yet integrated. Reject every
+    # approval request regardless of stored approvals, session, tool,
+    # arguments, or revocation state. The rule remains PROPOSED.
+    raise HTTPException(
+        status_code=400,
+        detail="shield activation not yet integrated; rule remains PROPOSED",
     )
 
 
