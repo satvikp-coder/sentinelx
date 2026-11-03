@@ -23,22 +23,28 @@ export function AttackLab() {
   const [error, setError] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
 
   useEffect(() => {
     // Create a real session for the Attack Lab so decisions go through
-    // the gateway with a valid, server-owned session.
+    // the gateway with a valid, server-owned session. Then start a run
+    // so the session transitions to RUNNING (required for decisions).
     api.createSession({
       scenario_id: "S1",
       lab: "vibe_notes_node",
       arm: "A",
     })
-      .then((s) => setSessionId(s.id))
-      .catch((e) => setError(`Failed to create session: ${e instanceof Error ? e.message : "unknown error"}`));
+      .then((s) => {
+        setSessionId(s.id);
+        return api.createRun({ session_id: s.id, arm: "A" });
+      })
+      .then((r) => setRunId(r.id))
+      .catch((e) => setError(`Failed to create session/run: ${e instanceof Error ? e.message : "unknown error"}`));
   }, []);
 
   async function runDecision(action: typeof TEST_ACTIONS[number]) {
-    if (!sessionId) {
-      setError("Session not ready yet");
+    if (!sessionId || !runId) {
+      setError("Session or run not ready yet");
       return;
     }
     setLoading(true);
@@ -110,7 +116,7 @@ export function AttackLab() {
           </div>
           <div className="mt-2 text-sm text-gray-700">
             <p><strong>Reason:</strong> {decision.reasonCode}</p>
-            <p><strong>Rules:</strong> {decision.ruleIds.join(", ") || "none"}</p>
+            <p><strong>Rules:</strong> {(decision.ruleIds ?? []).join(", ") || "none"}</p>
             <p><strong>Explanation:</strong> {decision.explanation}</p>
           </div>
           <div className="mt-2 text-xs text-gray-500">

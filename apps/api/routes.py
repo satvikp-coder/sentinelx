@@ -16,6 +16,7 @@ import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from fastapi import (
@@ -769,11 +770,12 @@ async def add_target(
     payload: TargetCreate,
     user: str = Depends(_require_auth),
 ):
-    # No arbitrary target URLs: only localhost / 127.0.0.1 / *.lab.test
+    # No arbitrary target URLs: only http://localhost or http://127.0.0.1 / *.lab.test
     url = payload.url
-    url_host = url.split("//", 1)[-1].split("/", 1)[0] if "//" in url else url
-    # Strip port number if present
-    url_host = url_host.split(":", 1)[0]
+    parsed = urlparse(url)
+    if parsed.scheme != "http":
+        raise HTTPException(status_code=400, detail="only http:// URLs are allowed")
+    url_host = parsed.hostname or ""
     allowed = (
         url_host == "127.0.0.1"
         or url_host == "localhost"
@@ -810,6 +812,7 @@ async def create_scan(
             "findings_count": 0,
             "requests_used": 0,
             "request_budget": 100,
+            "note": "Scan execution not yet integrated; scan remains PENDING",
         }
         store.scans[sid] = scan
     return scan
@@ -954,6 +957,7 @@ async def create_shield_rule(
             "ttl_minutes": payload.ttl_minutes,
             "created_at": now,
             "expires_at": expires_at,
+            "note": "Shield activation not yet integrated; rule remains PROPOSED",
         }
         store.shield_rules[rid] = rule
     await events.event_stream.append(

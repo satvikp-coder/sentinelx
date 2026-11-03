@@ -268,6 +268,7 @@ class ScanResponse(APIModel):
     findings_count: int
     requests_used: int
     request_budget: int
+    note: str | None = None  # e.g. "Scan execution not yet integrated; scan remains PENDING"
 
 
 # ---------------------------------------------------------------- patches
@@ -310,6 +311,7 @@ class ShieldRuleResponse(APIModel):
     ttl_minutes: int
     created_at: datetime
     expires_at: datetime | None
+    note: str | None = None  # e.g. "Shield activation not yet integrated; rule remains PROPOSED"
 
 
 # ---------------------------------------------------------------- escalations

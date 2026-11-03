@@ -82,9 +82,10 @@ function validateDecision(raw: GuardDecisionResult): ValidatedDecision {
   if (typeof raw.reasonCode !== "string" || !raw.reasonCode) {
     throw new GuardClientError("invalid reasonCode from sidecar");
   }
-  if (!Array.isArray(raw.ruleIds) || !raw.ruleIds.every((r) => typeof r === "string")) {
-    throw new GuardClientError("invalid ruleIds from sidecar");
-  }
+  // ruleIds is optional: the guard/decide API may omit it. Default to empty.
+  const ruleIds = Array.isArray(raw.ruleIds) && raw.ruleIds.every((r) => typeof r === "string")
+    ? raw.ruleIds
+    : [];
   if (typeof raw.requiresHuman !== "boolean") {
     throw new GuardClientError("invalid requiresHuman from sidecar");
   }
@@ -94,7 +95,7 @@ function validateDecision(raw: GuardDecisionResult): ValidatedDecision {
   return {
     decision,
     reasonCode: raw.reasonCode,
-    ruleIds: raw.ruleIds,
+    ruleIds,
     blocked: decision === "BLOCK",
     requiresHuman: decision === "CONFIRM",
     explanation: raw.explanation,
@@ -143,7 +144,9 @@ export class Guard {
    *
    * @param toolName - name of the tool (validated)
    * @param fn - the tool function to wrap
-   * @param options - optional config (sessionId required for enforce mode)
+   * @param options - optional config: `sessionId` (required for enforce mode)
+   *                  and `arguments` (optional override of argument names;
+   *                  if omitted, positional args become arg0, arg1, ...)
    * @returns a wrapped function that checks the guard before executing
    *
    * Behavior:
@@ -157,14 +160,20 @@ export class Guard {
    * A sessionId is required. Callers must create a session via the API
    * (POST /api/v1/sessions) and pass the sessionId here. Using check()
    * directly is preferred when per-session tracking is needed.
+   *
+   * NOTE: If `arguments` is not provided, positional function arguments are
+   * mapped to "arg0", "arg1", etc. Many policy rules expect specific argument
+   * names (e.g. "url" for navigate). Pass `arguments` explicitly when the
+   * wrapped function's parameter names don't match the policy's expected names.
    */
   tool<TArgs extends unknown[], TReturn>(
     toolName: string,
     fn: (...args: TArgs) => TReturn | Promise<TReturn>,
-    options?: { sessionId?: string },
+    options?: { sessionId?: string; arguments?: Record<string, unknown> },
   ): (...args: TArgs) => Promise<TReturn> {
     validateToolName(toolName);
     const sessionId = options?.sessionId;
+    const fixedArguments = options?.arguments;
 
     return async (...args: TArgs): Promise<TReturn> => {
       if (!sessionId) {
@@ -173,11 +182,14 @@ export class Guard {
         );
       }
 
-      // Build the action from the function arguments. We use positional argument
-      // names from the wrapped function if available, otherwise "arg0", "arg1", etc.
-      const arguments_: Record<string, unknown> = {};
-      for (let i = 0; i < args.length; i++) {
-        arguments_[`arg${i}`] = args[i];
+      // Build the action arguments. If fixedArguments is provided, use them
+      // as-is. Otherwise, map positional args to arg0, arg1, ... (callers
+      // needing specific argument names should pass fixedArguments).
+      const arguments_: Record<string, unknown> = fixedArguments ?? {};
+      if (!fixedArguments) {
+        for (let i = 0; i < args.length; i++) {
+          arguments_[`arg${i}`] = args[i];
+        }
       }
 
       const action: GuardAction = { tool: toolName, arguments: arguments_ };

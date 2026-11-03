@@ -23,7 +23,8 @@ from pathlib import Path
 REPO_ROOT = Path(".").resolve()
 EXCLUDE_NAMES = {
     ".git", ".venv", "node_modules", "dist", "build",
-    "__pycache__", ".pytest_cache", ".ruff_cache", ".env",
+    "__pycache__", ".pytest_cache", ".ruff_cache", ".env", ".env.local",
+    ".env.*",
 }
 
 

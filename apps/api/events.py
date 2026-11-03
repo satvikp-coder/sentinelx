@@ -95,7 +95,10 @@ event_stream = EventStream()
 
 
 def _sse_line(event: str, data: str, ev_id: str | None = None, retry: int = 3000) -> str:
-    parts = [f"event: {event}\n"]
+    # Do NOT send an "event:" line: all events arrive as unnamed "message"
+    # events so that clients listening on `onmessage` receive them. The event
+    # kind is carried inside the JSON payload (ev.kind).
+    parts: list[str] = []
     if ev_id is not None:
         parts.append(f"id: {ev_id}\n")
     parts.append(f"retry: {retry}\n")
