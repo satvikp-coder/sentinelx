@@ -296,9 +296,100 @@ def test_socket_owner_pid_wrong_process_fails_closed():
     from our own process, so fail closed (return None). We simulate this by
     checking a port that no local process owns."""
     port = _find_free_port()
-    owner_pid = labctl._socket_owner_pid(port)
+    owner_pid = labctl._socket_owner_pid(port, host="127.0.0.1")
     assert owner_pid is None, (
         f"expected None for unowned port {port}, got {owner_pid}")
+
+
+def test_socket_owner_pid_different_address_rejected():
+    """A TCP listener on 127.0.0.2:P cannot establish ownership of
+    127.0.0.1:P. The owner-pid lookup must match both port AND local
+    address."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.2", 0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    try:
+        owner_pid = labctl._socket_owner_pid(port, host="127.0.0.1")
+        assert owner_pid is None, (
+            f"expected None for 127.0.0.2:{port} when querying 127.0.0.1:{port}, "
+            f"got {owner_pid}")
+    finally:
+        s.close()
+
+
+def test_socket_owner_pid_wildcard_rejected():
+    """A wildcard listener on 0.0.0.0:P cannot establish ownership of
+    127.0.0.1:P."""
+    wildcard = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    wildcard.bind(("0.0.0.0", 0))
+    wildcard.listen(1)
+    port = wildcard.getsockname()[1]
+    try:
+        owner_pid = labctl._socket_owner_pid(port, host="127.0.0.1")
+        assert owner_pid is None, (
+            f"expected None for wildcard 0.0.0.0:{port} when querying "
+            f"127.0.0.1:{port}, got {owner_pid}")
+    finally:
+        wildcard.close()
+
+
+def test_socket_owner_pid_ipv6():
+    """A TCP listener on ::1:P is found when querying ::1:P."""
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    try:
+        s.bind(("::1", 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+        owner_pid = labctl._socket_owner_pid(port, host="::1")
+        assert owner_pid == os.getpid(), (
+            f"expected {os.getpid()} for IPv6 listener on ::1:{port}, "
+            f"got {owner_pid}")
+    finally:
+        s.close()
+
+
+def test_socket_owner_pid_ipv6_not_matching_ipv4():
+    """An IPv6 listener on ::1:P cannot establish ownership of
+    127.0.0.1:P."""
+    s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    try:
+        s.bind(("::1", 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+        owner_pid = labctl._socket_owner_pid(port, host="127.0.0.1")
+        assert owner_pid is None, (
+            f"expected None for IPv6 ::1:{port} when querying "
+            f"127.0.0.1:{port}, got {owner_pid}")
+    finally:
+        s.close()
+
+
+def test_socket_owner_pid_same_port_different_addresses():
+    """TCP listeners on 127.0.0.1:P1 and 127.0.0.2:P2 are correctly
+    distinguished by address. Querying one address does not return the
+    other's listener."""
+    s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s1.bind(("127.0.0.1", 0))
+    s1.listen(1)
+    port1 = s1.getsockname()[1]
+
+    s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s2.bind(("127.0.0.2", 0))
+    s2.listen(1)
+    port2 = s2.getsockname()[1]
+
+    try:
+        # Each address:port pair maps to the current process's PID.
+        assert labctl._socket_owner_pid(port1, host="127.0.0.1") == os.getpid()
+        assert labctl._socket_owner_pid(port2, host="127.0.0.2") == os.getpid()
+        # Cross-address lookups return None: no listener on 127.0.0.1:port2
+        # or 127.0.0.2:port1.
+        assert labctl._socket_owner_pid(port2, host="127.0.0.1") is None
+        assert labctl._socket_owner_pid(port1, host="127.0.0.2") is None
+    finally:
+        s1.close()
+        s2.close()
 
 
 # ------------------------------------------------------------------ end of file
