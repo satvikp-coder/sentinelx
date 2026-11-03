@@ -157,9 +157,16 @@ export const api = {
     request(`/api/v1/runs/${id}/cancel`, { method: "POST" }),
 
   listEvents: (): Promise<EventData[]> => request("/api/v1/events"),
+  createSSESession: () =>
+    request("/api/v1/events/session", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${DEMO_TOKEN}`,
+      },
+    }),
   eventStream: (onEvent: (event: EventData) => void, afterSeq = 0) => {
     const es = new EventSource(
-      `${BASE_URL}/api/v1/events/stream?after_seq=${afterSeq}&token=${encodeURIComponent(DEMO_TOKEN)}`,
+      `${BASE_URL}/api/v1/events/stream?after_seq=${afterSeq}`,
     );
     es.onmessage = (e) => {
       try {

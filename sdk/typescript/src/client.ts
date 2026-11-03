@@ -106,11 +106,14 @@ export class SidecarClient {
       const json: RawSidecarDecision = await resp.json();
 
       // Validate the shape of the response (extra fields are ignored here;
-      // the Guard class performs stricter validation).
+      // the Guard class performs stricter validation). rule_ids is optional
+      // because the guard/decide API may omit it.
       if (
         typeof json.decision !== "string" ||
         typeof json.reason_code !== "string" ||
-        !Array.isArray(json.rule_ids) ||
+        (json.rule_ids !== undefined &&
+          (!Array.isArray(json.rule_ids) ||
+            !json.rule_ids.every((r) => typeof r === "string"))) ||
         typeof json.requires_human !== "boolean" ||
         typeof json.explanation !== "string"
       ) {

@@ -21,11 +21,13 @@ from uuid import UUID, uuid4
 
 from fastapi import (
     APIRouter,
+    Cookie,
     Depends,
     Header,
     HTTPException,
     Query,
     Request,
+    Response,
     status,
 )
 from fastapi.security import HTTPAuthorizationCredentials
@@ -321,6 +323,10 @@ async def _gateway_decide(
         "policy_gateway",
         ev_payload,
     )
+    # Also mirror into the in-memory events log so the /events list endpoint
+    # (and the evidence timeline UI) can surface persisted decisions.
+    async with store.lock:
+        store.events_log.append(ev_payload)
     await event_stream.append(
         EventKind.ACTION_DECIDED,
         ev_payload,
@@ -629,15 +635,36 @@ async def list_events(
     return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
 
 
+@router.post("/events/session", tags=["events"])
+async def create_sse_session(
+    response: Response,
+    user: str = Depends(_require_auth),
+):
+    """Create an SSE session. Sets an HttpOnly cookie that the SSE stream
+    endpoint reads for authentication, avoiding query-param tokens that
+    would appear in server access logs."""
+    response.set_cookie(
+        key="sse_token",
+        value="authenticated",
+        httponly=True,
+        secure=False,  # local dev only; set True behind HTTPS
+        samesite="lax",
+        path="/api/v1/events/stream",
+        max_age=3600,
+    )
+    return {"status": "ok"}
+
+
 @router.get("/events/stream", tags=["events"])
 async def stream_events(
     request: Request,
-    token: str | None = Query(default=None),
+    sse_token: str | None = Cookie(default=None),
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ):
-    # Auth: bearer header takes precedence over token query parameter
-    # (needed for SSE/EventSource which cannot set custom headers).
+    # Auth: bearer header takes precedence; SSE session cookie is used by
+    # EventSource (which cannot set custom headers). Avoids query-param
+    # tokens that would appear in access logs.
     authenticated = False
     if creds is not None and creds.credentials:
         if secrets.compare_digest(creds.credentials, DEMO_TOKEN):
@@ -648,9 +675,8 @@ async def stream_events(
                 detail="authentication required",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-    if not authenticated and token is not None and token:
-        if secrets.compare_digest(token, DEMO_TOKEN):
-            authenticated = True
+    if not authenticated and sse_token == "authenticated":
+        authenticated = True
     if not authenticated:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -18,7 +18,7 @@ interface ApiContextType {
   eventsError: string | null;
   refreshHealth: () => Promise<void>;
   refreshEvents: () => Promise<void>;
-  subscribeEvents: () => () => void;
+  subscribeEvents: () => Promise<void>;
 }
 
 const ApiContext = createContext<ApiContextType | null>(null);
@@ -58,8 +58,9 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const subscribeEvents = useCallback(() => {
+  const subscribeEvents = useCallback(async () => {
     if (esRef.current) esRef.current();
+    await api.createSSESession().catch(() => {}); // cookie set by server
     esRef.current = api.eventStream((ev) => {
       setEvents((prev) => {
         const exists = prev.some((e) => e.id === ev.id);
@@ -67,16 +68,24 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         return [ev, ...prev].slice(0, 200);
       });
     }, 0);
-    return () => {
-      if (esRef.current) { esRef.current(); esRef.current = null; }
-    };
   }, []);
 
   useEffect(() => {
     refreshHealth();
     refreshEvents();
-    const unsub = subscribeEvents();
-    return () => unsub();
+    let cancelled = false;
+    subscribeEvents().then(() => {
+      if (!cancelled && esRef.current) {
+        // subscription established
+      }
+    });
+    return () => {
+      cancelled = true;
+      if (esRef.current) {
+        esRef.current();
+        esRef.current = null;
+      }
+    };
   }, [refreshHealth, refreshEvents, subscribeEvents]);
 
   useEffect(() => {

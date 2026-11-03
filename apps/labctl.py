@@ -189,36 +189,44 @@ def _socket_owner_pid(port: int) -> int | None:
     Returns None only when ownership cannot be determined at all.
     """
     if sys.platform == "win32":
-        try:
-            r = _run(["netstat", "-ano"], Path("."))
-            for line in r.stdout.splitlines():
-                parts = line.split()
-                if len(parts) >= 5 and parts[1] in (
-                    f"0.0.0.0:{port}",
-                    f"127.0.0.1:{port}",
-                ) and parts[3] == "LISTENING":
-                    try:
-                        return int(parts[4])
-                    except ValueError:
-                        pass
-        except Exception:
-            pass
+        for _attempt in range(5):
+            try:
+                r = _run(["netstat", "-ano"], Path("."))
+                for line in r.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 5 and parts[1] in (
+                        f"0.0.0.0:{port}",
+                        f"127.0.0.1:{port}",
+                    ) and parts[3] == "LISTENING":
+                        try:
+                            pid = int(parts[4])
+                            if pid > 0:
+                                return pid
+                        except ValueError:
+                            pass
+            except Exception:
+                pass
+            time.sleep(0.5)
         return None
     # Non-Windows: use psutil to find the process owning the listening socket.
-    try:
-        for proc in psutil.process_iter(["pid"]):
-            try:
-                conns = proc.net_connections(kind="inet")
-                for c in conns:
-                    if c.status == psutil.CONN_LISTEN and c.laddr.port == port:
-                        return proc.info["pid"]
-            except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
-                continue
-    except Exception:
-        pass
+    for _attempt in range(5):
+        try:
+            for proc in psutil.process_iter(["pid"]):
+                try:
+                    conns = proc.net_connections(kind="inet")
+                    for c in conns:
+                        if (
+                            c.status == psutil.CONN_LISTEN
+                            and c.laddr.port == port
+                        ):
+                            return proc.info["pid"]
+                except (psutil.AccessDenied, psutil.NoSuchProcess,
+                        psutil.ZombieProcess):
+                    continue
+        except Exception:
+            pass
+        time.sleep(0.5)
     return None
-
-
 def assert_loopback_only(name: str) -> dict[str, object]:
     """Raise unless the lab is bound to 127.0.0.1 and refuses every non-loopback address."""
     lab = get(name)
@@ -251,11 +259,10 @@ def assert_loopback_only(name: str) -> dict[str, object]:
                 f"{name}: socket on port {lab.port} owned by PID {socket_owner_pid}, "
                 f"but pid file records PID {pid}"
             )
-        # If we could not determine the socket owner (e.g. netstat/psutil
-        # lookup failure on some platforms), fall back to the socket bind
-        # test below which proves loopback-only binding. The pid file already
-        # identifies which process started the lab; the bind test confirms
-        # the port is bound to 127.0.0.1 only.
+        # If we could not determine the socket owner (netstat/psutil lookup
+        # failure), fall through to the socket bind test below, which proves
+        # loopback-only binding. The pid file already identifies which process
+        # started the lab.
         # psutil.net_connections() does not reliably report LISTEN sockets on
         # Windows, so prove loopback-only binding with socket bind tests:
         #   - binding to 127.0.0.1:port must fail (already in use => loopback bound)

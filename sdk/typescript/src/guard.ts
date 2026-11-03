@@ -182,11 +182,20 @@ export class Guard {
         );
       }
 
-      // Build the action arguments. If fixedArguments is provided, use them
-      // as-is. Otherwise, map positional args to arg0, arg1, ... (callers
-      // needing specific argument names should pass fixedArguments).
-      const arguments_: Record<string, unknown> = fixedArguments ?? {};
-      if (!fixedArguments) {
+      // Build the action arguments. If fixedArguments is provided, its keys
+      // define the expected argument names and the per-invocation positional
+      // values are bound to those keys in order. This guarantees the checked
+      // arguments match the executed arguments. If fixedArguments is not
+      // provided, positional args become arg0, arg1, ...
+      let arguments_: Record<string, unknown>;
+      if (fixedArguments) {
+        const argNames = Object.keys(fixedArguments);
+        arguments_ = {};
+        for (let i = 0; i < argNames.length; i++) {
+          arguments_[argNames[i]] = i < args.length ? args[i] : fixedArguments[argNames[i]];
+        }
+      } else {
+        arguments_ = {};
         for (let i = 0; i < args.length; i++) {
           arguments_[`arg${i}`] = args[i];
         }
