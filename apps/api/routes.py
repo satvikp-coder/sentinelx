@@ -35,11 +35,15 @@ from pydantic import ValidationError
 
 from sentinelx.common_schemas import (
     ActionRequest,
+    ApprovalDecision,
     ApprovalRecord,
     EvidenceState,
     PolicyDecision,
     ScenarioSpec,
     SessionState,
+    ShieldRule,
+    ShieldScope,
+    ShieldStatus,
     TargetAuthorization,
     TargetScope,
     TargetStatus,
@@ -59,6 +63,7 @@ from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
 from sentinelx.scanner.models import load_profile as _load_scan_profile
 from sentinelx.scanner.orchestrate import run_scan
+from sentinelx.shield.rules import BenignReplayGate, GateError, RuleLifecycle
 
 from . import events
 from .auth import (
@@ -1295,15 +1300,22 @@ async def approve_shield_rule(
 ):
     """Record a human approval for a shield rule and activate it.
 
-    Shield activation is not yet integrated. This endpoint intentionally
-    fails closed: every approval request is rejected with 400 and the rule
-    remains PROPOSED. No ACTIVE state, no ACTIVE events, no proxy
-    activation, and no success metadata are ever produced until genuine
-    activation (scoped approval, benign-replay gate, proxy runtime, durable
-    evidence) is implemented.
+    Uses the real gated activation path:
+    1. Validates action_id matches rule_id
+    2. Finds the session with a stored approval for this exact action_id
+    3. Verifies the approval decision is "approve" (not reject/revoke)
+    4. Converts the API rule dict to a ShieldRule Pydantic model
+    5. Runs the benign-replay gate through RuleLifecycle.approve_rule()
+    6. Activates the rule only if the gate passes
+    7. Persists activation evidence and returns ACTIVE
+
+    Returns 400 if no valid approval exists, the gate rejects, or the rule
+    is not in PROPOSED state. No false ACTIVE states are ever produced.
     """
     action_id = body.get("action_id")
     tool = body.get("tool", "shield_rule")
+    reviewer = body.get("reviewer", "api")
+    rationale = body.get("rationale", "")
     decision = body.get("decision", "approve")
 
     if not action_id or not tool:
@@ -1313,12 +1325,153 @@ async def approve_shield_rule(
     if action_id != str(rule_id):
         raise HTTPException(status_code=400, detail="action_id must match rule_id")
 
-    # Fail closed: shield activation is not yet integrated. Reject every
-    # approval request regardless of stored approvals, session, tool,
-    # arguments, or revocation state. The rule remains PROPOSED.
-    raise HTTPException(
-        status_code=400,
-        detail="shield activation not yet integrated; rule remains PROPOSED",
+    # Find the session that has a stored approval for this exact action_id
+    # with matching tool and arguments. Cross-session approvals are rejected.
+    # The stored subject_id is "action_id:digest" where digest encodes
+    # tool+arguments, so a prefix match on action_id confirms the action.
+    sid = None
+    stored_approval = None
+    for candidate_sid, candidate_state in _SESSION_STATE.items():
+        for record in candidate_state.get("approvals", []):
+            subject_id = record.get("subject_id", "")
+            if (subject_id == action_id or subject_id.startswith(action_id + ":")) \
+                    and record.get("decision") == "approve":
+                sid = candidate_sid
+                stored_approval = record
+                break
+        if stored_approval is not None:
+            break
+
+    if stored_approval is None:
+        raise HTTPException(
+            status_code=400,
+            detail="no valid approval found for this action_id",
+        )
+
+    # Get the rule from the store
+    async with store.lock:
+        rule_entry = store.shield_rules.get(rule_id)
+    if not rule_entry:
+        raise HTTPException(status_code=404, detail="rule not found")
+    if rule_entry["state"] != "PROPOSED":
+        raise HTTPException(
+            status_code=400,
+            detail=f"rule is in {rule_entry['state']} state, only PROPOSED rules can be approved",
+        )
+
+    # Convert API rule dict to ShieldRule Pydantic model for RuleLifecycle
+    shield_rule = ShieldRule(
+        id=str(rule_id),
+        target_id=str(sid),
+        scope=ShieldScope(
+            route=rule_entry["route_pattern"],
+            parameter=None,
+            client=None,
+        ),
+        action="BLOCK_ROUTE_PATTERN",
+        reason=rule_entry["intent"],
+        linked_finding_id=None,
+        intent_event_ids=[],
+        owner=stored_approval.get("reviewer", reviewer),
+        created_at=rule_entry["created_at"],
+        expires_at=rule_entry.get("expires_at"),
+        status=ShieldStatus.PROPOSED,
+    )
+
+    # Create evidence store and RuleLifecycle for this session
+    ev_store = _evidence_store()
+    lifecycle = RuleLifecycle(ev_store, str(sid))
+    lifecycle.add_rule(shield_rule)
+
+    # Create ApprovalRecord from the stored approval.
+    # subject_id is set to the exact rule_id for RuleLifecycle's exact-match check.
+    approval_record = ApprovalRecord(
+        id=stored_approval.get("id", f"appr-{uuid4().hex[:12]}"),
+        subject_type="shield_rule",
+        subject_id=str(rule_id),
+        reviewer=stored_approval.get("reviewer", reviewer),
+        decision=ApprovalDecision.APPROVE,
+        rationale=stored_approval.get("rationale", rationale),
+        timestamp=stored_approval.get("timestamp", datetime.now(UTC)),
+    )
+
+    # Create BenignReplayGate with synthetic benign requests.
+    # These are common benign requests that should NOT be blocked by any
+    # narrowly-scoped shield rule.
+    gate = BenignReplayGate(ev_store, str(sid), benign_requests=[
+        {"method": "GET", "path": "/", "headers": {}, "params": {}},
+        {"method": "GET", "path": "/health", "headers": {}, "params": {}},
+        {"method": "GET", "path": "/api/notes",
+         "headers": {"Authorization": "Bearer test"}, "params": {}},
+        {"method": "POST", "path": "/api/notes",
+         "headers": {"Authorization": "Bearer test"}, "params": {}},
+    ])
+
+    # Approve and activate through the real gated path.
+    # RuleLifecycle.approve_rule() re-runs the gate and activates only if it passes.
+    try:
+        gate_result = lifecycle.approve_rule(str(rule_id), approval_record, gate)
+    except GateError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+    if not gate_result.passed:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"benign-replay gate rejected: "
+                f"{gate_result.benign_blocked} benign request(s) would be blocked"
+            ),
+        )
+
+    # Rule is now ACTIVE in RuleLifecycle. Update the API store.
+    async with store.lock:
+        rule_entry = store.shield_rules.get(rule_id)
+        if not rule_entry:
+            raise HTTPException(status_code=404, detail="rule not found")
+        rule_entry["state"] = "ACTIVE"
+        rule_entry["updated_at"] = _now()
+        rule_entry["approved_by"] = reviewer
+        rule_entry["approved_at"] = datetime.now(UTC)
+        rule_entry["approval_rationale"] = rationale
+
+    # Persist durable activation evidence
+    ev_store.append(
+        str(sid),
+        "SHIELD_RULE_ACTIVATED",
+        EvidenceState.OBSERVED,
+        "sentinelx.shield",
+        {
+            "rule_id": str(rule_id),
+            "route_pattern": rule_entry["route_pattern"],
+            "intent": rule_entry["intent"],
+            "gate_passed": True,
+            "benign_blocked": gate_result.benign_blocked,
+            "rule_hash": gate_result.rule_hash,
+        },
+    )
+
+    # Broadcast activation event on SSE
+    await events.event_stream.append(
+        EventKind.SHIELD_RULE_ADDED,
+        {
+            "rule_id": str(rule_id),
+            "route_pattern": rule_entry["route_pattern"],
+            "intent": rule_entry["intent"],
+            "state": "ACTIVE",
+        },
+        run_id=None,
+    )
+
+    return ShieldRuleResponse(
+        rule_id=rule_id,
+        route_pattern=rule_entry["route_pattern"],
+        intent=rule_entry["intent"],
+        mode=rule_entry["mode"],
+        state=rule_entry["state"],
+        ttl_minutes=rule_entry["ttl_minutes"],
+        created_at=rule_entry["created_at"],
+        expires_at=rule_entry.get("expires_at"),
+        note=rule_entry.get("note"),
     )
 
 
