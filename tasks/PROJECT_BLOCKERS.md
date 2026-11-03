@@ -2,7 +2,27 @@
 
 **Audit date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** 51e99d8
+**Worker SHA:** f46e7e6
+
+---
+
+## BLOCKERS RESOLVED IN THIS SESSION
+
+| Blocker | Resolution |
+|---------|------------|
+| SDK rejects localhost URLs with ports | `validateBaseUrl` now parses URL and checks hostname, allowing any port |
+| SDK expects `rule_ids` field API omits | Made `rule_ids` optional in `RawSidecarDecision`, defaults to `[]` |
+| SDK hardcoded "sdk-default" session ID | Removed; `tool()` requires explicit `sessionId` parameter, throws clear `GuardConfigError` if missing |
+| Dashboard SSE returns 401 (no auth) | SSE endpoint accepts `token` query parameter; dashboard passes it in EventSource URL |
+| Dashboard hardcoded invalid session_id | Attack Lab creates real session via `POST /api/v1/sessions` before making decisions |
+| API targets: JSON/query-parameter mismatch | Changed to `TargetCreate` Pydantic model accepting JSON body |
+| API targets: `owned=True` without verification | Changed to `owned=False`; registration doesn't verify ownership |
+| API targets: loose URL check (`.lab.test in url`) | Proper host:port parsing; checks `url_host == "127.0.0.1"` or `url_host.endswith(".lab.test")` |
+| API scans: fabricated COMPLETED state | Initial state is `PENDING`; no fabricated findings/requests |
+| API shield: ACTIVE with no expiry | Initial state is `PROPOSED`; `expires_at` set from TTL |
+| labctl: lost process-ownership proof | `netstat -ano` verifies socket-owning PID matches pid file PID |
+| fresh_clone_check: copies .env | `.env` added to EXCLUDE_NAMES |
+| fresh_clone_check: uses caller's interpreter | Creates fresh venv in clone directory |
 
 ---
 
@@ -13,7 +33,7 @@
 **Prerequisites:** Owner selects a license (MIT, Apache-2.0, etc.)
 **Expected cost/risk:** Low
 **Safe command/procedure:** Add LICENSE file to repository root
-**Expected evidence:** LICENSE file present, NOTICE.md updated if needed
+**Expected evidence:** LICENSE file present
 **Who must authorize/execute:** Owner
 
 ### 2. Public repository visibility (owner decision)
@@ -86,6 +106,8 @@
 
 | Item | Status | Why not a blocker |
 |------|--------|-------------------|
+| SDK runtime E2E vs real backend | Not run | Requires starting API server and running SDK against it; unit tests pass |
+| Dashboard browser E2E | Not run | Requires Playwright Chromium; unit tests and typecheck/build pass |
 | CRLF git apply on Windows | Documented | Linux CRLF patches apply cleanly; Windows git limitation |
 | Tailwind @tailwind not processed | Documented | Structural layout works; styling not required for functionality |
 | LICENSE not chosen | Documented | Owner decision; doesn't affect code correctness |
@@ -99,7 +121,16 @@
 | Blocker | Resolution |
 |---------|------------|
 | Ruff 23 errors | Fixed all: StrEnum conversions, unused imports, long lines, import sorting |
-| Node lab loopback test (2 failures) | Replaced psutil.net_connections() with socket bind tests (Windows-compatible) |
+| Node lab loopback test (2 failures) | Replaced psutil.net_connections() with socket bind tests + netstat process-ownership proof |
 | test_rate_limit_burst (timing-dependent) | Made deterministic: pre-fill bucket, verify 429/200 via HTTP |
 | Security Repair 3 final blocker (error response redaction) | Generic 400 message instead of raw ValidationError; regression test added |
 | Security Repair 3 blockers (cancellation, approval storage, evidence persist-before-broadcast, report crash) | All fixed and verified |
+| SDK localhost URL port rejection | validateBaseUrl now parses URL properly |
+| SDK rule_ids mismatch | Made optional, defaults to empty array |
+| SDK hardcoded session ID | Removed; requires explicit sessionId |
+| Dashboard SSE 401 auth | Token query parameter support |
+| Dashboard hardcoded invalid session | Attack Lab creates real session |
+| API target fabrication (owned=True, loose URL) | owned=False, proper host:port validation, JSON body |
+| API scan fabrication (COMPLETED with 0 requests) | PENDING state |
+| API shield fabrication (ACTIVE, no expiry) | PROPOSED state, expires_at from TTL |
+| fresh_clone_check (.env copy, caller's interpreter) | .env excluded, fresh venv in clone |

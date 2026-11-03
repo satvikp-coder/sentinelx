@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** 51e99d8
+**Worker SHA:** f46e7e6
 **Main/origin main SHA:** 83030082641fca857df39f0db77ae4024efcbc21
 **Reviewer:** Independent security reviewer (not the implementation worker)
 
@@ -10,10 +10,10 @@
 
 ## 1. What Was Done
 
-Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implemented and verified locally on branch `work/ds`. The implementation worker completed:
+Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implemented and verified locally on branch `work/ds`. Additionally, all integration blockers from the independent review were resolved. The implementation worker completed:
 
 - **F1-F9 Security Repair 3**: Evidence persistence, SSE redaction, session lifecycle, approval identity, test isolation, concurrency, scenario snapshots, SSE reconnect, metrics integration
-- **Blocker fixes**: Cancellation revocation, approval record validation, evidence persist-before-broadcast, error response redaction, report crash fix
+- **Integration blocker fixes**: SDK port validation, SDK rule_ids optional, SDK session ID, Dashboard SSE auth, Dashboard session creation, API target validation, API scan state, API shield state, labctl process-ownership proof, fresh_clone_check safety
 - **Ruff stabilization**: 23 errors fixed (StrEnum, unused imports, long lines, import sorting)
 - **Test fixes**: Node lab loopback check (Windows-compatible), deterministic rate limit burst test
 - **Full project**: Tasks 22-33 all implemented and VERIFIED_LOCAL
@@ -31,14 +31,16 @@ Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implement
 | License chosen | Owner decision pending |
 | Demo video recorded | Human task |
 | Hackathon submission | Human task, Nov 4 deadline |
+| SDK runtime E2E vs real backend | Requires API server running + SDK connected |
 
 ## 3. Where to Review
 
 ### Key Security Files (read-only reference, do not modify)
-- `apps/api/routes.py` — API routes, `_gateway_decide`, `_evidence_store`, approval workflow
+- `apps/api/routes.py` — API routes, `_gateway_decide`, `_evidence_store`, approval workflow, targets, scans, shield rules
+- `apps/api/auth.py` — Demo authentication, bearer token validation
 - `apps/api/events.py` — SSE event stream
-- `apps/api/schemas.py` — Pydantic schemas (StrEnum conversions)
-- `apps/labctl.py` — Lab lifecycle, loopback verification
+- `apps/api/schemas.py` — Pydantic schemas (StrEnum conversions, TargetCreate)
+- `apps/labctl.py` — Lab lifecycle, loopback verification with netstat process-ownership proof
 - `packages/evaluation/harness.py` — Evaluation harness
 - `packages/evaluation/metrics.py` — Metrics computation
 - `packages/evaluation/report.py` — Report generation
@@ -46,6 +48,11 @@ Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implement
 - `packages/fixer/patch_gen.py` — Patch generation
 - `packages/shield/intent.py` — Shield intent classification
 - `packages/scanner/checks/` — Scanner checks (stored_xss, authz_post, etc.)
+- `sdk/typescript/src/client.ts` — Sidecar API client (URL validation, rule_ids optional)
+- `sdk/typescript/src/guard.ts` — Guard (no hardcoded session ID)
+- `apps/web/src/api.ts` — Dashboard API layer (SSE token query param)
+- `apps/web/src/screens/AttackLab.tsx` — Dashboard Attack Lab (creates real session)
+- `scripts/fresh_clone_check.py` — Fresh clone smoke test (.env excluded, fresh venv)
 
 ### Test Files (for independent reproduction)
 - `tests/unit/test_api_units.py` — 43 API unit tests
@@ -62,6 +69,7 @@ Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implement
 - `tasks/PROJECT_COMPLETION_AUDIT.md` — Full completion audit
 - `tasks/PROJECT_BLOCKERS.md` — All blockers and human actions
 - `tasks/LOCAL_VERIFICATION_GUIDE.md` — Reproducible verification steps
+- `tasks/INDEPENDENT_REVIEW_HANDOFF.md` — This file
 - `tasks/CRITICAL_SECURITY_REPAIR_3.result.md` — Security Repair 3 details
 - `tasks/OVERNIGHT_MASTER_LEDGER.md` — Task completion matrix
 - `STATUS.md` — Current project status
@@ -95,12 +103,16 @@ Expected: All checks pass, 0 failures.
 
 The independent reviewer should pay particular attention to:
 
-1. **Approval workflow** (`routes.py:825+`): ApprovalRecord validation before storage, no silent skip of malformed records, generic 400 error messages (no sensitive echo), cross-session isolation
-2. **Evidence persistence** (`routes.py:283+`): Persist-before-broadcast ordering, verify_chain() integrity checking, hash-chained redacted payloads
-3. **Session lifecycle** (`routes.py:581+`): Cancel transitions session to PENDING, subsequent decisions denied with SESSION_NOT_RUNNING
-4. **SSE redaction** (`routes.py:292+`): tool and arguments redacted before broadcast/storage
+1. **Approval workflow** (`routes.py`): ApprovalRecord validation before storage, no silent skip of malformed records, generic 400 error messages (no sensitive echo), cross-session isolation
+2. **Evidence persistence** (`routes.py`): Persist-before-broadcast ordering, verify_chain() integrity checking, hash-chained redacted payloads
+3. **Session lifecycle** (`routes.py`): Cancel transitions session to PENDING, subsequent decisions denied with SESSION_NOT_RUNNING
+4. **SSE redaction** (`routes.py`): tool and arguments redacted before broadcast/storage
 5. **SSE reconnect** (`events.py`): Integer seq cursor instead of UUID, no duplicate replay
-6. **Scenario binding** (`routes.py:466`): ScenarioSpec.model_copy(deep=True), immutable snapshot
+6. **SSE auth** (`routes.py`, `auth.py`): Token query parameter support for EventSource
+7. **Scenario binding** (`routes.py`): ScenarioSpec.model_copy(deep=True), immutable snapshot
+8. **Target validation** (`routes.py`): host:port parsing, owned=False, .lab.test suffix check
+9. **Scan state** (`routes.py`): PENDING instead of COMPLETED, no fabricated findings
+10. **Shield state** (`routes.py`): PROPOSED instead of ACTIVE, expires_at from TTL
 
 ## 6. What Requires Human Action (not reviewer)
 

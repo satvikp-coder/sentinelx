@@ -22,10 +22,10 @@ Last updated: 2026-11-03
 | Item | Value |
 |------|-------|
 | Branch | work/ds |
-| Worker SHA | 51e99d8 |
+| Worker SHA | f46e7e6 |
 | Main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
 | Origin/main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
-| Ahead of main | 40 commits |
+| Ahead of main | 44 commits |
 | Behind main | 0 commits |
 | Worktree status | clean (both worktrees) |
 | Merged | NO |
@@ -68,6 +68,16 @@ Last updated: 2026-11-03
 | F8 | SSE reconnect: integer seq cursor instead of UUID | COMPLETE |
 | F9 | Metrics integration: false_positive_rates, MetricError handling | COMPLETE |
 
+## Integration blocker fixes (all resolved)
+
+- SDK: validateBaseUrl allows ports; rule_ids optional; no hardcoded session ID
+- Dashboard: SSE token query param; Attack Lab creates real session
+- API targets: JSON body, owned=False, proper host:port validation
+- API scans: PENDING instead of COMPLETED
+- API shield: PROPOSED instead of ACTIVE, expires_at from TTL
+- labctl: netstat process-ownership proof for loopback verification
+- fresh_clone_check: .env excluded, fresh venv in clone
+
 ## Implemented Features (VERIFIED_LOCAL)
 
 Tasks 21A–33 are all implemented and verified locally:
@@ -96,6 +106,7 @@ Tasks 21A–33 are all implemented and verified locally:
 - Live model benchmark (Task 25): No model API credentials; remains NEEDS_LIVE_VALIDATION
 - Docker-dependent tests (Tasks 23/30): Docker daemon not running; PHP scanner tests unrun
 - Browser E2E (Task 29): Playwright not installed; browser tests not run
+- SDK runtime E2E vs real backend: Not run; requires API server + SDK together
 - LICENSE: not chosen (owner decision)
 - Repo visibility: not changed (kept private)
 - CI: not run on GitHub for these commits (no push authorized)

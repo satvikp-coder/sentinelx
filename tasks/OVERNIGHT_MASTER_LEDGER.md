@@ -18,9 +18,9 @@ Columns: Task ID | Feature | Original requirement | Starting state | Files chang
 | 24 | sentinelx agent test | Agent adapter contract + fixtures | Implemented, verified | packages/agent_test/adapter.py, packages/agent_test/runner.py, cli/sentinelx_cli/agent_cmd.py, cli/sentinelx_cli/main.py | tests/unit/test_agent_test_units.py | tasks/24.result.md | in work/ds history | VERIFIED_LOCAL | Live end-to-end vs real lab | none |
 | 25 | Full 30-case model eval harness | Offline runner + live-run commands | Implemented, verified offline | packages/evaluation/harness.py, packages/evaluation/metrics.py, tests/unit/test_evaluation_harness.py | tests/unit/test_evaluation_harness.py (8) | tasks/25.result.md | in work/ds history | VERIFIED_LOCAL | NEEDS_LIVE_VALIDATION (no credentials) | Live model run |
 | 26 | Model-written report explanations | Advisory, evidence-cited explanations | Implemented, verified | packages/report/loader.py, packages/report/render.py, tests/unit/test_report_explanations.py | tests/unit/test_report_explanations.py (8) | tasks/26.result.md | in work/ds history | VERIFIED_LOCAL | none | none |
-| 27 | Versioned FastAPI + event-stream API | /api/v1 routes | Implemented, verified | apps/api/main.py, apps/api/schemas.py, apps/api/auth.py, apps/api/events.py, apps/api/routes.py | tests/unit/test_api_units.py (43) | tasks/27.result.md | 125d29a + Security Repair 3 commits | VERIFIED_LOCAL | none | none |
-| 28 | TypeScript Agent Guard SDK | sdk/typescript | Implemented, verified | sdk/typescript/package.json, sdk/typescript/tsconfig.json, sdk/typescript/src/{client,errors,guard,index,types}.ts | tsc --noEmit: 0 errors | tasks/28.result.md | in work/ds history | VERIFIED_LOCAL | none | none |
-| 29 | React Mission Control dashboard | React + Vite dashboard | Implemented, verified | apps/web/src/{App,main,api,index.css}.tsx, apps/web/src/components/*.tsx, apps/web/src/contexts/ApiContext.tsx, apps/web/src/screens/*.tsx, apps/web/tailwind.config.js | tsc: 0 errors; vite build: success | tasks/29.result.md | in work/ds history | VERIFIED_LOCAL | Tailwind @tailwind directives not processed by lightningcss | none |
+| 27 | Versioned FastAPI + event-stream API | /api/v1 routes | Implemented, verified + integration fixes | apps/api/main.py, apps/api/schemas.py, apps/api/auth.py, apps/api/events.py, apps/api/routes.py, apps/api/labctl.py, scripts/fresh_clone_check.py | tests/unit/test_api_units.py (43) + security repair (26) + lab loopback tests | tasks/27.result.md + CRITICAL_SECURITY_REPAIR_3.result.md | 125d29a + Security Repair 3 commits + f46e7e6 | VERIFIED_LOCAL | Live SSE E2E needs browser | none |
+| 28 | TypeScript Agent Guard SDK | sdk/typescript | Implemented, verified + integration fixes | sdk/typescript/src/client.ts, sdk/typescript/src/guard.ts | tsc --noEmit: 0 errors | tasks/28.result.md | b3d4f95 + f46e7e6 | VERIFIED_LOCAL | SDK runtime E2E vs real backend | none |
+| 29 | React Mission Control dashboard | React + Vite dashboard | Implemented, verified + integration fixes | apps/web/src/api.ts, apps/web/src/screens/AttackLab.tsx | tsc: 0 errors; vite build: success | tasks/29.result.md | 3dcd430 + f46e7e6 | VERIFIED_LOCAL | Browser E2E not run; Tailwind lightningcss | none |
 | 30 | External scanner QA harness | Opt-in Strix/PentAGI lab-only | Implemented, verified offline | packages/external_scanner/*.py, tests/unit/test_external_scanner.py | tests/unit/test_external_scanner.py (16) | tasks/30.result.md | in work/ds history | VERIFIED_LOCAL | NEEDS_HUMAN_APPROVAL for external operation | External scanner authorization |
 | 31 | Evaluation/report/final-run integration | scripts/final_run.py + reports | Implemented, verified | scripts/final_run.py (existing), tests/unit/test_final_run.py | tests/unit/test_final_run.py (9) | tasks/31.result.md | in work/ds history | VERIFIED_LOCAL | Live model execution needs credentials | Live model run |
 | 32 | Security hardening & release readiness | Self-audit, secret scan, packaging | Implemented, verified | scripts/history_secret_scan.py, scripts/fresh_clone_check.py, SECURITY.md, NOTICE.md, docs/HACKATHON_SCOPE.md, docs/DECISIONS.md | ruff clean, npm audit 0 vulns, pytest passed | tasks/32.result.md | in work/ds history | VERIFIED_LOCAL | LICENSE not chosen | License choice, public visibility |
@@ -40,6 +40,21 @@ Columns: Task ID | Feature | Original requirement | Starting state | Files chang
 | F8 | SSE reconnect: integer seq cursor instead of UUID | 18a1978 |
 | F9 | Metrics integration: false_positive_rates, MetricError handling | 4ab4fb5 |
 
+## Integration blocker fixes (commit f46e7e6)
+
+| Blocker | Fix | Files |
+|---------|-----|-------|
+| SDK rejects localhost URLs with ports | validateBaseUrl uses URL.hostname instead of prefix match | sdk/typescript/src/client.ts |
+| SDK expects rule_ids API doesn't return | Made rule_ids optional, defaults to [] | sdk/typescript/src/client.ts |
+| SDK hardcoded "sdk-default" session ID | Removed; tool() requires sessionId parameter | sdk/typescript/src/guard.ts |
+| Dashboard SSE returns 401 (no auth) | SSE endpoint accepts token query param; dashboard passes it | apps/api/routes.py, apps/api/auth.py, apps/web/src/api.ts |
+| Dashboard hardcoded invalid session_id | Attack Lab creates real session via POST /api/v1/sessions | apps/web/src/screens/AttackLab.tsx |
+| API targets: JSON/query mismatch, owned=True, loose URL check | TargetCreate Pydantic model, host:port validation, owned=False | apps/api/schemas.py, apps/api/routes.py |
+| API scans: fabricated COMPLETED state | PENDING state, no fabricated findings | apps/api/routes.py |
+| API shield: ACTIVE with no expiry | PROPOSED state, expires_at from TTL | apps/api/routes.py |
+| labctl: lost process-ownership proof | netstat -ano to verify socket-owning PID matches pid file | apps/labctl.py |
+| fresh_clone_check: copies .env, uses caller's interpreter | Exclude .env, create fresh venv in clone | scripts/fresh_clone_check.py |
+
 ## Verification Summary (current, 2026-11-03)
 
 | Check | Result |
@@ -51,6 +66,15 @@ Columns: Task ID | Feature | Original requirement | Starting state | Files chang
 | npm audit | 0 vulnerabilities |
 | git diff --check | exit 0 |
 | Forbidden paths vs main | empty diff |
+
+## Known Integration Limitations (documented, not hidden)
+
+| Limitation | Impact | Required for resolution |
+|------------|--------|------------------------|
+| SDK runtime E2E vs real backend | Cannot verify end-to-end without running API + SDK together | Start API server, run SDK against it |
+| Dashboard browser E2E | Cannot verify dashboard UI flows without Chromium | Playwright install + browser tests |
+| Lab loopback on Windows | netstat -ano approach works but needs Docker/node running | Docker Desktop for PHP labs |
+| Live model benchmark | No credentials available | Organizer-provided API credentials |
 
 ## Notes
 
