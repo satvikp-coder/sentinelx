@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** b4f2ec1
+**Worker SHA:** 7a7ab19
 
 ---
 
@@ -23,6 +23,13 @@
 | fresh_clone_check: copies .env | `.env` and `.env.local` added to EXCLUDE_NAMES |
 | Evidence events: action_id string used as UUID | `uuid4()` used for event `id`; `action_id` kept in payload |
 | Scan endpoint: hangs when lab unavailable | Scan creates PENDING record without executing; no hang |
+| Socket ownership: accepts UDP/non-LISTEN/different address | Requires SOCK_STREAM + LISTEN state; matches host address; fails closed when ownership unknown |
+| CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
+| Shield: no gated activation | RuleLifecycle.approve_rule() with benign-replay gate; ACTIVE only when gate passes |
+| Scan: no execution pipeline | create_scan runs run_scan() in background thread; state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED |
+| Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
+| Shield list: no pagination | _paginate applied before serialization |
+| Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
 
 ---
 
@@ -88,19 +95,11 @@
 **Expected evidence:** Browser tests pass
 **Who must authorize/execute:** Owner
 
-### 8. Scanner/shield execution pipeline
-**Why:** Scans stay PENDING and shields stay PROPOSED without execution/activation integration. The API returns honest states but doesn't actually execute scans or activate shields.
-**Prerequisites:** Scanner execution engine, shield activation logic (benign-replay gate)
-**Expected cost/risk:** High (new feature development)
-**Safe command/procedure:** Implement scan execution that actually runs the scanner against the target; implement shield activation that runs the benign-replay gate
-**Expected evidence:** Scan transitions from PENDING to COMPLETED with real findings; shield transitions from PROPOSED to ACTIVE after gate passes
-**Who must authorize/execute:** Owner
-
 ---
 
 ## BLOCKERS REQUIRING CI INFRASTRUCTURE
 
-### 9. GitHub Actions CI run
+### 8. GitHub Actions CI run
 **Why:** Verify CI configuration (.github/workflows/ci.yml) passes on pushed commits.
 **Prerequisites:** Repository pushed to origin
 **Expected cost/risk:** Low
@@ -117,7 +116,7 @@
 | SDK runtime E2E vs real backend | Not run | Requires starting API server and running SDK against it; unit tests pass |
 | Dashboard browser E2E | Not run | Requires Playwright Chromium; unit tests and typecheck/build pass |
 | CRLF git apply on Windows | Documented | Linux CRLF patches apply cleanly; Windows git limitation |
-| Tailwind @tailwind not processed | Documented | Structural layout works; styling not required for functionality |
+| Tailwind v4 @tailwind not processed | Resolved | Replaced with plain CSS utility classes; dashboard builds cleanly |
 | LICENSE not chosen | Documented | Owner decision; doesn't affect code correctness |
 | Repo not public | Documented | Owner decision; doesn't affect code correctness |
 | No live model runs | Documented | All results are from scripted/planned agents; clearly labeled SIMULATED |
@@ -128,21 +127,9 @@
 
 | Blocker | Resolution |
 |---------|------------|
-| Ruff 23 errors | Fixed all: StrEnum conversions, unused imports, long lines, import sorting |
-| Node lab loopback test (2 failures) | Replaced psutil.net_connections() with socket bind tests + netstat process-ownership proof |
-| test_rate_limit_burst (timing-dependent) | Made deterministic: pre-fill bucket, verify 429/200 via HTTP |
-| Security Repair 3 final blocker (error response redaction) | Generic 400 message instead of raw ValidationError; regression test added |
-| Security Repair 3 blockers (cancellation, approval storage, evidence persist-before-broadcast, report crash) | All fixed and verified |
-| SDK localhost URL port rejection | validateBaseUrl now parses URL properly |
-| SDK rule_ids mismatch | Made optional, defaults to empty array |
-| SDK hardcoded session ID | Removed; requires explicit sessionId |
-| Dashboard SSE 401 auth | Token query parameter support |
-| Dashboard hardcoded invalid session | Attack Lab creates real session |
-| Evidence UI: SSE named events | Server no longer sends named events |
-| API target fabrication (owned=True, loose URL) | owned=False, proper host:port validation via urlparse, JSON body |
-| API scan fabrication (COMPLETED with 0 requests) | PENDING state + note field |
-| API shield fabrication (ACTIVE, no expiry) | PROPOSED state + expires_at + note field |
-| fresh_clone_check (.env copy, caller's interpreter) | .env and .env.local excluded, fresh venv in clone |
-| Evidence events: action_id string as UUID | `uuid4()` used for event `id`; `action_id` kept in payload |
-| Scan endpoint: hangs when lab unavailable | Scan creates PENDING record without executing; no hang |
-| Socket ownership: accepts UDP/non-LISTEN/different address | Requires SOCK_STREAM + LISTEN state; matches host address; fails closed when ownership unknown |
+| CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
+| Shield: no gated activation | RuleLifecycle.approve_rule() with benign-replay gate; ACTIVE only when gate passes |
+| Scan: no execution pipeline | create_scan runs run_scan() in background thread; state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED |
+| Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
+| Shield list: no pagination | _paginate applied before serialization |
+| Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
