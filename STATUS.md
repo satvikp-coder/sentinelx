@@ -82,7 +82,7 @@ Last updated: 2026-11-04
 |------|-----|--------|
 | CI packaging | `pip install -e sdk/python` added to CI workflow | COMPLETE |
 | Scanner API execution | `create_scan` runs `run_scan()` in background daemon thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted | COMPLETE |
-| Shield approval | Fail-closed: `approve_shield_rule` rejects all activations with 400; real activation not implemented | PARTIAL |
+| Shield approval + activation | Canonical scoped approval, benign gate, real activation into the proxy lifecycle; shared runtime store coordinates the standalone proxy; atomic activation with rollback; expiry/removal stop enforcement | VERIFIED_LOCAL (see tasks/SHIELD_RECOVERY.result.md) |
 | Scan findings endpoint | GET /scans/{scan_id}/findings returns findings filtered by scan_id | COMPLETE |
 | Scan status endpoint | GET /scans/{scan_id} returns current scan state | COMPLETE |
 | Global findings endpoint | GET /findings returns all findings with explicit serialization | COMPLETE |
@@ -100,7 +100,7 @@ Last updated: 2026-11-04
 | Policy gateway | POST /api/v1/policy/decide | PASS |
 | Session management | POST /api/v1/sessions | PASS |
 | Approval workflow | POST /api/v1/approvals | PASS |
-| Shield rules | POST/GET/POST-approve /api/v1/shield/rules | PARTIAL (fail-closed; no actual activation) |
+| Shield rules | POST/GET/POST-approve/DELETE/expire /api/v1/shield/rules | VERIFIED_LOCAL (real activation + proxy enforcement; browser/Docker/hosted-CI validation NOT RUN) |
 | Scan execution | POST /api/v1/scans, GET /scans/{id}, GET /scans/{id}/findings, POST /scans/{id}/cancel | PASS |
 | Evidence verification | POST /evidence/verify | PASS |
 | SSE event stream | GET /api/v1/events/stream | PASS |
@@ -119,9 +119,14 @@ Last updated: 2026-11-04
 | CI on GitHub | Not run for these commits (no push authorized) | NOT_RUN |
 | LICENSE | Not chosen (owner decision) | HUMAN_ACTION |
 | Repository visibility | Not public (owner decision) | HUMAN_ACTION |
-| Actual shield activation | Fail-closed only; real activation needs proxy runtime, benign-replay gate, scoped approval | NOT_RUN (feature incomplete) |
+| Shield activation — hosted validation | Local E2E passed (real proxy process, real upstream, public API). Browser/Docker/hosted-CI validation NOT RUN | NOT_RUN (external validation) |
 
-> **Important:** Shield approval fail-closed behavior (rejecting all activations with 400) is NOT feature completion. It is a safe disabling of the activation path until genuine runtime integration is implemented. Do not describe safe disabling as feature completion.
+> **History (preserved):** the earlier fail-closed shield approval (rejecting all
+> activations with 400) was deliberately NOT counted as feature completion.
+> The current implementation replaces it with real, scoped, gated activation and
+> proxy enforcement, verified locally through the public API + real proxy E2E
+> (see tasks/SHIELD_RECOVERY.result.md and tasks/SHIELD_RECOVERY_E2E.md).
+> Independent Codex review of this implementation is still required.
 
 
 ## Resolved Blockers
