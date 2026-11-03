@@ -21,6 +21,8 @@ from uuid import UUID, uuid4
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
+from sentinelx.policy.redaction import redact
+
 from .schemas import EventKind, EventStreamMessage
 
 
@@ -116,11 +118,12 @@ async def sse_stream_generator(request: Request, after_seq: int = 0):
     """
     # Replay any missed events first.
     for ev in event_stream.replay(after_seq):
+        redacted_payload = redact(ev.payload).value
         msg = EventStreamMessage(
             seq=ev.seq,
             id=ev.id,
             kind=ev.kind.value,
-            payload=ev.payload,
+            payload=redacted_payload,
             timestamp=ev.timestamp.isoformat(),
         )
         yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))
@@ -139,11 +142,12 @@ async def sse_stream_generator(request: Request, after_seq: int = 0):
                 continue
             if ev is None:
                 break
+            redacted_payload = redact(ev.payload).value
             msg = EventStreamMessage(
                 seq=ev.seq,
                 id=ev.id,
                 kind=ev.kind.value,
-                payload=ev.payload,
+                payload=redacted_payload,
                 timestamp=ev.timestamp.isoformat(),
             )
             yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))

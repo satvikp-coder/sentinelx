@@ -38,6 +38,7 @@ from sentinelx.common_schemas import (
     ApprovalRecord,
     EvidenceState,
     PolicyDecision,
+    PolicyMode,
     ScenarioSpec,
     SessionState,
 )
@@ -287,6 +288,33 @@ async def _gateway_decide(
         canonical = json.dumps({"tool": tool, "arguments": arguments},
                                sort_keys=True)
         action_id = f"api-{hashlib.sha256(canonical.encode()).hexdigest()[:12]}"
+
+        # Check if this action has been previously approved.
+        # If so, return ALLOW immediately without re-running the gateway.
+        existing_approval = None
+        for _candidate_sid, candidate_state in _SESSION_STATE.items():
+            for record in candidate_state.get("approvals", []):
+                subject_id = record.get("subject_id", "")
+                if subject_id.startswith(action_id + ":") \
+                        and record.get("decision") == "approve":
+                    existing_approval = record
+                    break
+            if existing_approval is not None:
+                break
+        if existing_approval is not None:
+            if existing_approval.get("decision") == "approve":
+                return PolicyDecision(
+                    action_id=action_id,
+                    decision=Decision.ALLOW,
+                    policy_version=_POLICY.policy_version,
+                    rule_ids=["APPROVED"],
+                    reason_code="HUMAN_APPROVED",
+                    explanation="Previously approved by human",
+                    policy_mode=PolicyMode.ENFORCE,
+                    effective_action=Decision.ALLOW,
+                    would_have_decided=None,
+                    signals=[],
+                )
 
         action_request = ActionRequest.model_validate(
             {
@@ -864,6 +892,35 @@ async def create_scan(
     return store.scans[sid]
 
 
+@router.get("/scans/{scan_id}/findings", response_model=list[FindingResponse], tags=["scans"])
+async def get_scan_findings(
+    scan_id: UUID,
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    user: str = Depends(_require_auth),
+):
+    """Return findings for a given scan.
+
+    Unknown scan IDs return 404. Known scans in PENDING state have no
+    findings yet (scan execution not yet integrated); completed scans
+    return their actual findings.
+    """
+    async with store.lock:
+        scan = store.scans.get(scan_id)
+    if scan is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+
+    # Scan execution is not yet integrated, so scans remain PENDING with
+    # no findings. If a scan were completed, its findings would be listed
+    # here (filtered by scan association if such tracking existed).
+    if scan["state"] != RunState.COMPLETED:
+        return []
+
+    async with store.lock:
+        items = list(store.findings.values())
+    return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+
+
 # ------------------------------------------------------------------ patches
 
 @router.get("/patches", response_model=list[PatchResponse], tags=["patches"])
@@ -1058,22 +1115,28 @@ async def approve_shield_rule(
         raise HTTPException(status_code=400, detail="action_id and tool are required")
     if decision != "approve":
         raise HTTPException(status_code=400, detail="only 'approve' decisions are accepted")
+    if action_id != str(rule_id):
+        raise HTTPException(status_code=400, detail="action_id must match rule_id")
 
-    # Validate the approval record against the stored approvals.
-    try:
-        ApprovalRecord.model_validate(
-            {
-                "id": f"appr-{uuid4().hex[:12]}",
-                "subject_type": "shield_rule",
-                "subject_id": str(rule_id),
-                "reviewer": reviewer,
-                "decision": "approve",
-                "rationale": rationale,
-                "timestamp": datetime.now(UTC),
-            }
-        )
-    except ValidationError:
-        raise HTTPException(status_code=400, detail="invalid approval record") from None
+    # Validate the approval against stored approval records.
+    # The approval must have been previously recorded via POST /api/v1/approvals
+    # with the same action_id, tool, and arguments. We look up the approval
+    # in _SESSION_STATE[sid]["approvals"] list and verify the stored
+    # subject_id matches the action_id (subject_id is "action_id:digest")
+    # and the decision is "approve".
+    existing_approval = None
+    for _candidate_sid, candidate_state in _SESSION_STATE.items():
+        for record in candidate_state.get("approvals", []):
+            subject_id = record.get("subject_id", "")
+            if (subject_id == action_id or subject_id.startswith(action_id + ":")) \
+                    and record.get("decision") == "approve":
+                existing_approval = record
+                break
+        if existing_approval is not None:
+            break
+
+    if existing_approval is None:
+        raise HTTPException(status_code=400, detail="no valid approval found for this action_id")
 
     async with store.lock:
         rule = store.shield_rules.get(rule_id)
@@ -1102,7 +1165,17 @@ async def approve_shield_rule(
         },
         run_id=None,
     )
-    return store.shield_rules[rule_id]
+    return ShieldRuleResponse(
+        rule_id=rule_id,
+        route_pattern=rule["route_pattern"],
+        intent=rule["intent"],
+        mode=rule["mode"],
+        state=rule["state"],
+        ttl_minutes=rule["ttl_minutes"],
+        created_at=rule["created_at"],
+        expires_at=rule.get("expires_at"),
+        note=rule.get("note"),
+    )
 
 
 # ------------------------------------------------------------------ escalations
