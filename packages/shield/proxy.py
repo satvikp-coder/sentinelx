@@ -20,7 +20,7 @@ from sentinelx.policy.redaction import redact
 
 from .config import ShieldConfig
 from .detect import Detector
-from .intent import IntentAssessment, map_intent
+from .intent import IntentAssessment, aggregate_intent
 from .recorder import ShieldRecorder, hash_client_key
 from .rules import (
     BenignReplayGate,
@@ -356,13 +356,14 @@ class ShieldProxy:
             try:
                 signals = self._scan(client_key, method, path, query, headers, body, now)
                 if signals:
-                    label, _ = map_intent([s.name for s in signals])
-                    intent = str(getattr(label, "value", label))
+                    intent_label, confidence, _scores = aggregate_intent([s.name for s in signals])
+                    intent = str(getattr(intent_label, "value", intent_label))
                     evt = self.store.append(
                         self.session_id, "shield_intent", EvidenceState.INFERRED,
                         "sentinelx.shield",
                         {"request_id": headers.get("x-request-id"), "intent": intent,
-                         "signals": [s.name for s in signals], "client_key": client_key})
+                         "signals": [s.name for s in signals], "client_key": client_key,
+                         "confidence": confidence})
                     self._consider_rule(client_key, intent, path, params, evt.id)
             except Exception as exc:  # fail open: keep going
                 shield_error = f"{type(exc).__name__}: {exc}"
@@ -478,7 +479,7 @@ class ShieldProxy:
         Never blocks traffic. Returns a rules-only IntentAssessment with note
         "model unavailable: rules-only" when the model is unavailable or returns invalid output.
         """
-        intent, conf = map_intent(signal_names)
+        intent, conf, _scores = aggregate_intent(signal_names)
         fallback = IntentAssessment(
             intent=intent,
             summary=f"rules-only mapping from {len(signal_names)} signal(s)",

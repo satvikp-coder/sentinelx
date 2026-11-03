@@ -9,6 +9,7 @@ control now behaves differently)."""
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -334,10 +335,75 @@ def _verify_upload(ctx: ScanContext, c: Candidate) -> Verification:
     return _v("rejected", f"re-check returned HTTP {out.status}, not 200", True)
 
 
+def _verify_stored_xss(ctx: ScanContext, c: Candidate) -> Verification:
+    """Re-verify stored XSS: set the marker bio again in a fresh session, then fetch the
+    public profile and check the marker is still reflected unencoded."""
+    proof = c.proof
+    marker = str(proof["marker"])
+    session = ctx.ensure_persona("user_a", fresh=True)
+    from ..session import login
+    login(ctx.client, ctx.base_url, session, ctx.personas_file.login)
+    set_bio = ctx.call(
+        "user_a", "PUT", "/api/profile",
+        body='{"bio":"' + marker + '"}',
+        headers={"Content-Type": "application/json"},
+        reason="independent verification: set profile bio to stored-XSS marker",
+        account="user_a",
+    )
+    if not set_bio.allowed:
+        return _v("needs_validation", "the re-check profile update was refused", True)
+    probe = ctx.get("anonymous", "/u/carol")
+    if not probe.allowed:
+        return _v("needs_validation", "the public profile re-fetch was refused", True)
+    if marker in probe.text:
+        return _v("confirmed", "the stored marker is still reflected unencoded", True,
+                  event_ids=[e for e in [set_bio.event_id, probe.event_id] if e],
+                  excerpt=_excerpt(probe.text))
+    return _v("rejected", "the marker is encoded (or absent) on re-check", True,
+                  excerpt=_excerpt(probe.text))
+
+
+def _verify_authz_post(ctx: ScanContext, c: Candidate) -> Verification:
+    """Re-verify authz_post: user_a creates a note, user_b attempts to modify it via PUT."""
+    title = "sx_authz_post_verify_" + __import__("uuid").uuid4().hex[:8]
+    session_a = ctx.ensure_persona("user_a", fresh=True)
+    from ..session import login
+    login(ctx.client, ctx.base_url, session_a, ctx.personas_file.login)
+    create = ctx.call(
+        "user_a", "POST", "/api/notes",
+        body='{"title":"' + title + '","body":"user_a private note"}',
+        headers={"Content-Type": "application/json"},
+        reason="independent verification: user_a creates a note",
+        account="user_a",
+    )
+    if not create.allowed or create.status not in (200, 201):
+        return _v("needs_validation", "the verification note creation was refused", True)
+    try:
+        verify_id = str(json.loads(create.text)["id"])
+    except (ValueError, KeyError, TypeError):
+        return _v("needs_validation", "could not parse the verification note id", True)
+    session_b = ctx.ensure_persona("user_b", fresh=True)
+    login(ctx.client, ctx.base_url, session_b, ctx.personas_file.login)
+    probe = ctx.call(
+        "user_b", "PUT", f"/api/notes/{verify_id}",
+        body='{"title":"user_b modified","body":"user_b modified this note"}',
+        headers={"Content-Type": "application/json"},
+        reason="independent verification: user_b attempts to modify user_a's note",
+        account="user_b",
+    )
+    if probe.allowed and probe.status in (200, 201):
+        return _v("confirmed", "user_b can still modify user_a's note via PUT", True,
+                  event_ids=[e for e in [create.event_id, probe.event_id] if e],
+                  excerpt=_excerpt(probe.text))
+    return _v("rejected", "user_b can no longer modify user_a's note (ownership enforced)", True,
+                  excerpt=_excerpt(probe.text))
+
+
 _VERIFIERS: dict[VulnClass, Callable[[ScanContext, Candidate], Verification]] = {
     VulnClass.SQL_INJECTION: _verify_sql_injection,
     VulnClass.REFLECTED_XSS: _verify_reflected_xss,
     VulnClass.BROKEN_OBJECT_AUTHORIZATION: _verify_bola,
+    VulnClass.XSS_STORED: _verify_stored_xss,
     VulnClass.MISSING_AUTHENTICATION: _verify_missing_auth,
     VulnClass.SENSITIVE_FILE_EXPOSURE: _verify_sensitive_file,
     VulnClass.DEBUG_EXPOSURE: _verify_debug_exposure,

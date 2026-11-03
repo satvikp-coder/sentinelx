@@ -312,6 +312,7 @@ class FixResult:
     verification_status: str | None
     failed_checks: list[tuple[str, str]]
     explanation: str | None
+    patch_format: str | None  # absent in older reports; never invented
 
 
 @dataclass(frozen=True)
@@ -335,7 +336,7 @@ def _build_fix(d: dict[str, Any], src: str) -> FixData:
             finding_id=str(r.get("finding_id")), lab=str(r.get("lab")),
             status=status, patch_status=r.get("patch_status"),
             verification_status=r.get("verification_status"), failed_checks=failed,
-            explanation=r.get("explanation")))
+            explanation=r.get("explanation"), patch_format=r.get("patch_format")))
     spend = d.get("spend") if isinstance(d.get("spend"), dict) else None
     return FixData(counts, results, spend, model_label(d.get("provenance") or {}))
 
@@ -441,6 +442,88 @@ def load_limitations(evaluations: Path) -> Section:
     return Section("limitations", "OK", evaluations.as_posix(), None, items)
 
 
+# ------------------------------------------------------------------ explanations
+@dataclass(frozen=True)
+class ExplanationClaim:
+    claim_id: str
+    kind: str  # OBSERVED | INFERRED
+    text: str
+    cited_event_ids: list[str]
+    passed: bool
+    code: str  # VERIFIED, UNKNOWN_EVENT, ASSERTION_FALSE, UNSUPPORTED, CONTRADICTS_VERIFIER
+    detail: str | None = None
+    confidence: str | None = None
+
+
+@dataclass(frozen=True)
+class ExplanationFinding:
+    case: str
+    arm: str
+    session_id: str
+    run_valid: bool
+    mode: str  # MODEL | BASELINE
+    state: str  # confirmed | needs_validation | rejected
+    severity: str
+    summary: str
+    numerator: int
+    denominator: int
+    note: str
+    claims: list[ExplanationClaim]
+    mitigations: list[str]
+    model_call: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class ExplanationsData:
+    run_dir: str
+    cases: list[str]
+    findings: list[ExplanationFinding]
+
+
+def _build_explanations(d: dict[str, Any], src: str) -> ExplanationsData:
+    findings = []
+    for f in d.get("findings", []):
+        inv = f.get("investigation", {})
+        claims = []
+        for c in inv.get("claims", []):
+            claims.append(ExplanationClaim(
+                claim_id=str(c.get("id", "")),
+                kind=str(c.get("kind", "")),
+                text=str(c.get("text", "")),
+                cited_event_ids=list(c.get("cited", [])),
+                passed=bool(c.get("passed", False)),
+                code=str(c.get("code", "")),
+                detail=c.get("detail"),
+                confidence=c.get("confidence"),
+            ))
+        findings.append(ExplanationFinding(
+            case=str(f.get("case", "")),
+            arm=str(f.get("arm", "")),
+            session_id=str(f.get("session_id", "")),
+            run_valid=bool(f.get("run_valid", False)),
+            mode=str(inv.get("mode", "")),
+            state=str(inv.get("state", "")),
+            severity=str(inv.get("severity", "")),
+            summary=str(inv.get("summary", "")),
+            numerator=int(inv.get("numerator", 0)),
+            denominator=int(inv.get("denominator", 0)),
+            note=str(inv.get("note", "")),
+            claims=claims,
+            mitigations=list(inv.get("mitigations", [])),
+            model_call=f.get("model_call"),
+        ))
+    return ExplanationsData(
+        run_dir=str(d.get("run_dir", "")),
+        cases=list(d.get("cases", [])),
+        findings=findings,
+    )
+
+
+def load_explanations(evaluations: Path) -> Section:
+    return _section("explanations", evaluations / "example_investigation" / "investigations.json",
+                    _build_explanations)
+
+
 # ------------------------------------------------------------------ entry points
 def load_all(evaluations: Path | None = None) -> dict[str, Section]:
     ev = Path(evaluations) if evaluations else Path("evaluations")
@@ -448,7 +531,7 @@ def load_all(evaluations: Path | None = None) -> dict[str, Section]:
     for s in load_agent_guard(ev):
         sections[s.name] = s
     for s in (load_investigator(ev), load_evcs(ev), load_scan(ev), load_fix(ev),
-              load_shield(ev), load_limitations(ev)):
+              load_shield(ev), load_limitations(ev), load_explanations(ev)):
         sections[s.name] = s
     for s in load_provenance(ev):
         sections[s.name] = s

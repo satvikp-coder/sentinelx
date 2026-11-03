@@ -8,6 +8,7 @@ off the request path and falls back to rules-only mapping with a visible note.
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -41,21 +42,37 @@ class IntentAssessment(SXModel):
     note: str | None = None
 
 
-# ---- rules table: signal -> intent, confidence (first match wins)
+# ---- rules table: signal -> intent, confidence
+# Multiple signals for the same intent are aggregated by confidence-weighted voting
+# (aggregate_intent). map_intent is kept for backward compatibility: first match wins.
 SIGNAL_TO_INTENT: tuple[tuple[str, IntentLabel, float], ...] = (
+    # Injection probes - narrowly scoped, high confidence
     ("sql_break_char", IntentLabel.INJECTION_PROBE, 0.85),
     ("markup_reflected", IntentLabel.INJECTION_PROBE, 0.8),
+    ("nosqli_probe", IntentLabel.INJECTION_PROBE, 0.8),
+    ("command_injection", IntentLabel.INJECTION_PROBE, 0.85),
+    ("directory_traversal", IntentLabel.INJECTION_PROBE, 0.8),
+    ("oversized_param", IntentLabel.INJECTION_PROBE, 0.5),
+    # Recon - path probing, scanners, 404 sweeps
     ("sensitive_path_env", IntentLabel.RECON, 0.7),
     ("sensitive_path_git", IntentLabel.RECON, 0.7),
     ("backup_extension", IntentLabel.RECON, 0.6),
     ("debug_route", IntentLabel.RECON, 0.6),
     ("scanner_ua", IntentLabel.RECON, 0.65),
-    ("oversized_param", IntentLabel.INJECTION_PROBE, 0.5),
-    ("protected_no_session", IntentLabel.CREDENTIAL_GUESSING, 0.6),
     ("high_404_rate", IntentLabel.RECON, 0.6),
+    ("directory_listing", IntentLabel.RECON, 0.7),
+    # Credential guessing - failed logins (distinguished by velocity/severity)
+    ("protected_no_session", IntentLabel.CREDENTIAL_GUESSING, 0.6),
     ("repeated_failed_logins", IntentLabel.CREDENTIAL_GUESSING, 0.8),
+    ("rapid_failed_logins", IntentLabel.CREDENTIAL_GUESSING, 0.9),
+    ("nonexistent_user_probe", IntentLabel.CREDENTIAL_GUESSING, 0.7),
+    # Data enumeration - sequential object access
     ("object_id_enumeration", IntentLabel.DATA_ENUMERATION, 0.75),
+    # Admin probing - admin/debug route access without session
     ("admin_probe", IntentLabel.ADMIN_PROBE, 0.8),
+    ("sensitive_admin_path", IntentLabel.ADMIN_PROBE, 0.85),
+    # Exfiltration attempts - large outbound data transfers
+    ("data_transfer_large", IntentLabel.EXFIL_ATTEMPT, 0.75),
 )
 
 DEFAULT_INTENT = IntentLabel.RECON
@@ -63,12 +80,52 @@ DEFAULT_CONFIDENCE = 0.4
 
 
 def map_intent(signal_names: list[str]) -> tuple[IntentLabel, float]:
-    """Deterministic mapping from fired signal names to (intent, confidence). First match wins."""
+    """Deterministic mapping from fired signal names to (intent, confidence). First match wins.
+
+    Kept for backward compatibility. Prefer aggregate_intent for new code.
+    """
     for name in signal_names:
         for sig, intent, conf in SIGNAL_TO_INTENT:
             if name == sig:
                 return intent, conf
     return DEFAULT_INTENT, DEFAULT_CONFIDENCE
+
+
+def aggregate_intent(
+    signal_names: list[str],
+) -> tuple[IntentLabel, float, dict[IntentLabel, float]]:
+    """Aggregate multiple fired signals into one (intent, confidence) verdict.
+
+    Confidence-weighted voting: each signal's confidence is summed per intent; the intent with
+    the highest total confidence wins. Ties are broken by signal count, then by the fixed
+    taxonomy order (RECON first). Returns (intent, confidence, per_intent_scores). Confidence is
+    capped at 1.0 and never fabricated - it is the normalized sum of observed signal confidences.
+
+    Only signals present in SIGNAL_TO_INTENT contribute; unknown signal names are ignored.
+    Empty input returns DEFAULT_INTENT / DEFAULT_CONFIDENCE.
+    """
+    scores: dict[IntentLabel, float] = defaultdict(float)
+    counts: dict[IntentLabel, int] = defaultdict(int)
+    for name in signal_names:
+        for sig, intent, conf in SIGNAL_TO_INTENT:
+            if name == sig:
+                scores[intent] += conf
+                counts[intent] += 1
+                break  # a signal name maps to exactly one intent
+    if not scores:
+        return DEFAULT_INTENT, DEFAULT_CONFIDENCE, dict(scores)
+
+    # Rank by (total confidence desc, signal count desc, taxonomy order asc)
+    ranked = sorted(
+        scores.items(),
+        key=lambda kv: (-kv[1], -counts[kv[0]], INTENT_LABELS.index(kv[0])),
+    )
+    best_intent, best_score = ranked[0]
+    # Confidence is the summed confidence of the winning intent's signals, capped at 1.0.
+    # Multiple signals for the same intent reinforce; competing intents do not dilute the
+    # winning score (they simply lose the ranking).
+    confidence = min(best_score, 1.0)
+    return best_intent, confidence, dict(scores)
 
 
 # ------------------------------------------------------------------ AttackIntent building

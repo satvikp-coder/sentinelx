@@ -22,7 +22,7 @@ from .apply import ApplyError, apply_diff
 from .diagnose import DiagnosedLocation, DiagnosisFailure, diagnose
 from .ladder import LadderOutcome, decide, escalate
 from .models import FixPolicy, RepoScope
-from .patch_gen import PatchGenResult, generate_patch
+from .patch_gen import PatchGenResult, generate_patch, generate_patch_edits
 from .scope import create_scope, destroy_scope
 from .verify import TimedCheck, VerificationReport, verify_patch
 
@@ -59,9 +59,22 @@ def load_scope_record(patch_id: str) -> tuple[str, RepoScope]:
     return data["lab"], scope
 
 
+def select_generator(policy: FixPolicy, patch_format: str | None = None):
+    """Pick the patch generator: an explicit override wins, else the config value
+    (policy.patch_format, default "diff"). Unknown formats fail loudly - never silently
+    fall back to a different mode than the operator asked for."""
+    fmt = patch_format or getattr(policy, "patch_format", "diff")
+    if fmt == "edits":
+        return generate_patch_edits
+    if fmt == "diff":
+        return generate_patch
+    raise ValueError(f"unknown patch_format: {fmt!r} (expected 'edits' or 'diff')")
+
+
 def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPolicy,
            original_findings: list[dict], models_config: ModelsConfig | None = None,
-           profile_name: str | None = None) -> FixOutcome:
+           profile_name: str | None = None,
+           patch_format: str | None = None) -> FixOutcome:
     """`models_config`/`profile_name`, if given, make every model call's actual cost get
     recorded into the `usage` ledger (sentinelx.model_clients.profiles) under that profile, so
     the hard spend guard sees real fixer spend on the next finding/run - not just the one
@@ -108,10 +121,11 @@ def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPo
                                 "Have a human write the fix directly."])
                     return FixOutcome(finding_id, vuln_class, "ESCALATED", ticket_id=ticket_id,
                                      diagnosis=diag, retries_used=retries)
-            patch = generate_patch(scope, diag, vuln_class=vuln_class, method=candidate["method"],
-                                   endpoint=candidate["endpoint"], summary=candidate["summary"],
-                                   client=client, allowed_files={diag.file},
-                                   usage_sink=model_results)
+            generator = select_generator(policy, patch_format)
+            patch = generator(
+                scope, diag, vuln_class=vuln_class, method=candidate["method"],
+                endpoint=candidate["endpoint"], summary=candidate["summary"],
+                client=client, allowed_files={diag.file}, usage_sink=model_results)
             verification = None
             if patch.status == "VALIDATED":
                 # each attempt starts from the unpatched baseline, never stacked on a

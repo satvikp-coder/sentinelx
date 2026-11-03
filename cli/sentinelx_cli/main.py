@@ -54,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_fix = site_sub.add_parser("fix", help="Run fixes for a target")
     p_fix.add_argument("target_id", help="Target ID")
     p_fix.add_argument("--repo", required=True, help="Path to local repository")
+    p_fix.add_argument("--patch-format", choices=["diff", "edits"], default=None,
+                       help="Patch format for this run (default: configured patch_format, "
+                            "currently 'diff')")
     p_fix.set_defaults(func=lambda args: site_cmd(args, "fix"))
 
     p_guard = site_sub.add_parser("guard", help="Run shield proxy in front of a target")
@@ -128,6 +131,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.add_argument("--policy", required=True, help="Policy YAML file")
     p_check.add_argument("--action", required=True, help="Action JSON file")
     p_check.set_defaults(func=agent_cmd)
+    p_test = agent_sub.add_parser("test", help="Run agent test against a lab")
+    p_test.add_argument("--adapter", required=True, help="Adapter spec (scripted:..., exec:..., http://...)")
+    p_test.add_argument("--lab", required=True, help="Lab name")
+    p_test.add_argument("--scenario", required=True, help="Scenario ID")
+    p_test.set_defaults(func=lambda args: agent_cmd(args, "test"))
 
     # report
     p_report = subparsers.add_parser("report", help="Build the static results report")

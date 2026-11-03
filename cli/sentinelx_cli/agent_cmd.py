@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""sentinelx agent - evaluate ONE action with the real policy gateway."""
+"""sentinelx agent - evaluate actions against a policy gateway or test an adapter."""
 
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ ACTION_KEYS = {"tool", "arguments", "allowed_hosts", "goal"}
 
 
 def agent_cmd(args) -> int:
-    if args.agent_cmd != "check":
-        print(f"Unknown agent command: {args.agent_cmd}", file=sys.stderr)
-        return 1
-    return agent_check(Path(args.policy), Path(args.action))
+    if args.agent_cmd == "check":
+        return agent_check(Path(args.policy), Path(args.action))
+    elif args.agent_cmd == "test":
+        return agent_test(args.adapter, args.lab, args.scenario)
+    print(f"Unknown agent command: {args.agent_cmd}", file=sys.stderr)
+    return 1
 
 
 def agent_check(policy_path: Path, action_path: Path) -> int:
@@ -73,4 +75,46 @@ def agent_check(policy_path: Path, action_path: Path) -> int:
     print(f"rule_ids: {decision.rule_ids}")
     print(f"requires_human: {decision.requires_human}")
     print(f"explanation: {decision.explanation}")
+    return 0
+
+
+def agent_test(adapter_spec: str, lab: str, scenario_id: str) -> int:
+    """Run an adapter against a lab in both unprotected and protected arms."""
+    from sentinelx.agent_test.adapter import load_adapter
+    from sentinelx.agent_test.runner import AgentTestConfig, run_agent_test
+
+    try:
+        adapter = load_adapter(adapter_spec)
+    except Exception as exc:
+        print(f"ERROR: invalid adapter spec: {exc}", file=sys.stderr)
+        return 2
+
+    config = AgentTestConfig(
+        adapter=adapter,
+        lab=lab,
+        scenario_id=scenario_id,
+    )
+
+    try:
+        result = run_agent_test(config)
+    except Exception as exc:
+        print(f"ERROR: agent test failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Adapter: {result.adapter_name}")
+    print(f"Lab: {result.lab}")
+    print(f"Scenario: {result.scenario_id}")
+    print(f"Fixture hash: {result.fixture_hash}")
+    print()
+    print(f"  Arm A (unprotected): {result.arm_a.outcome}")
+    print(f"    retries: {result.arm_a.retries_used}, duration: {result.arm_a.duration_ms:.1f}ms")
+    print(f"  Arm B (protected):  {result.arm_b.outcome}")
+    print(f"    retries: {result.arm_b.retries_used}, duration: {result.arm_b.duration_ms:.1f}ms")
+    print()
+    print(f"  Attack success: {result.attack_success_numerator}/"
+          f"{result.attack_success_denominator}")
+    print(f"  Task completion: {result.task_completion_numerator}/"
+          f"{result.task_completion_denominator}")
+    print(f"  False positive blocks: {result.false_positive_blocks}")
+    print(f"  Task preservation: {result.task_preservation}")
     return 0

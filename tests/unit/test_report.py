@@ -387,6 +387,38 @@ def test_rejected_fix_never_shows_explanation_as_result(tmp_path):
     assert fix_html.index("model's description") < fix_html.index("The model proposes")
 
 
+def test_fix_report_without_patch_format_shows_not_recorded(tmp_path):
+    # the fixture's fix report predates the patch_format field: the loader must NOT
+    # invent a format, and the renderer must show "not recorded" for every row
+    root = _make_full_fixture(tmp_path)
+    sections = load_all(root)
+    fix = sections["fix"]
+    assert fix.ok
+    assert all(r.patch_format is None for r in fix.data.results)
+    result = render_index(sections, check_integrity(root, None), tmp_path / "index.html")
+    html_text = result.out_path.read_text(encoding="utf-8")
+    fix_html = html_text[html_text.index("Fix engine"):
+                         html_text.index("Evidence integrity")]
+    assert "not recorded" in fix_html
+    assert ">edits<" not in fix_html and ">diff<" not in fix_html
+
+
+def test_fix_report_with_patch_format_shows_it(tmp_path):
+    root = _make_full_fixture(tmp_path)
+    fix = json.loads((root / "example_fix_report" / "report.json")
+                     .read_text(encoding="utf-8"))
+    fix["results"][0]["patch_format"] = "edits"
+    (root / "example_fix_report" / "report.json").write_text(json.dumps(fix),
+                                                             encoding="utf-8")
+    sections = load_all(root)
+    assert sections["fix"].data.results[0].patch_format == "edits"
+    result = render_index(sections, check_integrity(root, None), tmp_path / "index.html")
+    html_text = result.out_path.read_text(encoding="utf-8")
+    fix_html = html_text[html_text.index("Fix engine"):
+                         html_text.index("Evidence integrity")]
+    assert ">edits<" in fix_html
+
+
 def test_benign_caveat_present_with_gate_rejected_count(tmp_path):
     root = _make_full_fixture(tmp_path)
     sections = load_all(root)

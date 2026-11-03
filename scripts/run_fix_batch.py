@@ -43,16 +43,17 @@ def select_findings(report: dict, policy, *, max_auto: int = 3) -> tuple[list[di
 
 
 def run_one(finding: dict, lab: str, conn, client, policy, original_findings, models_config,
-           profile_name: str) -> dict:
+            profile_name: str, patch_format: str | None = None) -> dict:
     start = time.monotonic()
     outcome = run_fix(finding, lab=lab, conn=conn, client=client, policy=policy,
                       original_findings=original_findings, models_config=models_config,
-                      profile_name=profile_name)
+                      profile_name=profile_name, patch_format=patch_format)
     elapsed_s = time.monotonic() - start
     return {
         "lab": lab, "finding_id": outcome.finding_id, "vuln_class": outcome.vuln_class,
         "status": outcome.status, "patch_id": outcome.patch_id, "ticket_id": outcome.ticket_id,
         "retries_used": outcome.retries_used, "elapsed_s": round(elapsed_s, 1),
+        "patch_format": patch_format or getattr(policy, "patch_format", "diff"),
         "diagnosis": outcome.diagnosis.model_dump(mode="json") if outcome.diagnosis else None,
         "diff": outcome.patch.diff if outcome.patch else None,
         "explanation": outcome.patch.explanation if outcome.patch else None,
@@ -73,6 +74,8 @@ def main() -> int:
     ap.add_argument("--node-scan", required=True)
     ap.add_argument("--out", default=str(ROOT / "evaluations" / "example_fix_report"))
     ap.add_argument("--db", default=str(ROOT / "evaluations" / "fix_runs" / "fix.sqlite"))
+    ap.add_argument("--patch-format", choices=["edits", "diff"], default=None,
+                    help="Patch format for this batch (default: the configured patch_format)")
     args = ap.parse_args()
 
     policy = load_fix_policy()
@@ -108,7 +111,7 @@ def main() -> int:
         for lab, finding, original_findings in batch:
             print(f"running {lab} / {finding['candidate']['id']} ...")
             result = run_one(finding, lab, conn, client, policy, original_findings,
-                            models_config, routed.profile_name)
+                             models_config, routed.profile_name, patch_format=args.patch_format)
             results.append(result)
             print(f"  -> {result['status']} ({result['elapsed_s']}s, "
                  f"{result['retries_used']} retries)")

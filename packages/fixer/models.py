@@ -38,6 +38,7 @@ class FixPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     policy_version: str
     entries: dict[str, FixPolicyEntry]  # keyed by VulnClass value
+    patch_format: str = "diff"
 
     def for_class(self, vuln_class: VulnClass) -> FixPolicyEntry | None:
         return self.entries.get(vuln_class.value)

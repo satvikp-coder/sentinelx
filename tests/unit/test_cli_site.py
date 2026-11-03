@@ -122,10 +122,37 @@ def test_site_fix_mocked_backend(tmp_path, monkeypatch):
     assert rc == 0
     assert calls == [("run_fix.py", ["--target", "vibe_notes_node",
                                      "--scan-report", str(run_dir / "report.json")])]
+    # legacy call shape (no --patch-format given): the flag must NOT be added
 
     bad = site_mod._fix(argparse.Namespace(target_id="vibe_notes_node",
                                            repo=str(tmp_path / "missing")))
     assert bad == 1
+
+
+def test_site_fix_patch_format_dispatch(tmp_path, monkeypatch):
+    monkeypatch.setattr(site_mod, "repo_root", lambda: tmp_path)
+    run_dir = tmp_path / "evaluations" / "scan_runs" / "run1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "report.json").write_text(json.dumps({
+        "provenance": {"target_id": "vibe_notes_node"}, "findings": []}), encoding="utf-8")
+    repo_dir = tmp_path / "repo_dir"
+    repo_dir.mkdir()
+    calls = []
+    monkeypatch.setattr(site_mod, "run_script", lambda s, a: calls.append((s, a)) or 0)
+
+    base = {"target_id": "vibe_notes_node", "repo": str(repo_dir)}
+    rc = site_mod._fix(argparse.Namespace(**base, patch_format="edits"))
+    assert rc == 0
+    assert calls[-1][1][-2:] == ["--patch-format", "edits"]
+
+    rc = site_mod._fix(argparse.Namespace(**base, patch_format="diff"))
+    assert rc == 0
+    assert calls[-1][1][-2:] == ["--patch-format", "diff"]
+
+    # omitted -> omitted: the configured default applies inside run_fix.py
+    rc = site_mod._fix(argparse.Namespace(**base, patch_format=None))
+    assert rc == 0
+    assert "--patch-format" not in calls[-1][1]
 
 
 def test_shield_wrapper_builds_real_arguments(tmp_path, monkeypatch):

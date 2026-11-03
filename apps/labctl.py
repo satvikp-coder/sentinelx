@@ -181,6 +181,48 @@ def non_loopback_addresses() -> list[str]:
     return sorted(set(out))
 
 
+def _socket_owner_pid(port: int, host: str = "127.0.0.1") -> int | None:
+    """Return the PID that owns a TCP listening socket on ``host:port``, or
+    None.
+
+    Uses psutil to inspect each process's connections. On Windows,
+    netstat -ano often reports PID 0 for kernel-owned sockets, and
+    psutil.net_connections() does not reliably report LISTEN sockets, so
+    we check each process's connections for a TCP (SOCK_STREAM) socket in
+    LISTEN state on the target host:port.
+
+    UDP sockets, non-LISTEN TCP connections, and connections on unrelated
+    addresses (different local address or address family) are explicitly
+    ignored: they do not establish listener ownership. Returns None only
+    when ownership cannot be determined.
+    """
+    for _attempt in range(20):
+        try:
+            for proc in psutil.process_iter(["pid"]):
+                try:
+                    conns = proc.net_connections(kind="inet")
+                    for c in conns:
+                        if c.laddr[1] != port or c.laddr[0] != host:
+                            continue
+                        # Require TCP (SOCK_STREAM) and LISTEN state.
+                        # On Windows, psutil reports listening sockets with
+                        # status CONN_NONE ('NONE') rather than CONN_LISTEN
+                        # ('LISTEN'), so accept both.
+                        if c.type != socket.SOCK_STREAM:
+                            continue
+                        if c.status not in (
+                            psutil.CONN_LISTEN,
+                            psutil.CONN_NONE,
+                        ):
+                            continue
+                        return proc.info["pid"]
+                except (psutil.AccessDenied, psutil.NoSuchProcess,
+                        psutil.ZombieProcess):
+                    continue
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return None
 def assert_loopback_only(name: str) -> dict[str, object]:
     """Raise unless the lab is bound to 127.0.0.1 and refuses every non-loopback address."""
     lab = get(name)
@@ -200,12 +242,55 @@ def assert_loopback_only(name: str) -> dict[str, object]:
         pf = _pid_file(lab)
         if not pf.exists():
             raise LabError(f"{name}: not started by labctl")
-        proc = psutil.Process(int(pf.read_text(encoding="utf-8")))
-        listening = {f"{c.laddr.ip}:{c.laddr.port}" for c in proc.net_connections(kind="inet")
-                     if c.status == psutil.CONN_LISTEN}
-        if listening != {f"127.0.0.1:{lab.port}"}:
-            raise LabError(f"{name}: listening on {listening}, expected only 127.0.0.1:{lab.port}")
-        published = listening
+        pid = int(pf.read_text(encoding="utf-8"))
+        proc = psutil.Process(pid)
+        # Verify the recorded process is our node server (not a stray process).
+        cmdline = proc.cmdline()
+        if "server.js" not in " ".join(cmdline):
+            raise LabError(f"{name}: pid {pid} is not the lab server: {cmdline}")
+        # Prove process ownership: the pid-file PID must own the listening socket
+        # on the lab's expected host:port (127.0.0.1:port), not merely any socket
+        # on that port number.
+        socket_owner_pid = _socket_owner_pid(lab.port, host="127.0.0.1")
+        if socket_owner_pid is None:
+            raise LabError(
+                f"{name}: could not determine socket-owning PID for "
+                f"127.0.0.1:{lab.port}; "
+                f"refusing to assert loopback-only without process-ownership proof"
+            )
+        if socket_owner_pid != pid:
+            raise LabError(
+                f"{name}: socket on 127.0.0.1:{lab.port} owned by PID "
+                f"{socket_owner_pid}, but pid file records PID {pid}"
+            )
+        # psutil.net_connections() does not reliably report LISTEN sockets on
+        # Windows, so prove loopback-only binding with socket bind tests:
+        #   - binding to 127.0.0.1:port must fail (already in use => loopback bound)
+        #   - binding to 0.0.0.0:port must succeed (not bound on all interfaces)
+        loopback_bound = False
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2.0)
+        try:
+            s.bind(("127.0.0.1", lab.port))
+        except OSError:
+            loopback_bound = True
+        finally:
+            s.close()
+        if not loopback_bound:
+            raise LabError(f"{name}: not bound to 127.0.0.1:{lab.port}")
+        all_interfaces_free = False
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2.0)
+        try:
+            s.bind(("0.0.0.0", lab.port))
+            all_interfaces_free = True
+        except OSError:
+            all_interfaces_free = False
+        finally:
+            s.close()
+        if not all_interfaces_free:
+            raise LabError(f"{name}: also bound to 0.0.0.0:{lab.port} (not loopback only)")
+        published = {f"127.0.0.1:{lab.port}"}
     refused: dict[str, str] = {}
     for ip in non_loopback_addresses():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -79,26 +79,28 @@ sequence (with the benign request sent by httpx) is run by `python scripts/readm
 | Component | Status |
 |---|---|
 | Common schemas (strict Pydantic) | implemented (local) |
-| Model adapter (OpenAI-compatible, Meta open-weight) | planned |
+| Model adapter (OpenAI-compatible, Meta open-weight) | implemented (local; no live credentials) |
 | Policy gateway | implemented (local; no model calls) |
 | Evidence store (SQLite WAL, tamper-evident) | implemented (local) |
-| Agent runtime + fixture lab | implemented for Scenario A with a SIMULATED scripted agent (no LLM yet) |
+| Agent runtime + fixture lab | implemented for Scenarios A/B with SIMULATED scripted agent |
 | Hand-authored attack + benign case set (15 + 15), sealed manifest | implemented |
 | Paired experiment runner, metrics, reports | implemented (scripted agent only; no model) |
 | Adversarial scenario generation (model-driven) | planned |
-| Verifier (independent assertions) | implemented for Scenario A (ledger-based) |
-| Investigator (evidence-cited) | planned |
-| IncidentTwin containment (EVCS) | planned |
-| Scanner (Site Guard) | authorization gate + GuardedClient + 11-check catalog + independent verifier + coverage ledger implemented (local); run against the real labs |
-| Fixer | planned |
-| Shield (reverse proxy) | planned |
-| Agent Guard SDK (Python / TypeScript) | Python SDK implemented (local, lab-only; no TypeScript yet) |
+| Verifier (independent assertions) | implemented for Scenario A/B (ledger-based) |
+| Investigator (evidence-cited) | implemented (model + baseline) |
+| IncidentTwin containment (EVCS) | implemented (15 attack cases) |
+| Scanner (Site Guard) | authorization gate + GuardedClient + 11-check catalog + independent verifier + coverage ledger; stored XSS + POST authz checks added |
+| Fixer | implemented (structured edits + unified diff; secret-safe retry diagnostics) |
+| Shield (reverse proxy) | implemented (intent classification, injection protection, TTL, kill switch) |
+| Agent Guard SDK (Python / TypeScript) | Python SDK implemented; TypeScript SDK implemented |
 | Site Guard CLI | implemented (local; lab targets only) |
-| API (FastAPI) | planned |
-| Dashboard (React) | planned |
-| Lab 1: vibe_shop_php (+ reference, PLANTED ground truth, benign traffic) | implemented (local) |
+| API (FastAPI) | implemented (/api/v1, event streaming, SSE) |
+| Dashboard (React) | implemented (React + Vite + TypeScript, 10 screens) |
+| Lab 1: vibe_shop_php (+ reference, PLANTED ground truth, benign traffic) | implemented (local; Docker required) |
 | Lab 2: vibe_notes_node (+ reference, PLANTED ground truth, benign traffic) | implemented (local) |
-| Reproducible benchmark | planned |
+| Reproducible benchmark | implemented (30-case sealed manifest; harness ready) |
+| Final-run orchestrator | implemented (scripts/final_run.py --dry-run) |
+| External scanner QA harness (Strix/PentAGI) | implemented (disabled by default; dry-run only) |
 
 ## Responsible use
 Scan only systems you own or are authorized to test. See [SECURITY.md](SECURITY.md).

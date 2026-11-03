@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from . import (
     authz_object,
+    authz_post,
     cors,
     errors,
     exposure,
     headers_cookies,
     injection,
     rate_limit,
+    stored_xss,
     upload,
 )
 from .base import Check, CheckSpec
@@ -32,8 +34,11 @@ CATALOG: dict[str, Check] = {
                                  injection.applicable_sql_injection),
     injection.XSS_SPEC.id: Check(injection.XSS_SPEC, injection.run_reflected_xss,
                                  injection.applicable_reflected_xss),
-    authz_object.SPEC.id: Check(authz_object.SPEC, authz_object.run, authz_object.applicable),
+    authz_object.SPEC.id: Check(authz_object.SPEC, authz_object.run,
+                                authz_object.applicable),
+    authz_post.SPEC.id: Check(authz_post.SPEC, authz_post.run, authz_post.applicable),
     rate_limit.SPEC.id: Check(rate_limit.SPEC, rate_limit.run, rate_limit.applicable),
+    stored_xss.SPEC.id: Check(stored_xss.SPEC, stored_xss.run, stored_xss.applicable),
     upload.SPEC.id: Check(upload.SPEC, upload.run, upload.applicable),
 }
 

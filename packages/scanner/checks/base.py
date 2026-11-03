@@ -33,6 +33,7 @@ def looks_like_a_secret(text: str) -> bool:
 SEVERITY_BY_CLASS: dict[VulnClass, Severity] = {
     VulnClass.SQL_INJECTION: Severity.HIGH,
     VulnClass.REFLECTED_XSS: Severity.MEDIUM,
+    VulnClass.XSS_STORED: Severity.MEDIUM,
     VulnClass.BROKEN_OBJECT_AUTHORIZATION: Severity.HIGH,
     VulnClass.MISSING_AUTHENTICATION: Severity.HIGH,
     VulnClass.SENSITIVE_FILE_EXPOSURE: Severity.HIGH,

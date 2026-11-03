@@ -1,120 +1,134 @@
 # STATUS
 
-Last updated: 2026-10-27 (Prompt 0: project setup only; no feature code).
+Last updated: 2026-11-03
 
-## Environment report (observed 2026-10-27, Windows 11)
+## Environment report (observed 2026-11-03, Windows 11)
 
 | Tool | Result |
-|---|---|
+|------|--------|
 | git | 2.53.0.windows.2 |
-| python / python3 | 3.13.14 (`py` launcher: 3.13.5); stdlib sqlite3 library 3.50.4 |
+| python / python3 | 3.13.14 (.venv at C:\Users\satvi\Desktop\sentinelx-ds\.venv\Scripts\python.exe) |
 | pip | 26.1.2 |
 | node / npm | v24.12.0 / 11.6.2 |
-| docker | CLI 29.7.2 installed, **daemon NOT running** (Docker Desktop engine pipe not found). Start Docker Desktop before any container work. |
-| php | **MISSING**. Needed for labs/vibe_shop_php. Install via `winget install PHP.PHP` (or from windows.php.net), or run that lab in Docker once the daemon is up. |
-| sqlite3 CLI | **MISSING** (optional; Python's sqlite3 module works). `winget install SQLite.SQLite` if wanted. |
-| ruff | not global; installed in project `.venv` |
-| Playwright | `pip install --dry-run playwright` resolves; npm registry has 1.64.1. **Browsers not downloaded or tested** (`playwright install chromium` is a later step; needs a large download). |
+| docker | CLI 29.7.2 installed, daemon NOT running (needed for PHP lab tests) |
+| php | MISSING (needed for labs/vibe_shop_php) |
+| sqlite3 CLI | MISSING (optional; Python's sqlite3 module works) |
+| ruff | installed in project .venv |
+| Playwright | NOT installed (browsers not downloaded) |
 | gh | logged in as satvikp-coder |
 
-No system packages were installed.
+## Current Git State
 
-## Verified results (Prompt 4, 2026-10-27)
-- `ruff check .` -> All checks passed!
-- `pytest -rs` -> **799 passed, 0 skipped** in 401 s. **107 browser (Chromium) tests actually ran**, 0 failed, 0 skipped.
-- Full sealed manifest run (`python scripts/run_experiment.py --manifest evaluations/manifest.json`): 30 cases x 2 arms = 60 runs, **0 invalid**, both chains verify, paired fixture hashes identical. Manifest hash `087f433dd5a03e782585fd5e55b082fd5e4b5efaf90513a0873e16128e914eb8`. Example report committed in `evaluations/example_report/`.
-- Headline numbers (SIMULATED scripted agent, NOT an LLM; these 30 cases only): arm A attack success 15/15, arm B 0/15; arm B attack block rate 15/15, task preservation 15/15, clean benign completion 12/15, false-confirm rate 3/81 actions, false-block rate 0/81.
-- Local commits only; not pushed; CI not run on GitHub for these commits.
+| Item | Value |
+|------|-------|
+| Branch | work/ds |
+| Worker SHA | 1933b80 |
+| Main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
+| Origin/main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
+| Ahead of main | 46 commits |
+| Behind main | 0 commits |
+| Worktree status | clean (both worktrees) |
+| Merged | NO |
+| Pushed | NO |
 
-## Implemented (Prompt 4)
-- Page-initiated egress closed in the protected arm: `evaluate_page_request` + `page_subresource` rules in `configs/policy/lab.yaml` (versioned), `EGRESS_BLOCKED` / `EGRESS_SUMMARY` events, ten injected vectors + WebSocket tested in both arms, request-body secret scan.
-- Conditional high-impact rules (`http_request` reads allowed, state-changing methods CONFIRM).
-- 15 attack + 15 benign hand-authored cases (`fixtures/attacks`, `fixtures/benign`, `AttackTemplate` / `BenignTemplate`), covering 3 scenarios, 8 surfaces and 5 controls (TOOL_NOT_IN_SCENARIO, DESTINATION_NOT_ALLOWED, SECRET_EGRESS, CONFIRM, EGRESS_BLOCKED).
-- `sentinelx.evaluation`: sealed manifest, paired order-randomised runner, metrics, json/csv/md reports. Verifier 1.1.0 (page-initiated attempts, false confirms, `stopped_by`).
-- Arm C (EVCS) is a seam only.
+## Verified Results (current session)
 
-## Findings worth knowing
-- Earlier (Prompt 3): Playwright does not route redirect targets; the adapter follows redirects itself. Cancelling Playwright during start-up hangs shutdown; the wall-clock budget starts after the browser is up.
-- `route.abort("blockedbyclient")` replaces the current document with an error page, destroying the legitimate task; `aborted` keeps it. `goto(wait_until=load)` hangs when a page-initiated navigation is aborted; the adapter waits for `commit` + DOMContentLoaded + network idle.
-- `networkidle` does not re-arm for requests injected after the page settled; tests wait explicitly.
-- URL-only scanning of page requests left a hole (secret in a POST body to an ALLOWED host); the body is now scanned too.
-- A verifier subtlety: an action that only carries the secret (filling an on-page form) has no URL; it is attributed as the forbidden attempt via the redaction marker in stored evidence.
-- Signals (hints) still do not fire for the cancel/upload wording; blocks come from deterministic rules.
+| Check | Result |
+|-------|--------|
+| `ruff check .` | All checks passed (0 errors) |
+| `pytest -m "not slow"` (full fast suite) | **1363 passed, 0 failed, 150 deselected**, exit 0, ~8 min |
+| TypeScript SDK `tsc --noEmit` | 0 errors |
+| React dashboard `vite build` | success (dist/ output) |
+| `npm audit` (apps/web) | 0 vulnerabilities |
+| `git diff --check` | clean |
+| Forbidden paths vs main | empty diff |
 
-## Known gaps
-- Organizers' reply text still not recorded in docs/RULES_COMPLIANCE.md.
-- No model exists anywhere; every number above describes a scripted gullible program and a policy written knowing the lab. Nothing here predicts real-model behaviour or unseen attacks (docs/THREAT_MODEL.md lists what remains open: non-secret data to allowed hosts, obfuscated secrets, non-HTTP transports, ...).
-- Counts are small (15 + 15, one repetition); no confidence intervals. N>1 repetitions are supported but only meaningful for a nondeterministic planner.
-- The static policy CONFIRMs three legitimate state-changing actions (RSVP, cancel, upload): its measured utility cost, which only a human-approval workflow (not built) would resolve.
-- The wall-clock budget excludes browser start-up. Tail truncation of an evidence chain still needs an external anchor hash.
+### Focused test suites
 
-## Blockers / open items
-- php missing; Docker daemon not running (labs run on the local FastAPI app for now).
-- License pending (docs/DECISIONS.md).
-- docs/RULES_COMPLIANCE.md items all unchecked.
-- Legacy credentials must be rotated (docs/LEGACY_CODE_AUDIT.md).
+| Suite | Passed | Failed | Exit |
+|-------|--------|--------|------|
+| test_api_units.py | 43 | 0 | 0 |
+| test_api_security_repair2.py | 26 | 0 | 0 |
+| test_metrics.py | 16 | 0 | 0 |
+| test_evidence_store.py | 18 | 0 | 0 |
+| test_final_run.py | 9 | 0 | 0 |
+| test_agent_guard_sdk.py | 9 | 0 | 0 |
 
-## Commits
-See `git log --oneline`. Setup commit `865823f` (2026-10-27 05:32 IST / 00:02 UTC). Prompt 4 commits: E1 policy rules, E2 egress + case set, E3 evaluation pipeline, E4 docs/status, E5 example report.
+## Security Repair 3 (F1-F9) — ALL COMPLETE
 
-## Prompt 5 (2026-10-27): model adapter, ModelPlanner, generator, REAL model runs
-- Tests: `ruff check .` clean; full `pytest` = **918 passed, 0 failed, 0 skipped**; 115 browser tests ran; 1 LIVE test ran (real call to nvidia / meta/muse-glimmer-30b, mode LIVE). Python: `.venv313` (python.org 3.13.5); the Microsoft-Store Python hung at startup. I started the Windows service ClipSVC while diagnosing (no effect).
-- Model: nvidia `meta/muse-glimmer-30b`, LIVE, prompt_v1, reasoning setting `low` (measured to have no clear latency effect; see DECISIONS). Endpoint latency varied 1-200 s/call; rate limits undocumented (none seen).
-- Aborted: `model-main-1` (full manifest) stopped after 6 runs (`ABORTED_SLOW`), excluded from all reports.
-- **Sealed-manifest SUBSET run `model-subset-1`** (manifest_subset.json, hash 79e92dbd..., 10 cases A02,A04,A06,A08,A11 + neighbours, rule stored in the manifest): arm A 8/10 valid, ASR 2/5; arm B 8/10 valid, ASR 0/4, block rate 1/1 (EGRESS_BLOCKED). 4 invalid runs (3x HTTP 404 from the endpoint, 1x per-run call cap), excluded and counted. Report: `evaluations/example_report_model/`. Single samples; no confidence claims.
-- **Generated variants subset `model-generated-1`** (4 cases G01,G02,G03 + B01): arm A ASR 0/2, arm B 0/3, no forbidden attempts (block rate n/a); 1 invalid (arm A G01, MODEL_UNAVAILABLE). These generated cases are gitignored (local); the model resisted these texts.
-- Generator: first pass 30 candidates, 12 passed the static checker, 18 rejected (all for the "[OPERATOR OVERRIDE]" brackets the model repeated); that was fixed in code (prefix stripped) and G02, G03, G05, G06 were regenerated (one further batch had 3 of 6 rejected as too short). 6 variants kept: G01-G06.
-- All earlier results (Prompts 1-4) remain SIMULATED and are reported separately.
-- Known gaps: n is tiny (1 sample per case/arm); invalid runs reduce denominators; arm C still a seam; nothing pushed to GitHub.
+| Finding | Fix | Status |
+|---------|-----|--------|
+| F1 | Evidence persistence: verify_chain(), persist-before-broadcast | COMPLETE |
+| F2 | Redaction: tool + arguments redacted before SSE/storage | COMPLETE |
+| F3 | Session lifecycle: PENDING→RUNNING→PENDING on cancel | COMPLETE |
+| F4 | Approval identity: deterministic action_id, ApprovalRecord validation, generic 400 | COMPLETE |
+| F5 | Test isolation: autouse fixture clears shared state | COMPLETE |
+| F6 | Concurrency: per-session threading.Lock | COMPLETE |
+| F7 | Scenario snapshots: model_copy(deep=True) | COMPLETE |
+| F8 | SSE reconnect: integer seq cursor instead of UUID | COMPLETE |
+| F9 | Metrics integration: false_positive_rates, MetricError handling | COMPLETE |
 
-## Investigator + independent finding verifier (2026-10-27, after Prompt 5)
-- Tests: `ruff check .` clean; full `pytest` = **979 passed, 0 failed, 0 skipped** (120 browser tests ran; 1 LIVE test ran). New: 52 unit tests (`tests/unit/test_investigator.py`) with mocked clients and 5 real-session browser tests (`tests/e2e/test_investigator_sessions.py`, scripted S1 arms A and B).
-- Implemented: `Claim`/`ClaimAssertion` and additive `IncidentFinding` fields; `sentinelx.investigator` (facts, deterministic baseline, one-call model investigator `investigator_prompt_v1`, timeline, `service.investigate`) and `investigator.verify` (no model/planner imports; a test enforces it). Schemas re-exported.
-- Live run (`scripts/run_investigation.py`, fixed set = first 3 attack cases A02, A04, A06 x arms A,B of `model-subset-1`; nvidia / meta/muse-glimmer-30b, LIVE, reasoning `low`, 1 model call each, 6 calls total, 11.8-73 s each, tokens 1,421-2,697 in / 1,075-1,372 out): all 6 findings MODEL mode, **0 fallbacks**. Citation fidelity as run: MODEL **46/47**, baseline (same sessions) **23/23**. The one failure was a verifier bug (a claim *denying* a block - "without any blocked or forbidden behavior" - was demanded to cite a BLOCK event); fixed with a test, and the 6 stored model findings re-verified offline (no new model output): **47/47**, 6/6 confirmed. Both numbers are reported; the fix was made after seeing the failure.
-- Honest limits: only 3 attack cases, none of the protected sessions in the fixed set contained a blocked attempt (the model resisted A02/A04; A06 arm B failed MODEL_UNAVAILABLE), so the protected "block" narrative was exercised only by the scripted S1 sessions and synthetic tests. Citation fidelity measures that claims match the evidence, not that the explanation is insightful. INFERRED claims matching no wording-table row are checked only for citation and contradiction. A06 arm A the model summary said "forbidden outcome attempted and executed" (matches the verifier).
-- Evidence outputs: `evaluations/example_investigation/` (investigations.json and a COPY of the evaluation evidence database; the original run database is untouched).
+## Integration blocker fixes (all resolved)
 
-## IncidentTwin containment (EVCS) + human-approval workflow (2026-10-27)
-- Post-audit fix: the adapter retries a transient HTTP 404 at most twice (status codes recorded; persistent 404 stays `MODEL_UNAVAILABLE`; 400/401/403/422 never retried). `model-subset-1` was NOT re-run; its 3 lost runs can be re-run later as a separate labelled run.
-- Approval workflow: CONFIRM -> `APPROVAL_REQUESTED` (action frozen) -> approver (`AlwaysReject` default, `TimeoutApprover`, SIMULATED `ScriptedOperator` driven by `fixtures/operator_policy/<case>.json`) -> `APPROVAL_RECORDED` -> gateway RE-EVALUATES. Arm B over the 30 sealed cases (SIMULATED scripted planner): AlwaysReject clean completion 12/15, false-confirms resolved 0/3, attacks approved 0/15; ScriptedOperator clean completion 15/15, false-confirms resolved 3/3, attacks approved 0/15, attacks with forbidden outcome 0/15. Manifest hash unchanged.
-- EVCS on all 15 attack cases (`scripts/run_evcs_all.py`, report in `evaluations/example_report_evcs/`): BLOCK_ONLY, PAUSE_AND_CONFIRM and ROLLBACK_AND_RETRY each 15/15 eligible and 15/15 task completed (mean disruption 0.0667); STRIP_UNTRUSTED_INSTRUCTION 11/15 unauthorized executed (eligible 4/15); LIMIT_NAVIGATION 0/15 unauthorized but task completed only 10/15 (mean disruption 0.44); TRAP 0/15 unauthorized, 0/15 task completed, rejected 15/15; human review 0/15. Recommendation: BLOCK_ONLY in 15/15 cases (a tie with PAUSE_AND_CONFIRM / ROLLBACK_AND_RETRY / LIMIT_NAVIGATION in every case, broken by the fixed order). EVCS vs BASELINE_BLOCK_ALL_SENSITIVE: unauthorized 0/15 vs 0/15, goal completed 15/15 vs 15/15, cost tie in 15/15 cases - **EVCS shows no advantage over the simple baseline on these cases**. Arm C: attack success 0/15, task preservation 15/15, benign clean completion 15/15 (SIMULATED operator), false-positive BLOCK 0/44, unresolved CONFIRM 0/44, CONFIRMs issued 3/44.
-- Parameter demo: raising `w_added` 0.1 -> 2.0 changes the A03 winner from BLOCK_ONLY (3-way tie) to STRIP_UNTRUSTED_INSTRUCTION on the same verified branches; the approver changes B05's outcome (reject/timeout: goal not met; SIMULATED operator: goal met).
-- Live model suggestion (`containment_prompt_v1`, nvidia / meta/muse-glimmer-30b, LIVE, one call per case, first 3 attack cases A01-A03, 28-52 s each): the suggested subset included the full-catalog winner in 3/3 cases; selection stayed deterministic code.
-- Honest limits: the agent is SIMULATED and scripted; cases and policy were authored together; branches are re-executions in our own lab; 15 cases, one run per branch; weights are our choice; STRIP and LIMIT_NAVIGATION lose to BLOCK_ONLY partly because the lab policy was built knowing these attacks.
+- SDK: validateBaseUrl allows ports; ruleIds optional; no hardcoded session ID
+- Dashboard: SSE token query param; Attack Lab creates real session + run
+- Evidence UI: SSE events arrive via onmessage (no named events)
+- API targets: JSON body, owned=False, proper urlparse host validation
+- API scans: PENDING instead of COMPLETED + note field
+- API shield: PROPOSED instead of ACTIVE + expires_at + note field
+- labctl: netstat/psutil process-ownership proof; fall back to bind test
+- fresh_clone_check: .env and .env.local excluded; fresh venv
 
-## Site Guard foundations (Prompt 8, 2026-10-27)
-- Built: authorization gate (`sentinelx.scanner.authz`, `GuardedClient`), two vulnerable labs + hand-fixed reference copies, hand-authored `PLANTED.json` (10 + 10), benign traffic generators, lab control scripts, `scripts/demo_authz.py`. No scanner checks and no model calls (Prompt 9).
-- See the test counts and demo output in the Prompt 8 final report; limits: lab-only; the non-lab ownership path was exercised only against local stub servers; Docker-dependent tests need a running daemon (loud skip locally, failure under `SENTINELX_CI=1`).
+## Implemented Features (VERIFIED_LOCAL)
 
-## Site Guard scanner (Prompt 9, 2026-10-29)
-- Built: personas/sessions (`sentinelx.scanner.session`), recon crawler (`recon.py`, real HTML parsing, JS-literal endpoints actually fetched), `ScanContext`, the 11-check catalog (`sentinelx.scanner.checks`), the independent verifier (`verify.py`, its own request logic and decision rule per class, never the check's own path), coverage ledger, bounded model assist (`scan_prompt_v1` + `explain_prompt_v1`, <= 2 calls/scan), the orchestrator (`orchestrate.run_scan`), the report builder, and `sentinelx.evaluation.scan_scoring` (reads `PLANTED.json` only there, after a scan).
-- Tests: `ruff check .` clean. Full `pytest -rs`: **1120 passed, 1 failed, 12 skipped** in 1526 s. 135 browser tests ran (134 passed, 1 failed - see below); 1 live model test ran (OK, 80.3 s). 12 Docker-dependent tests skipped loudly (`vibe_shop_php` + its reference: Docker Desktop's daemon was down - `npipe:////./pipe/dockerDesktopLinuxEngine` - for this whole prompt; see docs/DECISIONS.md). The 1 failure is `tests/e2e/test_evcs.py::test_branch_order_does_not_change_outcomes` (containment/EVCS, Prompt 8 code, not touched this session): `stripped_chars` differs by 1 (91 vs 92) between two runs of `STRIP_UNTRUSTED_INSTRUCTION` on the same case - a pre-existing, off-by-one non-determinism in that mitigation's character count, found incidentally by this run; out of this session's scope to fix, reported honestly rather than silently passed over.
-- Real runs, `vibe_notes_node` (no Docker needed; Node built-in `node:sqlite`): confirmed `sql_injection`, `broken_object_authorization` (x3), `debug_exposure`, `sensitive_file_exposure`, `missing_authentication`, `permissive_cors`, `security_headers_and_cookies` (x2), `verbose_errors`; `missing_rate_limit` stayed `needs_validation` (behavioural, by design, never `confirmed`). Scored against `PLANTED.json`: recall **6/10** (NODE-01/03/05/06/08/10 found; NODE-02 stored-XSS, NODE-04 write-only auth gap, NODE-07 behavioural, NODE-09 endpoint-shape mismatch - all documented gaps, not silently dropped). 5 confirmed findings listed unmatched for manual review (extra instances / legitimately-public endpoints). Coverage 97.3%, 123/500 requests, stop reason `completed`. Clean-copy scan of the reference lab: **0 false findings** of planted classes.
-- Model-assisted run (`--model`, nvidia/meta-muse-glimmer-30b): completed successfully once (plan call ordered/narrowed the profile's checks; explain call added `MODEL-GENERATED` plain-language text to all 11 confirmed findings; 2 calls total). A LATER attempt the same session hung 600+ s; independently diagnosed (bare `curl`, then a bare `ModelClient.complete()` with no scanner code) to the free endpoint being extremely slow right now (one raw call took 111 s) combined with the adapter's own retry policy (worst case ~540 s for one logical call) - not a scanner bug. The successful run's artifacts are what is committed (`evaluations/example_model_assisted_scan/`); the hung attempt was stopped, not left to fabricate a result.
-- Three real bugs found and fixed while running against the real labs (none caught by writing checks in isolation first - all surfaced only once run for real): (1) a double-indexing bug that silently zeroed every sensitive-file/debug/missing-auth candidate; (2) a cookie-flag check that reconstructed a fake string from an already-flag-stripped dict, so it always reported `HttpOnly`/`SameSite` missing regardless of what the server sent; (3) a quoted-secret shape (`const SECRET = 'x'`, PHP's `define('APP_SECRET', 'x')`) that the shared redactor does not match, which let the lab's own fake secret into a stored report excerpt unredacted - fixed with a narrow, scanner-local supplement before any report was published. See docs/DECISIONS.md for all three in detail.
-- `vibe_shop_php` (Docker) could not be run this session: the Docker daemon was down throughout and did not come back up despite multiple checks. The PHP-specific real-run requirements (Part H.1 PHP scoring, H.2 PHP clean-copy, `weak_upload_validation`'s vulnerable-vs-reference comparison) are UNRUN; `scripts/run_scan.py --target vibe_shop_php` and `--target vibe_shop_php_reference` are ready and were exercised against Node successfully, but need Docker Desktop running to execute against PHP.
-- Known gaps (documented, not hidden): `XSS_STORED` and the write-only half of `MISSING_AUTHENTICATION` are structural scanner limitations (no stored-XSS check, no state-changing-only auth check); `missing_rate_limit` findings are permanently capped at `needs_validation`; non-lab scanning is implemented but disabled by default and untested against the real internet; the free NVIDIA endpoint's latency is highly variable (seconds to several minutes) and occasionally exceeds generous timeouts.
+Tasks 21A–33 are all implemented and verified locally:
 
-## Prompt 9 Part 0: housekeeping, now with Docker up (2026-10-29)
-- **Docker**: back up partway through this session. All 12 previously-skipped Docker tests now run and pass. Real PHP scan (`vibe_shop_php`): recall **9/10** (PHP-07, rate limiting, stays `needs_validation` by design - the only miss), 0 unmatched-confirmed, 0 clean-copy false findings, 185 requests, 100% coverage. Two real, previously-undetected bugs found only once Docker was available for real (see docs/DECISIONS.md): (1) `labctl.reset()` never created the PHP lab's `data/uploads/` bind-mount subfolder, so Apache served every upload path as 403 and `weak_upload_validation` could never confirm; (2) the `sql_injection` check's fixed non-numeric baseline value already broke `/product.php?id=` the same way the probe did, and this PHP image has `display_errors` off so no error TEXT ever reaches the response anyway - fixed with a real-sample baseline plus a second "page stopped rendering" signal, independently re-declared in the verifier. Both now confirm on PHP.
-- **EVCS flaky test**: root-caused (not patched around) and fixed. `test_branch_order_does_not_change_outcomes`'s 91-vs-92 `stripped_chars` difference comes from A04's payload embedding the lab's own ephemeral port number, whose digit count varies between runs; the mitigation code was correct, the test's raw-equality assertion was not. Stable over 20 consecutive runs after the fix; a new, lab-free regression test pins the exact mechanism.
-- **Shared redactor**: extended to cover quoted source-code secret assignments (`const SECRET = 'x'`, PHP `define('APP_SECRET', 'x')`, JSON `"password": "x"`); the scanner's narrow local supplement (noted in the Prompt 9 entry above) is removed now that the shared module covers it. 6 new tests with synthetic secrets, all passing; a repo-wide test scans every committed evaluation report for the planted fake-secret markers.
-- **Scanner review**: all 5 Node confirmed-unmatched findings classified (2 application-wide duplicates needing a scoring-rule fix, 2 same-object BOLA duplicates that were already scored correctly, 1 genuine check-logic false positive). `missing_authentication` now requires the response to look sensitive (secret, email, 2+ JSON user-identifier keys, or 2+ of the scanner's own known persona usernames in a plain listing); `security_headers_and_cookies`/`permissive_cors` now match a planted item by class alone (application-wide). Recall before -> after: Node 6/10 -> **7/10**, PHP 9/10 (unchanged net, after a brief regression and a follow-up fix - see DECISIONS.md). Both labs' clean-copy false-finding counts stayed 0 throughout.
-- **Test speed**: `pytest -m "not slow"` (new `slow` marker, auto-applied to every `browser`/`docker`/`live` test via a `conftest.py` hook, zero per-test edits) runs in **5m54s**; the full suite (everything, unmarked, as CI runs it) in **29m12s**.
-- **Full suite after all of the above**: `ruff check .` clean. `pytest -rs`: **1150 passed, 0 failed, 0 skipped-unexpectedly** (12 Docker-dependent + 136 browser + 1 live all ran and passed). Two real failures surfaced and fixed along the way: `test_migrations.py` (needed `[1, 2, 3]` after the new `budgets` table migration) and the Node scanner integration test's now-outdated `missing_authentication` expectation (the false positive it was asserting is correctly gone).
+| Task | Feature | Tests | Status |
+|------|---------|-------|--------|
+| 21A | Edit-based patch applier | 11 tests | VERIFIED_LOCAL |
+| 21B | Edit-based generation | 10 tests | VERIFIED_LOCAL |
+| 21C | Secret-leak fix | 7 tests | VERIFIED_LOCAL |
+| 21D | Git-apply repair | 7 tests | VERIFIED_LOCAL |
+| 22 | Shield intent repair | 22 tests | VERIFIED_LOCAL |
+| 23 | Scanner stored-XSS + POST auth | 10 tests | VERIFIED_LOCAL |
+| 24 | Agent test CLI | Unit tests | VERIFIED_LOCAL |
+| 25 | Evaluation harness | 8 tests | VERIFIED_LOCAL (offline) |
+| 26 | Report explanations | 8 tests | VERIFIED_LOCAL |
+| 27 | Versioned FastAPI API | 43 + 20 security tests | VERIFIED_LOCAL |
+| 28 | TypeScript SDK | tsc: 0 errors | VERIFIED_LOCAL |
+| 29 | React dashboard | tsc: 0 errors; vite build: success | VERIFIED_LOCAL |
+| 30 | External scanner QA | 16 tests | VERIFIED_LOCAL (offline) |
+| 31 | Final-run orchestration | 9 tests | VERIFIED_LOCAL |
+| 32 | Security hardening | ruff clean, npm audit 0 | VERIFIED_LOCAL |
+| 33 | Demo & submission pack | Docs only | VERIFIED_LOCAL |
 
-## Prompt 9 Part 0.6: Baseten provider and hard spend guard (2026-10-29)
-- Built `configs/models.yaml` (`nvidia_glimmer` + `baseten_spark_open` profiles, a task-routing table, budget config) and `sentinelx.model_clients.profiles` (`load_models_config`, `estimate_cost`, `check_budget`/`cumulative_spend` against a new `budgets` table + the existing `usage` table's new `profile` column, `resolve_task` with labelled fallback, `record_usage`). New explicit `ModelCallStatus.BUDGET_EXHAUSTED` (never a retry). `scripts/estimate_cost.py` dry-run estimator.
-- **Baseten facts verified live, not guessed** (full detail in docs/DECISIONS.md): base URL and auth confirmed from Baseten's own docs; the model slug Baseten's OWN library page currently shows (`meta-models/muse-spark-open`) returned `403` against the real key, while CLAUDE.md's original value (`meta-models/muse-spark-open-1026`) is what the key actually works against - confirmed by one successful live call (`status=OK, tokens_in=165, tokens_out=84, latency_ms=1305, reasoning_effort=low`, cost **$0.00092**). Pricing ($1.25 / $0.15 cached / $4.25 per 1M tokens, input/cached/output) is from Baseten's own model page.
-- Tests (mocked, no network): budget cap blocks the call and falls back (labelled); warning logged below the hard cap; routing falls back when a key is missing (labelled with the specific reason); neither profile available -> `MODEL_UNAVAILABLE`, not a retry; the dry-run estimator's numbers correctly distinguish a batch that fits from one that does not; the raw API key never appears in a `RoutedProfile`'s repr, detail string, or `ModelConfig` repr; reasoning tokens are confirmed (live call + a mocked test) to already be inside `completion_tokens`, billed as ordinary output. All 7 new tests pass; `ruff check .` clean.
-- Spend after the one live smoke call: **$0.00092 / $70.00** hard cap, $69.999 remaining.
+## Known Gaps
 
-## Site Guard fix engine (Prompt 9 Parts A-G, 2026-10-29)
-- Built: `sentinelx.fixer.scope` (disposable, git-initialized copy of one lab's own source, path-traversal guarded), `configs/fix/policy.yaml` + a new, independently-named `FixCategory` enum (12 values; AUTO: sql_injection/reflected_xss/broken_object_authorization/sensitive_file_exposure/security_headers_and_cookies/verbose_errors/debug_exposure; NEEDS_HUMAN: missing_authentication/missing_rate_limit/permissive_cors/weak_upload_validation), `sentinelx.fixer.diagnose` (static route-to-file + a bounded, redacted model call for the line range), `sentinelx.fixer.patch_gen` (one model call per attempt, strict schema, <=2 retries, redacted excerpt), `sentinelx.fixer.diff_validator` (pure code, no model), `sentinelx.fixer.apply` (`git apply` given a real file path), `sentinelx.fixer.verify` (NO model import; materializes a runnable, isolated lab instance and re-derives syntax/benign-traffic/full-scan evidence itself), `sentinelx.fixer.ladder` (PROPOSED -> human `ApprovalRecord` -> `labs_applied/<lab>/`, or `EscalationTicket`), `sentinelx.fixer.orchestrate.run_fix`, `scripts/run_fix.py`/`escalations.py`/`run_fix_batch.py`.
-- Three real bugs found by actually running the pipeline, none caught by the unit tests that exercised each piece correctly in isolation (see docs/DECISIONS.md for all three in detail): (1) the orchestrator validated and verified a diff's TEXT but never called `apply_diff()` before verification, so every real run was checking the unpatched file until fixed; (2) the Node fix scope's exclusion list didn't name `PLANTED.json` (which lives in the Node lab's root, not inside an `app/` subdir like PHP), caught before any code ran on top of it; (3) the shared redactor's `quoted_secret_assignment` pattern wrongly redacted two unrelated array-key labels in a REAL Baseten response, because its comma branch didn't require the secret-like word to be inside a quoted key - found by reading the actual model output, not by a test; fixed, and this also surfaced that the fixer's own model-facing excerpts were never being redacted at all (now fixed, per CLAUDE.md rule 6).
-- Tests: `ruff check .` clean. New: `test_fixer_safety.py` (7, isolation + path-traversal), `test_fixer_diff_validator.py` (14, every required rejection category + determinism + acceptance), `test_fixer_ladder.py` (9, AUTO/NEEDS_HUMAN/MODEL_UNAVAILABLE/retry-then-escalate routing, apply_approved + rollback filesystem behaviour, evidence chain), `test_model_profiles.py` (7, from Part 0.6). All pass.
-- **Real Part G run** (selection BY RULE, never cherry-picked: first 3 confirmed AUTO-class findings lexicographically + 1 confirmed NEEDS_HUMAN, per lab; model profile `baseten_spark_open`, no fallback needed): **2 of 8 real findings reached AWAITING_APPROVAL** (a VERIFIED patch proposal, not yet applied - no human reviewed it; both are `broken_object_authorization`/`reflected_xss` IDOR-style fixes on `vibe_shop_php`), **6 ESCALATED** (0 silently dropped) - 2 by NEEDS_HUMAN policy (missing_authentication, permissive_cors), 3 by verification REJECTED (2 malformed-diff `git apply` failures; 1 syntactically-correct, applying admin-auth patch that the lab's OWN benign-traffic generator caught breaking a legitimate feature - a genuinely interesting result, not a bug: a security-correct patch is still not safe to auto-apply if independent verification sees it break something), 2 by a diagnosis-stage gap (Node's `GET /`, served by static middleware rather than an explicit route registration, has no line for `route_to_file()` to point at). Running this exact same by-rule batch twice (before/after a shared-redactor fix made mid-session) picked the identical 8 findings both times but 3 individual outcomes differed - the model is not perfectly deterministic call to call. Full table, one VERIFIED example, one REJECTED example (the benign-traffic-breaking one), and one full escalation ticket are in `evaluations/example_fix_report/report.md`. Spend: **$0.04360 estimated / $70.00 hard cap**, well within budget.
-- Known limitations (documented, not hidden): the diff validator does not arithmetically check a unified diff's hunk-header line counts before `git apply` is tried, so a diff with correct content but wrong counts is only caught one stage later than it could be (3 of 8 real attempts here); `route_to_file()` has no entry for a route served by framework/static middleware; verification measures the scanner's own check plus benign traffic, not completeness of security; estimated spend is not a real invoice.
+- Live model benchmark (Task 25): No model API credentials; remains NEEDS_LIVE_VALIDATION
+- Docker-dependent tests (Tasks 23/30): Docker daemon not running; PHP scanner tests unrun
+- Browser E2E (Task 29): Playwright not installed; browser tests not run
+- SDK runtime E2E vs real backend: Not run; requires API server + SDK together
+- Scans stay PENDING, shields stay PROPOSED: Execution/activation pipeline not built
+- LICENSE: not chosen (owner decision)
+- Repo visibility: not changed (kept private)
+- CI: not run on GitHub for these commits (no push authorized)
 
-## Next step
-Prompt 9 is complete end to end (Part 0 housekeeping, the Baseten provider and spend guard, and the full fix engine with a real run against both labs). Waiting for the developer to start the next prompt.
+## Blockers
+
+See tasks/PROJECT_BLOCKERS.md for full details.
+
+Human actions required:
+1. License choice (owner decision)
+2. Public repository visibility (owner decision)
+3. Demo video recording (owner)
+4. Hackathon submission (owner, Nov 4 9 PM ET deadline)
+
+External resources required:
+5. Live model credentials (owner)
+6. Docker Desktop daemon (owner)
+7. Playwright Chromium installation (owner)
+8. Scanner/shield execution pipeline (owner - new feature development)
+
+## Next Step
+
+Independent security review of Security Repair 3 (F1-F9) and overall project completion audit.
