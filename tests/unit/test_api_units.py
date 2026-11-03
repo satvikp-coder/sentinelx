@@ -19,6 +19,7 @@ from apps.api.routes import (
     _SCAN_CANCEL_EVENTS,
     _SESSION_SCENARIOS,
     _SESSION_STATE,
+    _TARGET_AUTHZ,
     _TARGET_LABS,
     store,
 )
@@ -59,6 +60,7 @@ def _reset_shared_state():
     _APPROVALS.clear()
     _SCAN_CANCEL_EVENTS.clear()
     _TARGET_LABS.clear()
+    _TARGET_AUTHZ.clear()
 
 
 # ------------------------------------------------------------------ health (no auth)
@@ -586,7 +588,8 @@ def test_shield_approve_rejects_rejected_approval(client):
 
 
 def test_shield_approve_valid_approves_rule(client):
-    """Valid stored approval activates the rule through the gated path."""
+    """Shield activation is not integrated: a valid stored approval still
+    fails closed — rule stays PROPOSED, no ACTIVE, no ACTIVE events."""
     # Create session
     r = client.post("/api/v1/sessions",
                     json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
@@ -611,28 +614,25 @@ def test_shield_approve_valid_approves_rule(client):
                     headers=AUTH)
     assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
 
-    # Approve the rule — gated activation should succeed
+    # Approve the rule — must fail closed despite valid stored approval
     r = client.post(f"/api/v1/shield/rules/{rid}/approve",
                     json={"session_id": sid, "action_id": rid,
                           "tool": "shield_rule", "arguments": {},
                           "reviewer": "alice", "rationale": "test approve",
                           "decision": "approve"},
                     headers=AUTH)
-    assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
-    data = r.json()
-    assert data["state"] == "ACTIVE", f"expected ACTIVE, got {data['state']}: {data}"
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
 
-    # Rule stays ACTIVE on listing
+    # Rule must remain PROPOSED
     r = client.get("/api/v1/shield/rules", headers=AUTH)
-    assert r.status_code == 200
+    assert r.status_code == 200, f"listing must not 500: {r.status_code}: {r.text}"
     rules = r.json()
-    assert any(rr["rule_id"] == rid and rr["state"] == "ACTIVE"
+    assert any(rr["rule_id"] == rid and rr["state"] == "PROPOSED"
                for rr in rules)
 
 
 def test_shield_approve_duplicate_is_idempotent(client):
-    """Duplicate approval requests: first activates, second is rejected
-    because rule is no longer PROPOSED."""
+    """Duplicate approval requests are both rejected — no state change."""
     r = client.post("/api/v1/sessions",
                     json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
                     headers=AUTH)
@@ -652,17 +652,15 @@ def test_shield_approve_duplicate_is_idempotent(client):
                           "decision": "approve"},
                     headers=AUTH)
     assert r.status_code == 200
-    # First approve attempt — activates the rule
+    # First approve attempt — rejected (fail closed)
     r = client.post(f"/api/v1/shield/rules/{rid}/approve",
                     json={"session_id": sid, "action_id": rid,
                           "tool": "shield_rule", "arguments": {},
                           "reviewer": "alice", "rationale": "test approve",
                           "decision": "approve"},
                     headers=AUTH)
-    assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
-    data = r.json()
-    assert data["state"] == "ACTIVE"
-    # Second identical attempt — rejected because rule is no longer PROPOSED
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+    # Second identical attempt — also rejected, still PROPOSED
     r = client.post(f"/api/v1/shield/rules/{rid}/approve",
                     json={"session_id": sid, "action_id": rid,
                           "tool": "shield_rule", "arguments": {},
@@ -672,7 +670,7 @@ def test_shield_approve_duplicate_is_idempotent(client):
     assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
     r = client.get("/api/v1/shield/rules", headers=AUTH)
     assert r.status_code == 200
-    assert any(rr["rule_id"] == rid and rr["state"] == "ACTIVE"
+    assert any(rr["rule_id"] == rid and rr["state"] == "PROPOSED"
                for rr in r.json())
 
 

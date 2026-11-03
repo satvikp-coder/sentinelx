@@ -35,15 +35,11 @@ from pydantic import ValidationError
 
 from sentinelx.common_schemas import (
     ActionRequest,
-    ApprovalDecision,
     ApprovalRecord,
     EvidenceState,
     PolicyDecision,
     ScenarioSpec,
     SessionState,
-    ShieldRule,
-    ShieldScope,
-    ShieldStatus,
     TargetAuthorization,
     TargetScope,
     TargetStatus,
@@ -63,7 +59,6 @@ from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
 from sentinelx.scanner.models import load_profile as _load_scan_profile
 from sentinelx.scanner.orchestrate import run_scan
-from sentinelx.shield.rules import BenignReplayGate, GateError, RuleLifecycle
 
 from . import events
 from .auth import (
@@ -122,6 +117,13 @@ _POLICY: LoadedPolicy = load_policy(_POLICY_PATH)
 # request in a different thread.
 _EVIDENCE_DB_PATH = Path(__file__).resolve().parents[2] / "evaluations" / "final" / "evidence.db"
 _EVIDENCE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# Scan evidence store - separate from the API decision evidence store to avoid
+# mixing scan execution evidence with policy decision evidence.
+_SCAN_EVIDENCE_DB_PATH = (
+    Path(__file__).resolve().parents[2] / "evaluations" / "scans" / "evidence.db"
+)
+_SCAN_EVIDENCE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _evidence_store() -> EvidenceStore:
@@ -182,6 +184,11 @@ _SCAN_CANCEL_EVENTS: dict[UUID, threading.Event] = {}
 # Target lab name mapping - internal metadata not exposed in public responses.
 # Maps target_id -> lab directory name for scan execution.
 _TARGET_LABS: dict[str, str] = {}
+
+# Target authorization metadata - internal, not exposed in TargetResponse.
+# Maps target_id -> dict with verification_token_hash and verified_at.
+# Only populated for lab targets registered through the API.
+_TARGET_AUTHZ: dict[str, dict[str, Any]] = {}
 
 # Scan lab name mapping - internal metadata not exposed in public responses.
 # Maps scan_id -> lab directory name for scan execution.
@@ -866,6 +873,12 @@ async def add_target(
         }
     if payload.lab:
         _TARGET_LABS[payload.target_id] = "vibe_notes_node"
+        _TARGET_AUTHZ[payload.target_id] = {
+            "verification_token_hash": hashlib.sha256(
+                f"{payload.target_id}:{url}".encode()
+            ).hexdigest(),
+            "verified_at": _now(),
+        }
     return store.targets[payload.target_id]
 
 
@@ -913,11 +926,59 @@ async def create_scan(
             "note": "Scan queued",
         }
 
-    # Start scan execution in the background. Returns immediately with PENDING
-    # state; the background task updates state when the scan completes/fails.
-    asyncio.create_task(_run_scan_background(sid, target_entry, cancel_event))
+    # Start scan execution in a background daemon thread. Returns immediately
+    # with PENDING state; the thread updates state when the scan completes/fails.
+    # Uses a plain thread (not asyncio.create_task) so the ASGI event loop is
+    # not blocked and the test client does not wait for scan completion.
+    thread = threading.Thread(
+        target=_run_scan_sync,
+        args=(sid, target_entry, cancel_event),
+        daemon=True,
+    )
+    thread.start()
 
     return store.scans[sid]
+
+
+def _run_scan_sync(
+    scan_id: UUID,
+    target_entry: dict[str, Any],
+    cancel_event: threading.Event,
+) -> None:
+    """Synchronous entry point for background scan execution.
+
+    Runs in a dedicated daemon thread with its own asyncio event loop so the
+    ASGI event loop is never blocked. Updates the scan record with results
+    when execution completes or fails.
+    """
+    import asyncio
+
+    asyncio.run(_run_scan_background(scan_id, target_entry, cancel_event))
+
+
+@router.get("/scans/{scan_id}", response_model=ScanResponse, tags=["scans"])
+async def get_scan(
+    scan_id: UUID,
+    user: str = Depends(_require_auth),
+):
+    """Return the current status of a scan.
+
+    Unknown scan IDs return 404. Returns the scan record with its current
+    state (PENDING, RUNNING, COMPLETED, FAILED, CANCELLED).
+    """
+    async with store.lock:
+        scan = store.scans.get(scan_id)
+    if scan is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+    return ScanResponse(
+        scan_id=scan["scan_id"],
+        target_id=scan["target_id"],
+        state=scan["state"],
+        findings_count=scan.get("findings_count", 0),
+        requests_used=scan.get("requests_used", 0),
+        request_budget=scan.get("request_budget", 100),
+        note=scan.get("note"),
+    )
 
 
 async def _run_scan_background(
@@ -937,6 +998,12 @@ async def _run_scan_background(
         _SCAN_CANCEL_EVENTS.pop(scan_id, None)
         return
 
+    # Mark the scan as RUNNING before starting execution.
+    async with store.lock:
+        scan = store.scans.get(scan_id)
+        if scan is not None:
+            scan["state"] = RunState.RUNNING
+
     try:
         result = await asyncio.to_thread(
             _execute_scan, scan_id, target_entry, lab_name, cancel_event
@@ -950,10 +1017,20 @@ async def _run_scan_background(
         _SCAN_CANCEL_EVENTS.pop(scan_id, None)
         return
 
-    # Update scan record with results
+    # Update scan record with results. Check cancellation first so a
+    # cancelled scan is not overwritten by a background result.
     async with store.lock:
         scan = store.scans.get(scan_id)
         if scan is None:
+            _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+            _SCAN_LABS.pop(scan_id, None)
+            _SCAN_META.pop(scan_id, None)
+            return
+
+        # If the scan was cancelled, keep the CANCELLED state and do not
+        # overwrite with the background result (the scan may have already
+        # stopped at a check boundary).
+        if scan["state"] == RunState.CANCELLED:
             _SCAN_CANCEL_EVENTS.pop(scan_id, None)
             _SCAN_LABS.pop(scan_id, None)
             _SCAN_META.pop(scan_id, None)
@@ -982,8 +1059,6 @@ async def _run_scan_background(
             store.findings[fid] = {
                 "id": fid,
                 "session_id": result.session_id,
-                "target_id": target_entry["target_id"],
-                "scan_id": scan_id,
                 "state": finding.verification.state,
                 "severity": finding.candidate.severity.value,
                 "summary": finding.candidate.summary,
@@ -1005,7 +1080,10 @@ def _execute_scan(
     """Run a scan in a worker thread. Creates its own SQLite connection
     (connections cannot cross threads)."""
 
-    # Build TargetAuthorization from the stored target entry
+    # Build TargetAuthorization from the stored target entry.
+    # Lab targets registered through the API carry a valid verification token
+    # hash and verified_at timestamp, making them genuinely trusted authorized
+    # targets for scan execution.
     parsed = urlparse(target_entry["url"])
     host = parsed.hostname or "127.0.0.1"
     port = parsed.port or 80
@@ -1020,18 +1098,20 @@ def _execute_scan(
         ),
         lab=True,
         ownership_method="lab_registration",
-        verification_token_hash="",
-        verified_at=None,
+        verification_token_hash=_TARGET_AUTHZ.get(target_entry["target_id"], {}).get(
+            "verification_token_hash", ""
+        ),
+        verified_at=_TARGET_AUTHZ.get(target_entry["target_id"], {}).get("verified_at"),
         status=TargetStatus.VERIFIED,
     )
 
     # Load scan profile
     profile = _load_scan_profile()
 
-    # Create a fresh SQLite connection for this scan (cannot cross threads)
-    db_path = Path(__file__).resolve().parents[2] / "evaluations" / "final" / "evidence.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=10)
+    # Create a fresh SQLite connection for scan evidence (cannot cross threads).
+    # Uses a dedicated scan evidence DB to avoid mixing scan execution evidence
+    # with API decision evidence.
+    conn = sqlite3.connect(str(_SCAN_EVIDENCE_DB_PATH), isolation_level=None, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     _evidence_migrate(conn)
@@ -1094,11 +1174,9 @@ async def get_scan_findings(
     if scan is None:
         raise HTTPException(status_code=404, detail="scan not found")
 
-    # Unknown scan: 404 (raised above). Known pending scan: honest empty response.
-    # Completed scan: return findings associated with THIS scan only.
-    if scan["state"] != RunState.COMPLETED:
-        return []
-
+    # Unknown scan: 404 (raised above). Known scan in any state returns its
+    # findings (if any). Completed scans return all findings; PENDING,
+    # RUNNING, FAILED, CANCELLED scans return findings collected so far.
     async with store.lock:
         items = [f for f in store.findings.values() if f.get("scan_id") == scan_id]
     return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
@@ -1300,22 +1378,15 @@ async def approve_shield_rule(
 ):
     """Record a human approval for a shield rule and activate it.
 
-    Uses the real gated activation path:
-    1. Validates action_id matches rule_id
-    2. Finds the session with a stored approval for this exact action_id
-    3. Verifies the approval decision is "approve" (not reject/revoke)
-    4. Converts the API rule dict to a ShieldRule Pydantic model
-    5. Runs the benign-replay gate through RuleLifecycle.approve_rule()
-    6. Activates the rule only if the gate passes
-    7. Persists activation evidence and returns ACTIVE
-
-    Returns 400 if no valid approval exists, the gate rejects, or the rule
-    is not in PROPOSED state. No false ACTIVE states are ever produced.
+    Shield activation is not yet integrated. This endpoint intentionally
+    fails closed: every approval request is rejected with 400 and the rule
+    remains PROPOSED. No ACTIVE state, no ACTIVE events, no proxy
+    activation, and no success metadata are ever produced until genuine
+    activation (scoped approval, benign-replay gate, proxy runtime, durable
+    evidence) is implemented.
     """
     action_id = body.get("action_id")
     tool = body.get("tool", "shield_rule")
-    reviewer = body.get("reviewer", "api")
-    rationale = body.get("rationale", "")
     decision = body.get("decision", "approve")
 
     if not action_id or not tool:
@@ -1325,153 +1396,12 @@ async def approve_shield_rule(
     if action_id != str(rule_id):
         raise HTTPException(status_code=400, detail="action_id must match rule_id")
 
-    # Find the session that has a stored approval for this exact action_id
-    # with matching tool and arguments. Cross-session approvals are rejected.
-    # The stored subject_id is "action_id:digest" where digest encodes
-    # tool+arguments, so a prefix match on action_id confirms the action.
-    sid = None
-    stored_approval = None
-    for candidate_sid, candidate_state in _SESSION_STATE.items():
-        for record in candidate_state.get("approvals", []):
-            subject_id = record.get("subject_id", "")
-            if (subject_id == action_id or subject_id.startswith(action_id + ":")) \
-                    and record.get("decision") == "approve":
-                sid = candidate_sid
-                stored_approval = record
-                break
-        if stored_approval is not None:
-            break
-
-    if stored_approval is None:
-        raise HTTPException(
-            status_code=400,
-            detail="no valid approval found for this action_id",
-        )
-
-    # Get the rule from the store
-    async with store.lock:
-        rule_entry = store.shield_rules.get(rule_id)
-    if not rule_entry:
-        raise HTTPException(status_code=404, detail="rule not found")
-    if rule_entry["state"] != "PROPOSED":
-        raise HTTPException(
-            status_code=400,
-            detail=f"rule is in {rule_entry['state']} state, only PROPOSED rules can be approved",
-        )
-
-    # Convert API rule dict to ShieldRule Pydantic model for RuleLifecycle
-    shield_rule = ShieldRule(
-        id=str(rule_id),
-        target_id=str(sid),
-        scope=ShieldScope(
-            route=rule_entry["route_pattern"],
-            parameter=None,
-            client=None,
-        ),
-        action="BLOCK_ROUTE_PATTERN",
-        reason=rule_entry["intent"],
-        linked_finding_id=None,
-        intent_event_ids=[],
-        owner=stored_approval.get("reviewer", reviewer),
-        created_at=rule_entry["created_at"],
-        expires_at=rule_entry.get("expires_at"),
-        status=ShieldStatus.PROPOSED,
-    )
-
-    # Create evidence store and RuleLifecycle for this session
-    ev_store = _evidence_store()
-    lifecycle = RuleLifecycle(ev_store, str(sid))
-    lifecycle.add_rule(shield_rule)
-
-    # Create ApprovalRecord from the stored approval.
-    # subject_id is set to the exact rule_id for RuleLifecycle's exact-match check.
-    approval_record = ApprovalRecord(
-        id=stored_approval.get("id", f"appr-{uuid4().hex[:12]}"),
-        subject_type="shield_rule",
-        subject_id=str(rule_id),
-        reviewer=stored_approval.get("reviewer", reviewer),
-        decision=ApprovalDecision.APPROVE,
-        rationale=stored_approval.get("rationale", rationale),
-        timestamp=stored_approval.get("timestamp", datetime.now(UTC)),
-    )
-
-    # Create BenignReplayGate with synthetic benign requests.
-    # These are common benign requests that should NOT be blocked by any
-    # narrowly-scoped shield rule.
-    gate = BenignReplayGate(ev_store, str(sid), benign_requests=[
-        {"method": "GET", "path": "/", "headers": {}, "params": {}},
-        {"method": "GET", "path": "/health", "headers": {}, "params": {}},
-        {"method": "GET", "path": "/api/notes",
-         "headers": {"Authorization": "Bearer test"}, "params": {}},
-        {"method": "POST", "path": "/api/notes",
-         "headers": {"Authorization": "Bearer test"}, "params": {}},
-    ])
-
-    # Approve and activate through the real gated path.
-    # RuleLifecycle.approve_rule() re-runs the gate and activates only if it passes.
-    try:
-        gate_result = lifecycle.approve_rule(str(rule_id), approval_record, gate)
-    except GateError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
-
-    if not gate_result.passed:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"benign-replay gate rejected: "
-                f"{gate_result.benign_blocked} benign request(s) would be blocked"
-            ),
-        )
-
-    # Rule is now ACTIVE in RuleLifecycle. Update the API store.
-    async with store.lock:
-        rule_entry = store.shield_rules.get(rule_id)
-        if not rule_entry:
-            raise HTTPException(status_code=404, detail="rule not found")
-        rule_entry["state"] = "ACTIVE"
-        rule_entry["updated_at"] = _now()
-        rule_entry["approved_by"] = reviewer
-        rule_entry["approved_at"] = datetime.now(UTC)
-        rule_entry["approval_rationale"] = rationale
-
-    # Persist durable activation evidence
-    ev_store.append(
-        str(sid),
-        "SHIELD_RULE_ACTIVATED",
-        EvidenceState.OBSERVED,
-        "sentinelx.shield",
-        {
-            "rule_id": str(rule_id),
-            "route_pattern": rule_entry["route_pattern"],
-            "intent": rule_entry["intent"],
-            "gate_passed": True,
-            "benign_blocked": gate_result.benign_blocked,
-            "rule_hash": gate_result.rule_hash,
-        },
-    )
-
-    # Broadcast activation event on SSE
-    await events.event_stream.append(
-        EventKind.SHIELD_RULE_ADDED,
-        {
-            "rule_id": str(rule_id),
-            "route_pattern": rule_entry["route_pattern"],
-            "intent": rule_entry["intent"],
-            "state": "ACTIVE",
-        },
-        run_id=None,
-    )
-
-    return ShieldRuleResponse(
-        rule_id=rule_id,
-        route_pattern=rule_entry["route_pattern"],
-        intent=rule_entry["intent"],
-        mode=rule_entry["mode"],
-        state=rule_entry["state"],
-        ttl_minutes=rule_entry["ttl_minutes"],
-        created_at=rule_entry["created_at"],
-        expires_at=rule_entry.get("expires_at"),
-        note=rule_entry.get("note"),
+    # Fail closed: shield activation is not yet integrated. Reject every
+    # approval request regardless of stored approvals, session, tool,
+    # arguments, or revocation state. The rule remains PROPOSED.
+    raise HTTPException(
+        status_code=400,
+        detail="shield activation not yet integrated; rule remains PROPOSED",
     )
 
 
