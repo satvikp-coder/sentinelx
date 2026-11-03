@@ -35,7 +35,6 @@ from pydantic import ValidationError
 
 from sentinelx.common_schemas import (
     ActionRequest,
-    ApprovalDecision,
     ApprovalRecord,
     EvidenceState,
     PolicyDecision,
@@ -67,7 +66,12 @@ from sentinelx.shield.config import ShieldConfig
 from sentinelx.shield.detect import Detector
 from sentinelx.shield.proxy import ShieldProxy
 from sentinelx.shield.recorder import ShieldRecorder
-from sentinelx.shield.rules import BenignReplayGate, GateError, ShieldAction
+from sentinelx.shield.rules import (
+    BenignReplayGate,
+    GateError,
+    RuleCompiler,
+    ShieldAction,
+)
 
 from . import events
 from .auth import (
@@ -218,7 +222,33 @@ _SCAN_STATE_LOCK = threading.Lock()
 # connection (SQLite cannot cross threads) and its own RuleLifecycle for rule
 # enforcement. All shield rules created through the API are mirrored into the
 # proxy's lifecycle so that approved ACTIVE rules are enforced at runtime.
+#
+# Cross-process coordination: the API also writes every rule state transition
+# into a shared ShieldRuntimeStore (SQLite). A standalone proxy process that
+# opens the same SHIELD_RUNTIME_DB enforces those rules - see
+# packages/shield/runtime.py for the trust boundary.
 _SHIELD_PROXY: ShieldProxy | None = None
+_SHIELD_RUNTIME: Any = None
+
+
+def _shield_runtime():
+    """Return the shared runtime rule store (one authoritative contract)."""
+    global _SHIELD_RUNTIME
+    if _SHIELD_RUNTIME is not None:
+        return _SHIELD_RUNTIME
+    import os
+
+    from sentinelx.shield.runtime import ShieldRuntimeStore, default_runtime_db
+
+    _SHIELD_RUNTIME = ShieldRuntimeStore(default_runtime_db(os.environ.get("SHIELD_RUNTIME_DB")))
+    return _SHIELD_RUNTIME
+
+
+def _reset_shield_singletons() -> None:
+    """Test helper: drop the cached proxy/runtime so env overrides take effect."""
+    global _SHIELD_PROXY, _SHIELD_RUNTIME
+    _SHIELD_PROXY = None
+    _SHIELD_RUNTIME = None
 
 
 def _shield_proxy() -> ShieldProxy:
@@ -231,6 +261,7 @@ def _shield_proxy() -> ShieldProxy:
     if _SHIELD_PROXY is not None:
         return _SHIELD_PROXY
 
+    import os
     from pathlib import Path as _Path
 
     import yaml as _yaml
@@ -239,6 +270,8 @@ def _shield_proxy() -> ShieldProxy:
     config_data = _yaml.safe_load(
         (ROOT / "configs" / "shield" / "default.yaml").read_text(encoding="utf-8")
     )
+    config_data["mode"] = os.environ.get("SHIELD_MODE", config_data["mode"])
+    config_data["upstream"] = os.environ.get("SHIELD_UPSTREAM", config_data["upstream"])
     config = ShieldConfig.model_validate(config_data)
 
     # Dedicated EvidenceStore connection for the proxy's rule lifecycle.
@@ -248,7 +281,12 @@ def _shield_proxy() -> ShieldProxy:
         Path(__file__).resolve().parents[2] / "evaluations" / "shield" / "evidence.db"
     )
     _proxy_db_path.parent.mkdir(parents=True, exist_ok=True)
-    _proxy_conn = sqlite3.connect(str(_proxy_db_path), isolation_level=None, timeout=10)
+    # check_same_thread=False: the API serves requests from multiple threads.
+    # All writes through _shield_evidence_append() hold a process-local lock,
+    # so statements never interleave; SQLite serializes at the C level.
+    _proxy_conn = sqlite3.connect(
+        str(_proxy_db_path), isolation_level=None, timeout=10, check_same_thread=False
+    )
     _proxy_conn.row_factory = sqlite3.Row
     _proxy_conn.execute("PRAGMA journal_mode=WAL")
     _evidence_migrate(_proxy_conn)
@@ -273,6 +311,7 @@ def _shield_proxy() -> ShieldProxy:
 
     _SHIELD_PROXY = ShieldProxy(
         config, _proxy_store, _proxy_session.id, detector, recorder,
+        runtime_store=_shield_runtime(),
     )
     return _SHIELD_PROXY
 
@@ -1389,10 +1428,29 @@ async def submit_approval(
         raise HTTPException(status_code=404, detail="session has no runtime state")
 
     approved = decision == "approve"
+
+    # Canonical subject for shield-rule approvals: binds the exact rule id AND
+    # its enforcement digest, so a modified rule invalidates older approvals.
+    # Falls back to the generic action subject for every other tool.
+    if tool == "shield_rule":
+        try:
+            _rule_uuid = UUID(str(action_id))
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="invalid shield rule_id") from None
+        async with store.lock:
+            _rule_entry = store.shield_rules.get(_rule_uuid)
+        if _rule_entry is None:
+            raise HTTPException(status_code=404, detail="shield rule not found")
+        subject = _shield_approval_subject(str(_rule_uuid), _shield_rule_digest(_rule_entry))
+        subject_type = "shield_rule"
+    else:
+        subject = approval_subject_id(action_id, tool, arguments)
+        subject_type = "action"
+
     record = {
         "id": f"appr-{uuid4().hex[:12]}",
-        "subject_type": "action",
-        "subject_id": approval_subject_id(action_id, tool, arguments),
+        "subject_type": subject_type,
+        "subject_id": subject,
         "reviewer": reviewer,
         "decision": "approve" if approved else "reject",
         "rationale": rationale,
@@ -1421,6 +1479,76 @@ async def submit_approval(
 
 
 # ------------------------------------------------------------------ shield
+# Canonical approval contract: a shield-rule approval subject is exactly
+#   "shield_rule:{rule_id}:{rule_digest}"
+# where rule_digest binds the approval to the rule's enforcement content.
+# Both the public approval endpoint and the activation endpoint use these
+# helpers, so a modified rule invalidates older approvals and a later
+# rejection/revocation defeats a historical approval.
+
+_SHIELD_APPROVAL_MAX_AGE_S = 24 * 60 * 60  # approvals are valid for 24 hours
+_SHIELD_ACTIVATION_LOCK = threading.Lock()
+
+
+def _shield_rule_digest(rule_entry: dict[str, Any]) -> str:
+    """Canonical digest over the enforcement-relevant fields of an API rule."""
+    doc = json.dumps(
+        {
+            "rule_id": str(rule_entry["rule_id"]),
+            "route_pattern": rule_entry["route_pattern"],
+            "intent": rule_entry["intent"],
+            "mode": rule_entry["mode"],
+            "action": ShieldAction.BLOCK_ROUTE_PATTERN.value,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(doc.encode("utf-8")).hexdigest()
+
+
+def _shield_approval_subject(rule_id: str, digest: str) -> str:
+    return f"shield_rule:{rule_id}:{digest}"
+
+
+def _shield_rule_response(rule: dict[str, Any]) -> ShieldRuleResponse:
+    """Serialize an API rule to the public response with output redaction.
+
+    Internal enforcement fields (route_pattern matching) stay raw in the
+    store; the outward echo is redacted so credential-shaped text never
+    leaves the API or lands in SSE/evidence surfaces.
+    """
+    return ShieldRuleResponse(
+        rule_id=rule["rule_id"],
+        route_pattern=str(redact(rule["route_pattern"]).value),
+        intent=str(redact(rule["intent"]).value),
+        mode=rule["mode"],
+        state=rule["state"],
+        ttl_minutes=rule["ttl_minutes"],
+        created_at=rule["created_at"],
+        expires_at=rule.get("expires_at"),
+        note=str(redact(rule.get("note") or "").value) or None,
+    )
+
+
+def _runtime_proposed(rule: ShieldRule) -> None:
+    """Publish a PROPOSED rule to the shared runtime store (never ACTIVE)."""
+    try:
+        _shield_runtime().upsert(rule, status=ShieldStatus.PROPOSED.value)
+    except Exception:  # noqa: BLE001 - cross-process publish must not break the API
+        pass
+
+
+_SHIELD_EVIDENCE_LOCK = threading.Lock()
+
+
+def _shield_evidence_append(kind: str, payload: dict[str, Any]) -> Any:
+    """Thread-safe evidence append on the API-process proxy store."""
+    proxy = _shield_proxy()
+    with _SHIELD_EVIDENCE_LOCK:
+        return proxy.store.append(
+            proxy.session_id, kind, EvidenceState.OBSERVED, "sentinelx.shield", payload,
+        )
+
 
 @router.get("/shield/rules", response_model=list[ShieldRuleResponse], tags=["shield"])
 async def list_shield_rules(
@@ -1428,26 +1556,28 @@ async def list_shield_rules(
     offset: int = Query(0, ge=0),
     user: str = Depends(_require_auth),
 ):
+    # Expire overdue rules in the shared store so list output is truthful,
+    # then mirror any newly-expired state into the API store.
+    expired_ids: set[str] = set()
+    try:
+        runtime = _shield_runtime()
+        before = {r.id for r in runtime.active_rules()}
+        runtime.expire_overdue(datetime.now(UTC))
+        after = {r.id for r in runtime.active_rules()}
+        expired_ids = before - after
+    except Exception:  # noqa: BLE001
+        pass
     async with store.lock:
+        for rid_str in expired_ids:
+            try:
+                entry = store.shield_rules.get(UUID(rid_str))
+            except (ValueError, AttributeError):
+                continue
+            if entry is not None and entry.get("state") == "ACTIVE":
+                entry["state"] = "EXPIRED"
         items = list(store.shield_rules.values())
-    # Explicitly serialize each rule to ShieldRuleResponse so internal
-    # store fields (updated_at, approved_by, etc.) never leak into the
-    # public response and trigger a schema-validation 500.
     page = _paginate(items, Pagination(limit=limit, offset=offset))["items"]
-    return [
-        ShieldRuleResponse(
-            rule_id=rule["rule_id"],
-            route_pattern=rule["route_pattern"],
-            intent=rule["intent"],
-            mode=rule["mode"],
-            state=rule["state"],
-            ttl_minutes=rule["ttl_minutes"],
-            created_at=rule["created_at"],
-            expires_at=rule.get("expires_at"),
-            note=rule.get("note"),
-        )
-        for rule in page
-    ]
+    return [_shield_rule_response(rule) for rule in page]
 
 
 @router.post("/shield/rules", response_model=ShieldRuleResponse, tags=["shield"])
@@ -1455,83 +1585,146 @@ async def create_shield_rule(
     payload: ShieldRuleCreate,
     user: str = Depends(_require_auth),
 ):
-    # Reject broad or unsafe rules
-    if payload.route_pattern in {"/", "*"}:
-        raise HTTPException(status_code=400, detail="broad route patterns are not allowed")
-    if not payload.reason:
-        raise HTTPException(status_code=400, detail="reason is required")
-    async with store.lock:
-        rid = _new_id()
-        now = _now()
-        from datetime import timedelta
-        expires_at = now + timedelta(minutes=payload.ttl_minutes)
-        rule = {
+    # Route proposal creation through the real RuleCompiler so every proposal
+    # passes schema, scope, TTL and evidence validation before persistence.
+    from datetime import timedelta
+
+    proxy = _shield_proxy()
+    rid = _new_id()
+    now = _now()
+    expires_at = now + timedelta(minutes=payload.ttl_minutes)
+
+    # Record a real proposal evidence event in the proxy store. The compiler
+    # requires at least one cited intent event, and the benign gate/escalation
+    # surfaces must reference real evidence - never a fabricated id.
+    proposal_evt = _shield_evidence_append(
+        "SHIELD_RULE_PROPOSED",
+        {
+            "rule_id": str(rid),
+            "route_pattern": str(redact(payload.route_pattern).value),
+            "intent": str(redact(payload.intent).value),
+            "mode": payload.mode,
+            "owner": str(redact(user).value),
+        },
+    )
+
+    compiler = RuleCompiler(proxy.store, proxy.session_id)
+    compile_result = compiler.compile(
+        intent_id=str(rid),
+        suggested_action=ShieldAction.BLOCK_ROUTE_PATTERN,
+        scope=ShieldScope(route=payload.route_pattern),
+        reason=payload.reason,
+        owner=user,
+        ttl_minutes=payload.ttl_minutes,
+        intent_event_ids=[proposal_evt.id],
+    )
+    if compile_result.rejected or compile_result.rule is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"rule rejected by validation: {compile_result.reason}",
+        )
+
+    compiled = compile_result.rule.model_copy(update={
+        "id": str(rid),
+        "target_id": "shield-api",
+        "expires_at": expires_at,
+    })
+
+    rule = {
+        "rule_id": rid,
+        "route_pattern": payload.route_pattern,
+        "intent": payload.intent,
+        "mode": payload.mode,
+        "state": "PROPOSED",  # not ACTIVE until human approval + benign gate
+        "ttl_minutes": payload.ttl_minutes,
+        "created_at": now,
+        "expires_at": expires_at,
+        "note": "Rule proposed; activation requires human approval and benign-replay gate",
+        "digest": _shield_rule_digest({
             "rule_id": rid,
             "route_pattern": payload.route_pattern,
             "intent": payload.intent,
             "mode": payload.mode,
-            "state": "PROPOSED",  # not ACTIVE until benign-replay gate passes
-            "ttl_minutes": payload.ttl_minutes,
-            "created_at": now,
-            "expires_at": expires_at,
-            "note": "Rule proposed; activation requires human approval and benign-replay gate",
-        }
+        }),
+        "intent_event_ids": [proposal_evt.id],
+    }
+    async with store.lock:
         store.shield_rules[rid] = rule
 
-    # Mirror the rule into the proxy's RuleLifecycle so that an approved
-    # rule can be enforced at runtime. The rule starts PROPOSED; activation
-    # happens only after human approval passes the benign-replay gate.
-    proxy = _shield_proxy()
-    proxy.rules.add_rule(ShieldRule(
-        id=str(rid),
-        target_id="shield-api",
-        scope=ShieldScope(route=payload.route_pattern),
-        action=ShieldAction.BLOCK_ROUTE_PATTERN.value,
-        reason=payload.intent,
-        linked_finding_id=None,
-        intent_event_ids=[],
-        owner=user,
-        created_at=now,
-        expires_at=expires_at,
-        status=ShieldStatus.PROPOSED,
-    ))
+    # Mirror the PROPOSED rule into the proxy lifecycle and the shared
+    # runtime store (still PROPOSED - never enforced before approval).
+    proxy.rules.add_rule(compiled)
+    _runtime_proposed(compiled)
 
     await events.event_stream.append(
         EventKind.SHIELD_RULE_ADDED,
         {
             "rule_id": str(rid),
-            "route_pattern": payload.route_pattern,
-            "intent": payload.intent,
+            "route_pattern": str(redact(payload.route_pattern).value),
+            "intent": str(redact(payload.intent).value),
             "state": "PROPOSED",
         },
         run_id=None,
     )
-    return rule
+    return _shield_rule_response(rule)
 
 
 @router.delete("/shield/rules/{rule_id}", tags=["shield"])
 async def remove_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
+    """Manually remove a rule. Propagates to the proxy lifecycle and the shared
+    runtime store so enforcement actually stops - API state alone is not enough."""
     async with store.lock:
         rule = store.shield_rules.get(rule_id)
         if not rule:
             raise HTTPException(status_code=404, detail="rule not found")
         rule["state"] = "REMOVED"
+
+    proxy = _shield_proxy()
+    runtime_stopped = False
+    try:
+        runtime_stopped = _shield_runtime().set_status(str(rule_id), "REMOVED")
+    except Exception:  # noqa: BLE001 - report unresolved runtime state honestly
+        runtime_stopped = False
+    local_removed = proxy.rules.remove_rule(str(rule_id), user, "manual removal")
+
     await events.event_stream.append(
         EventKind.SHIELD_RULE_REMOVED,
-        {"rule_id": str(rule_id)},
+        {
+            "rule_id": str(rule_id),
+            "runtime_enforcement_stopped": bool(local_removed or runtime_stopped),
+        },
         run_id=None,
     )
-    return {"rule_id": rule_id, "state": "REMOVED"}
+    return {
+        "rule_id": rule_id,
+        "state": "REMOVED",
+        "runtime_enforcement_stopped": bool(local_removed or runtime_stopped),
+    }
 
 
 @router.post("/shield/rules/{rule_id}/expire", tags=["shield"])
 async def expire_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
+    """Manually expire a rule. Propagates to the proxy lifecycle and the shared
+    runtime store so enforcement actually stops - API state alone is not enough."""
     async with store.lock:
         rule = store.shield_rules.get(rule_id)
         if not rule:
             raise HTTPException(status_code=404, detail="rule not found")
         rule["state"] = "EXPIRED"
-    return {"rule_id": rule_id, "state": "EXPIRED"}
+
+    proxy = _shield_proxy()
+    runtime_stopped = False
+    try:
+        runtime_stopped = _shield_runtime().set_status(str(rule_id), "EXPIRED")
+    except Exception:  # noqa: BLE001
+        runtime_stopped = False
+    local_expired = proxy.rules.expire_rule(str(rule_id))
+
+    return {
+        "rule_id": rule_id,
+        "state": "EXPIRED",
+        "runtime_enforcement_stopped": bool(local_expired or runtime_stopped),
+    }
 
 
 @router.post("/shield/rules/{rule_id}/approve", response_model=ShieldRuleResponse, tags=["shield"])
@@ -1540,30 +1733,31 @@ async def approve_shield_rule(
     body: dict,
     user: str = Depends(_require_auth),
 ):
-    """Record a human approval for a shield rule and activate it.
+    """Activate a shield rule after verifying a scoped human approval.
 
-    Uses the real gated activation path:
-    1. Validates action_id matches rule_id.
-    2. Finds a stored approval for this exact rule_id in the session state.
-    3. Verifies the approval decision is "approve" (not reject/revoke).
-    4. Checks the kill switch.
-    5. Converts the API rule dict to a ShieldRule Pydantic model.
-    6. Runs the benign-replay gate through RuleLifecycle.approve_rule().
-    7. Activates the rule only if the gate passes.
-    8. Persists durable activation evidence.
-    9. Updates the API store to reflect ACTIVE state.
+    Canonical contract:
+    1. `session_id` is required; approvals are looked up ONLY in that session.
+    2. The exact approval subject is `shield_rule:{rule_id}:{rule_digest}` -
+       a modified rule has a different digest and older approvals do not match.
+    3. The LATEST record for that subject must be "approve": a later
+       rejection/revocation defeats a historical approval.
+    4. Approvals older than 24h are rejected.
+    5. The kill switch blocks activation.
+    6. The benign-replay gate must pass.
 
-    Returns 400 if no valid approval exists, the gate rejects, the rule is
-    not in PROPOSED state, or the kill switch is active. Returns 404 if the
-    rule does not exist. Never reports ACTIVE without actual proxy
-    registration through RuleLifecycle.
+    Activation is transactional: the runtime is installed first, then durable
+    state and evidence are persisted; if persistence fails the runtime
+    installation is rolled back and the API reports the failure truthfully.
     """
+    session_id_raw = body.get("session_id")
     action_id = body.get("action_id")
     tool = body.get("tool", "shield_rule")
     reviewer = body.get("reviewer", "api")
     rationale = body.get("rationale", "")
     decision = body.get("decision", "approve")
 
+    if not session_id_raw:
+        raise HTTPException(status_code=400, detail="session_id is required for activation")
     if not action_id or not tool:
         raise HTTPException(status_code=400, detail="action_id and tool are required")
     if decision != "approve":
@@ -1571,24 +1765,15 @@ async def approve_shield_rule(
     if action_id != str(rule_id):
         raise HTTPException(status_code=400, detail="action_id must match rule_id")
 
-    # Find a stored approval for this exact rule_id with decision "approve".
-    # Search all sessions' approval lists; cross-session approvals are not
-    # trusted because subject_id binds to the rule that was approved.
-    stored_approval = None
-    for _candidate_sid, candidate_state in _SESSION_STATE.items():
-        for record in candidate_state.get("approvals", []):
-            subject_id = record.get("subject_id", "")
-            if subject_id == str(rule_id) and record.get("decision") == "approve":
-                stored_approval = record
-                break
-        if stored_approval is not None:
-            break
-
-    if stored_approval is None:
-        raise HTTPException(
-            status_code=400,
-            detail="no valid approval found for this rule_id",
-        )
+    try:
+        sid = UUID(str(session_id_raw))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="invalid session_id") from None
+    if sid not in store.sessions:
+        raise HTTPException(status_code=404, detail="session not found")
+    session_state = _SESSION_STATE.get(sid)
+    if session_state is None:
+        raise HTTPException(status_code=404, detail="session has no runtime state")
 
     # Get the rule from the API store.
     async with store.lock:
@@ -1601,6 +1786,38 @@ async def approve_shield_rule(
             detail=f"rule is in {rule_entry['state']} state, only PROPOSED rules can be approved",
         )
 
+    # Canonical subject: rule id + current enforcement digest.
+    digest = _shield_rule_digest(rule_entry)
+    subject = _shield_approval_subject(str(rule_id), digest)
+
+    with session_state["lock"]:
+        candidates = [
+            r for r in session_state.get("approvals", [])
+            if r.get("subject_id") == subject and r.get("subject_type") == "shield_rule"
+        ]
+    if not candidates:
+        # Distinguish "no approval at all" from "approval for a different rule
+        # revision" so a modified rule cannot silently reuse an old approval.
+        raise HTTPException(
+            status_code=400,
+            detail="no valid approval found for this rule revision in this session",
+        )
+    latest = max(candidates, key=lambda r: r.get("timestamp") or datetime.min.replace(tzinfo=UTC))
+    if latest.get("decision") != "approve":
+        raise HTTPException(
+            status_code=400,
+            detail="the latest approval record is a rejection/revocation",
+        )
+    approval_ts = latest.get("timestamp")
+    approval_age = (
+        (datetime.now(UTC) - approval_ts).total_seconds() if approval_ts else None
+    )
+    if approval_age is None or approval_age > _SHIELD_APPROVAL_MAX_AGE_S:
+        raise HTTPException(
+            status_code=400,
+            detail="approval has expired",
+        )
+
     # Check kill switch before any activation attempt.
     proxy = _shield_proxy()
     if proxy._is_killed():
@@ -1609,8 +1826,7 @@ async def approve_shield_rule(
             detail="kill switch is active; shield activation denied",
         )
 
-    # Convert the API rule dict to a ShieldRule Pydantic model for the
-    # RuleLifecycle. The API store's rule entry mirrors the proxy's rule.
+    # Rebuild the canonical ShieldRule from the stored digest-bound fields.
     shield_rule = ShieldRule(
         id=str(rule_id),
         target_id="shield-api",
@@ -1622,31 +1838,16 @@ async def approve_shield_rule(
         action=ShieldAction.BLOCK_ROUTE_PATTERN.value,
         reason=rule_entry["intent"],
         linked_finding_id=None,
-        intent_event_ids=[],
-        owner=stored_approval.get("reviewer", reviewer),
+        intent_event_ids=list(rule_entry.get("intent_event_ids") or []),
+        owner=latest.get("reviewer", reviewer),
         created_at=rule_entry["created_at"],
         expires_at=rule_entry.get("expires_at"),
         status=ShieldStatus.PROPOSED,
     )
-
-    # Ensure the proxy's lifecycle has this rule (it should from creation,
-    # but re-add defensively in case of proxy restart).
     proxy.rules.add_rule(shield_rule)
 
-    # Build ApprovalRecord from the stored approval. subject_id must equal
-    # the rule_id for RuleLifecycle's exact-match check.
-    approval_record = ApprovalRecord(
-        id=stored_approval.get("id", f"appr-{uuid4().hex[:12]}"),
-        subject_type="shield_rule",
-        subject_id=str(rule_id),
-        reviewer=stored_approval.get("reviewer", reviewer),
-        decision=ApprovalDecision.APPROVE,
-        rationale=stored_approval.get("rationale", rationale),
-        timestamp=stored_approval.get("timestamp", datetime.now(UTC)),
-    )
-
-    # Build a BenignReplayGate with representative benign requests. These are
-    # common benign requests that a narrowly-scoped shield rule must not block.
+    # The benign-replay gate must pass. Representative benign traffic for the
+    # authorized local application: health, root, notes read/write, search.
     gate = BenignReplayGate(
         proxy.store, proxy.session_id,
         benign_requests=[
@@ -1656,78 +1857,88 @@ async def approve_shield_rule(
              "headers": {"Authorization": "Bearer test"}, "params": {}},
             {"method": "POST", "path": "/api/notes",
              "headers": {"Authorization": "Bearer test"}, "params": {}},
+            {"method": "GET", "path": "/api/search",
+             "headers": {"Authorization": "Bearer test"}, "params": {"q": "plan"}},
         ],
     )
 
-    # Approve and activate through the real gated path.
-    # RuleLifecycle.approve_rule() re-runs the gate and activates only if it
-    # passes. Any GateError means activation is denied.
-    try:
-        gate_result = proxy.rules.approve_rule(str(rule_id), approval_record, gate)
-    except GateError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
+    with _SHIELD_ACTIVATION_LOCK:
+        gate_result = gate.check(proxy.rules.get_rule(str(rule_id)))
+        if not gate_result.passed:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"benign-replay gate rejected: "
+                    f"{gate_result.benign_blocked} benign request(s) would be blocked"
+                ),
+            )
 
-    if not gate_result.passed:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"benign-replay gate rejected: "
-                f"{gate_result.benign_blocked} benign request(s) would be blocked"
-            ),
-        )
+        # Runtime installation (the ONLY place a rule becomes ACTIVE).
+        try:
+            installed = proxy.rules.activate_rule(str(rule_id), gate_result)
+        except GateError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        if not installed:
+            raise HTTPException(
+                status_code=400,
+                detail="rule could not be activated (not PROPOSED or unknown)",
+            )
 
-    # Rule is now ACTIVE in the proxy's RuleLifecycle. Update the API store
-    # to reflect the same state so listing and serialization are consistent.
-    async with store.lock:
-        rule_entry = store.shield_rules.get(rule_id)
-        if not rule_entry:
-            raise HTTPException(status_code=404, detail="rule not found")
-        rule_entry["state"] = "ACTIVE"
-        rule_entry["updated_at"] = _now()
-        rule_entry["approved_by"] = reviewer
-        rule_entry["approved_at"] = datetime.now(UTC)
-        rule_entry["approval_rationale"] = rationale
+        # Persist durable state + evidence. Any failure rolls the runtime back
+        # so an ACTIVE runtime is never left untracked or unrecorded.
+        try:
+            revision = _shield_runtime().upsert(
+                proxy.rules.get_rule(str(rule_id)), status=ShieldStatus.ACTIVE.value
+            )
+            async with store.lock:
+                rule_entry["state"] = "ACTIVE"
+                rule_entry["updated_at"] = _now()
+                rule_entry["approved_by"] = latest.get("reviewer", reviewer)
+                rule_entry["approved_at"] = datetime.now(UTC)
+                rule_entry["approval_rationale"] = rationale
+                rule_entry["runtime_revision"] = revision
+            _shield_evidence_append(
+                "SHIELD_RULE_ACTIVATED",
+                {
+                    "rule_id": str(rule_id),
+                    "route_pattern": str(redact(rule_entry["route_pattern"]).value),
+                    "intent": str(redact(rule_entry["intent"]).value),
+                    "gate_passed": True,
+                    "benign_blocked": gate_result.benign_blocked,
+                    "rule_hash": gate_result.rule_hash,
+                    "reviewer": str(redact(latest.get("reviewer", reviewer)).value),
+                },
+            )
+        except Exception as exc:  # noqa: BLE001 - compensation path
+            proxy.rules.deactivate_rule(str(rule_id))
+            try:
+                _shield_runtime().set_status(str(rule_id), ShieldStatus.PROPOSED.value)
+            except Exception:  # noqa: BLE001
+                pass
+            async with store.lock:
+                if rule_entry.get("state") == "ACTIVE":
+                    rule_entry["state"] = "PROPOSED"
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "activation persistence failed; runtime installation was "
+                    f"rolled back ({type(exc).__name__})"
+                ),
+            ) from None
 
-    # Persist durable activation evidence in the proxy's evidence store.
-    proxy.store.append(
-        proxy.session_id,
-        "SHIELD_RULE_ACTIVATED",
-        EvidenceState.OBSERVED,
-        "sentinelx.shield",
-        {
-            "rule_id": str(rule_id),
-            "route_pattern": rule_entry["route_pattern"],
-            "intent": rule_entry["intent"],
-            "gate_passed": True,
-            "benign_blocked": gate_result.benign_blocked,
-            "rule_hash": gate_result.rule_hash,
-            "reviewer": reviewer,
-        },
-    )
-
-    # Broadcast activation event on SSE.
+    # Broadcast activation event on SSE (redacted output).
     await events.event_stream.append(
         EventKind.SHIELD_RULE_ADDED,
         {
             "rule_id": str(rule_id),
-            "route_pattern": rule_entry["route_pattern"],
-            "intent": rule_entry["intent"],
+            "route_pattern": str(redact(rule_entry["route_pattern"]).value),
+            "intent": str(redact(rule_entry["intent"]).value),
             "state": "ACTIVE",
         },
         run_id=None,
     )
 
-    return ShieldRuleResponse(
-        rule_id=rule_id,
-        route_pattern=rule_entry["route_pattern"],
-        intent=rule_entry["intent"],
-        mode=rule_entry["mode"],
-        state=rule_entry["state"],
-        ttl_minutes=rule_entry["ttl_minutes"],
-        created_at=rule_entry["created_at"],
-        expires_at=rule_entry.get("expires_at"),
-        note=rule_entry.get("note"),
-    )
+    return _shield_rule_response(rule_entry)
 
 
 # ------------------------------------------------------------------ escalations
