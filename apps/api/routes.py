@@ -999,6 +999,7 @@ async def list_shield_rules(
     # Explicitly serialize each rule to ShieldRuleResponse so internal
     # store fields (updated_at, approved_by, etc.) never leak into the
     # public response and trigger a schema-validation 500.
+    page = _paginate(items, Pagination(limit=limit, offset=offset))["items"]
     return [
         ShieldRuleResponse(
             rule_id=rule["rule_id"],
@@ -1011,7 +1012,7 @@ async def list_shield_rules(
             expires_at=rule.get("expires_at"),
             note=rule.get("note"),
         )
-        for rule in items
+        for rule in page
     ]
 
 
