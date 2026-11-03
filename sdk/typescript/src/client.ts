@@ -8,17 +8,21 @@
 import { GuardClientError } from "./errors";
 import { GuardConfig, GuardDecision, GuardDecisionResult } from "./types";
 
-const ALLOWED_HOST_PREFIXES = ["http://127.0.0.1", "http://localhost"];
+const ALLOWED_HOSTS = ["127.0.0.1", "localhost"];
 
 /**
  * Validate that a base URL is local-only. Rejects any public or remote URL.
+ * Ports are allowed (e.g. http://127.0.0.1:8080).
  */
 function validateBaseUrl(baseUrl: string): void {
   try {
     const url = new URL(baseUrl);
-    if (
-      !ALLOWED_HOST_PREFIXES.some((p) => url.href.startsWith(p + "/") || url.href === p)
-    ) {
+    if (url.protocol !== "http:") {
+      throw new GuardClientError(
+        `Sidecar base URL must use http://, got: ${baseUrl}`,
+      );
+    }
+    if (!ALLOWED_HOSTS.includes(url.hostname)) {
       throw new GuardClientError(
         `Sidecar base URL must be local (127.0.0.1 or localhost), got: ${baseUrl}`,
       );
@@ -31,11 +35,12 @@ function validateBaseUrl(baseUrl: string): void {
 
 /**
  * Raw sidecar API decision response (before validation).
+ * rule_ids is optional: the API may omit it for guard decisions.
  */
 interface RawSidecarDecision {
   decision: string;
   reason_code: string;
-  rule_ids: string[];
+  rule_ids?: string[];
   requires_human: boolean;
   explanation: string;
 }
@@ -120,7 +125,7 @@ export class SidecarClient {
       return {
         decision,
         reasonCode: json.reason_code,
-        ruleIds: json.rule_ids,
+        ruleIds: json.rule_ids ?? [],
         requiresHuman: json.requires_human,
         explanation: json.explanation,
       };

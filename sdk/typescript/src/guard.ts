@@ -143,6 +143,7 @@ export class Guard {
    *
    * @param toolName - name of the tool (validated)
    * @param fn - the tool function to wrap
+   * @param options - optional config (sessionId required for enforce mode)
    * @returns a wrapped function that checks the guard before executing
    *
    * Behavior:
@@ -152,14 +153,26 @@ export class Guard {
    * - enforce mode CONFIRM: calls approver; if approved, tool executes;
    *   if not approved, throws GuardBlockedError
    * - Sidecar failure: throws GuardClientError (fail-closed, tool never executes)
+   *
+   * A sessionId is required. Callers must create a session via the API
+   * (POST /api/v1/sessions) and pass the sessionId here. Using check()
+   * directly is preferred when per-session tracking is needed.
    */
   tool<TArgs extends unknown[], TReturn>(
     toolName: string,
     fn: (...args: TArgs) => TReturn | Promise<TReturn>,
+    options?: { sessionId?: string },
   ): (...args: TArgs) => Promise<TReturn> {
     validateToolName(toolName);
+    const sessionId = options?.sessionId;
 
     return async (...args: TArgs): Promise<TReturn> => {
+      if (!sessionId) {
+        throw new GuardConfigError(
+          `tool("${toolName}") requires a sessionId. Pass { sessionId } to tool(), or use check() directly with a valid session created via POST /api/v1/sessions.`,
+        );
+      }
+
       // Build the action from the function arguments. We use positional argument
       // names from the wrapped function if available, otherwise "arg0", "arg1", etc.
       const arguments_: Record<string, unknown> = {};
@@ -168,11 +181,6 @@ export class Guard {
       }
 
       const action: GuardAction = { tool: toolName, arguments: arguments_ };
-
-      // We need a sessionId. Use a default if none provided by the caller.
-      // The wrapped function signature doesn't include sessionId, so we use
-      // a sentinel. Callers needing per-session tracking should use check() directly.
-      const sessionId = "sdk-default";
 
       let decision: GuardDecisionResult;
       try {

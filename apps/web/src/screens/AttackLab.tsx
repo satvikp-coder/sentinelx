@@ -3,7 +3,7 @@
  * Runs the guard decision API for test actions.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api, GuardDecision } from "../api";
 import { LabelChip } from "../components/LabelChip";
 
@@ -22,14 +22,31 @@ export function AttackLab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Create a real session for the Attack Lab so decisions go through
+    // the gateway with a valid, server-owned session.
+    api.createSession({
+      scenario_id: "S1",
+      lab: "vibe_notes_node",
+      arm: "A",
+    })
+      .then((s) => setSessionId(s.id))
+      .catch((e) => setError(`Failed to create session: ${e instanceof Error ? e.message : "unknown error"}`));
+  }, []);
 
   async function runDecision(action: typeof TEST_ACTIONS[number]) {
+    if (!sessionId) {
+      setError("Session not ready yet");
+      return;
+    }
     setLoading(true);
     setError(null);
     setLastAction(action.label);
     try {
       const d = await api.guardDecide({
-        session_id: "attack-lab-demo",
+        session_id: sessionId,
         tool: action.tool,
         arguments: action.arguments,
       });

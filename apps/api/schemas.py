@@ -241,6 +241,12 @@ class MetricsResponse(APIModel):
 
 # ---------------------------------------------------------------- targets
 
+class TargetCreate(APIModel):
+    target_id: str = Field(min_length=1, max_length=200)
+    url: str
+    lab: bool = True
+
+
 class TargetResponse(APIModel):
     target_id: str
     url: str

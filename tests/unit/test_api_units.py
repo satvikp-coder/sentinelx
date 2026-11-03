@@ -380,7 +380,7 @@ def test_shield_rule_valid(client):
                     headers=AUTH)
     assert r.status_code == 200
     data = r.json()
-    assert data["state"] == "ACTIVE"
+    assert data["state"] == "PROPOSED"
     assert data["route_pattern"] == "/api/*"
 
 
@@ -416,21 +416,21 @@ def test_expire_shield_rule(client):
 
 def test_target_localhost_allowed(client):
     r = client.post("/api/v1/targets",
-                    params={"target_id": "t-local", "url": "http://127.0.0.1:8080/", "lab": True},
+                    json={"target_id": "t-local", "url": "http://127.0.0.1:8080/", "lab": True},
                     headers=AUTH)
     assert r.status_code == 200
 
 
 def test_target_labtest_allowed(client):
     r = client.post("/api/v1/targets",
-                    params={"target_id": "t-lab", "url": "http://app.lab.test/", "lab": True},
+                    json={"target_id": "t-lab", "url": "http://app.lab.test/", "lab": True},
                     headers=AUTH)
     assert r.status_code == 200
 
 
 def test_target_public_rejected(client):
     r = client.post("/api/v1/targets",
-                    params={"target_id": "t-evil", "url": "http://evil.com/", "lab": True},
+                    json={"target_id": "t-evil", "url": "http://evil.com/", "lab": True},
                     headers=AUTH)
     assert r.status_code == 400
 
@@ -439,14 +439,14 @@ def test_target_public_rejected(client):
 
 def test_create_scan(client):
     client.post("/api/v1/targets",
-                params={"target_id": "t-scan", "url": "http://127.0.0.1:8080/", "lab": True},
+                json={"target_id": "t-scan", "url": "http://127.0.0.1:8080/", "lab": True},
                 headers=AUTH)
     r = client.post("/api/v1/scans",
                     json={"target_id": "t-scan", "model": False},
                     headers=AUTH)
     assert r.status_code == 200
     data = r.json()
-    assert data["state"] == "completed"
+    assert data["state"] == "pending"
     assert data["target_id"] == "t-scan"
 
 

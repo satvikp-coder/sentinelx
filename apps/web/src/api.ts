@@ -158,7 +158,9 @@ export const api = {
 
   listEvents: (): Promise<EventData[]> => request("/api/v1/events"),
   eventStream: (onEvent: (event: EventData) => void, afterSeq = 0) => {
-    const es = new EventSource(`${BASE_URL}/api/v1/events/stream?after_seq=${afterSeq}`);
+    const es = new EventSource(
+      `${BASE_URL}/api/v1/events/stream?after_seq=${afterSeq}&token=${encodeURIComponent(DEMO_TOKEN)}`,
+    );
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data) as EventData;

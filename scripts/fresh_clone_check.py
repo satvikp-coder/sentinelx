@@ -23,7 +23,7 @@ from pathlib import Path
 REPO_ROOT = Path(".").resolve()
 EXCLUDE_NAMES = {
     ".git", ".venv", "node_modules", "dist", "build",
-    "__pycache__", ".pytest_cache", ".ruff_cache",
+    "__pycache__", ".pytest_cache", ".ruff_cache", ".env",
 }
 
 
@@ -43,11 +43,24 @@ def main() -> int:
         print(f"Copying repo to {clone} ...")
         copy_repo(REPO_ROOT, clone)
 
+        # Create a fresh venv in the clone so we never touch the caller's
+        # Python environment or install into the caller's site-packages.
+        venv_dir = clone / ".venv"
+        print(f"Creating fresh venv at {venv_dir} ...")
+        r = run([sys.executable, "-m", "venv", str(venv_dir)])
+        if r.returncode != 0:
+            print(f"venv creation failed: {r.stderr}", file=sys.stderr)
+            return 1
+        if sys.platform == "win32":
+            venv_python = venv_dir / "Scripts" / "python.exe"
+        else:
+            venv_python = venv_dir / "bin" / "python"
+
         # Check Python availability
-        python = sys.executable
+        python = str(venv_python)
         print(f"Using Python: {python}")
 
-        # Install dependencies
+        # Install dependencies into the fresh venv
         print("Installing dependencies...")
         r = run([python, "-m", "pip", "install", "-e", ".[dev]"], cwd=clone)
         if r.returncode != 0:

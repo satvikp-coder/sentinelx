@@ -10,14 +10,24 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import secrets
 import sqlite3
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
 from sentinelx.common_schemas import (
@@ -43,7 +53,7 @@ from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
 
 from . import events
-from .auth import require_demo_auth
+from .auth import DEMO_TOKEN, _bearer, require_demo_auth
 from .events import event_stream, sse_response
 from .schemas import (
     ApprovalRecordResponse,
@@ -71,6 +81,7 @@ from .schemas import (
     SessionResponse,
     ShieldRuleCreate,
     ShieldRuleResponse,
+    TargetCreate,
     TargetResponse,
 )
 
@@ -620,9 +631,31 @@ async def list_events(
 @router.get("/events/stream", tags=["events"])
 async def stream_events(
     request: Request,
+    token: str | None = Query(default=None),
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
-    user: str = Depends(_require_auth),
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ):
+    # Auth: bearer header takes precedence over token query parameter
+    # (needed for SSE/EventSource which cannot set custom headers).
+    authenticated = False
+    if creds is not None and creds.credentials:
+        if secrets.compare_digest(creds.credentials, DEMO_TOKEN):
+            authenticated = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    if not authenticated and token is not None and token:
+        if secrets.compare_digest(token, DEMO_TOKEN):
+            authenticated = True
+    if not authenticated:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     after_seq = 0
     if last_event_id is not None:
         try:
@@ -733,27 +766,29 @@ async def list_targets(user: str = Depends(_require_auth)):
 
 @router.post("/targets", response_model=TargetResponse, tags=["targets"])
 async def add_target(
-    target_id: str,
-    url: str,
-    lab: bool = True,
+    payload: TargetCreate,
     user: str = Depends(_require_auth),
 ):
     # No arbitrary target URLs: only localhost / 127.0.0.1 / *.lab.test
+    url = payload.url
+    url_host = url.split("//", 1)[-1].split("/", 1)[0] if "//" in url else url
+    # Strip port number if present
+    url_host = url_host.split(":", 1)[0]
     allowed = (
-        url.startswith("http://127.0.0.1")
-        or url.startswith("http://localhost")
-        or ".lab.test" in url
+        url_host == "127.0.0.1"
+        or url_host == "localhost"
+        or url_host.endswith(".lab.test")
     )
     if not allowed:
         raise HTTPException(status_code=400, detail="only localhost / *.lab.test targets allowed")
     async with store.lock:
-        store.targets[target_id] = {
-            "target_id": target_id,
+        store.targets[payload.target_id] = {
+            "target_id": payload.target_id,
             "url": url,
-            "lab": lab,
-            "owned": True,
+            "lab": payload.lab,
+            "owned": False,  # ownership not verified by registration alone
         }
-    return store.targets[target_id]
+    return store.targets[payload.target_id]
 
 
 # ------------------------------------------------------------------ scans
@@ -771,7 +806,7 @@ async def create_scan(
         scan = {
             "scan_id": sid,
             "target_id": payload.target_id,
-            "state": RunState.COMPLETED,
+            "state": RunState.PENDING,
             "findings_count": 0,
             "requests_used": 0,
             "request_budget": 100,
@@ -908,20 +943,27 @@ async def create_shield_rule(
     async with store.lock:
         rid = _new_id()
         now = _now()
+        from datetime import timedelta
+        expires_at = now + timedelta(minutes=payload.ttl_minutes)
         rule = {
             "rule_id": rid,
             "route_pattern": payload.route_pattern,
             "intent": payload.intent,
             "mode": payload.mode,
-            "state": "ACTIVE",
+            "state": "PROPOSED",  # not ACTIVE until benign-replay gate passes
             "ttl_minutes": payload.ttl_minutes,
             "created_at": now,
-            "expires_at": None,
+            "expires_at": expires_at,
         }
         store.shield_rules[rid] = rule
     await events.event_stream.append(
         EventKind.SHIELD_RULE_ADDED,
-        {"rule_id": str(rid), "route_pattern": payload.route_pattern, "intent": payload.intent},
+        {
+            "rule_id": str(rid),
+            "route_pattern": payload.route_pattern,
+            "intent": payload.intent,
+            "state": "PROPOSED",
+        },
         run_id=None,
     )
     return rule
