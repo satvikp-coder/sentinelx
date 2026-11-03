@@ -16,8 +16,10 @@ from fastapi.testclient import TestClient
 from apps.api.main import _rate_tokens, app
 from apps.api.routes import (
     _APPROVALS,
+    _SCAN_CANCEL_EVENTS,
     _SESSION_SCENARIOS,
     _SESSION_STATE,
+    _TARGET_LABS,
     store,
 )
 
@@ -55,6 +57,8 @@ def _reset_shared_state():
     _SESSION_STATE.clear()
     _SESSION_SCENARIOS.clear()
     _APPROVALS.clear()
+    _SCAN_CANCEL_EVENTS.clear()
+    _TARGET_LABS.clear()
 
 
 # ------------------------------------------------------------------ health (no auth)

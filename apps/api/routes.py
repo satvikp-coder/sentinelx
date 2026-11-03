@@ -40,6 +40,9 @@ from sentinelx.common_schemas import (
     PolicyDecision,
     ScenarioSpec,
     SessionState,
+    TargetAuthorization,
+    TargetScope,
+    TargetStatus,
 )
 from sentinelx.common_schemas import (
     Decision as _CommonDecision,
@@ -54,6 +57,8 @@ from sentinelx.policy import (
 )
 from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
+from sentinelx.scanner.models import load_profile as _load_scan_profile
+from sentinelx.scanner.orchestrate import run_scan
 
 from . import events
 from .auth import (
@@ -76,6 +81,7 @@ from .schemas import (
     FindingResponse,
     GuardDecideRequest,
     GuardDecideResponse,
+    LabelMode,
     MetricResponse,
     MetricsResponse,
     Pagination,
@@ -163,6 +169,22 @@ _SESSION_SCENARIOS: dict[UUID, ScenarioSpec] = {}
 # kill-switch, user restrictions, approvals). Populated at session creation
 # and updated on each decision. Never derived from client input.
 _SESSION_STATE: dict[UUID, dict[str, Any]] = {}
+
+# Scan cancellation events - one per active scan. Set by the cancel endpoint
+# to request scan termination. Checked by run_scan() via the cancel_event parameter.
+_SCAN_CANCEL_EVENTS: dict[UUID, threading.Event] = {}
+
+# Target lab name mapping - internal metadata not exposed in public responses.
+# Maps target_id -> lab directory name for scan execution.
+_TARGET_LABS: dict[str, str] = {}
+
+# Scan lab name mapping - internal metadata not exposed in public responses.
+# Maps scan_id -> lab directory name for scan execution.
+_SCAN_LABS: dict[UUID, str] = {}
+
+# Scan internal metadata - not exposed in public ScanResponse schema.
+# Maps scan_id -> dict of internal fields (target_url, stop_reason, duration_ms, error).
+_SCAN_META: dict[UUID, dict[str, Any]] = {}
 
 
 def _session_scenario(session: dict[str, Any]) -> ScenarioSpec:
@@ -837,6 +859,8 @@ async def add_target(
             "lab": payload.lab,
             "owned": False,  # ownership not verified by registration alone
         }
+    if payload.lab:
+        _TARGET_LABS[payload.target_id] = "vibe_notes_node"
     return store.targets[payload.target_id]
 
 
@@ -850,8 +874,30 @@ async def create_scan(
     # target must exist
     if payload.target_id not in store.targets:
         raise HTTPException(status_code=404, detail="target not found")
+
+    target_entry = store.targets[payload.target_id]
+
+    # Only lab targets can be scanned through this API.
+    # Non-lab targets require ownership verification (not yet supported).
+    if not target_entry.get("lab"):
+        raise HTTPException(
+            status_code=403,
+            detail="non-lab targets require ownership verification",
+        )
+
+    lab_name = _TARGET_LABS.get(payload.target_id)
+    if not lab_name:
+        raise HTTPException(
+            status_code=400,
+            detail="target has no associated lab",
+        )
+
     async with store.lock:
         sid = _new_id()
+        cancel_event = threading.Event()
+        _SCAN_CANCEL_EVENTS[sid] = cancel_event
+        _SCAN_LABS[sid] = lab_name
+        _SCAN_META[sid] = {"target_url": target_entry["url"]}
         store.scans[sid] = {
             "scan_id": sid,
             "target_id": payload.target_id,
@@ -859,9 +905,170 @@ async def create_scan(
             "findings_count": 0,
             "requests_used": 0,
             "request_budget": 100,
-            "note": "Scan execution not yet integrated; scan remains PENDING",
+            "note": "Scan queued",
         }
+
+    # Start scan execution in the background. Returns immediately with PENDING
+    # state; the background task updates state when the scan completes/fails.
+    asyncio.create_task(_run_scan_background(sid, target_entry, cancel_event))
+
     return store.scans[sid]
+
+
+async def _run_scan_background(
+    scan_id: UUID,
+    target_entry: dict[str, Any],
+    cancel_event: threading.Event,
+) -> None:
+    """Run a scan in the background and update the scan record with results.
+    Any exception is caught and recorded as a FAILED state."""
+    lab_name = _SCAN_LABS.get(scan_id)
+    if not lab_name:
+        async with store.lock:
+            scan = store.scans.get(scan_id)
+            if scan is not None:
+                scan["state"] = RunState.FAILED
+                scan["error"] = "no lab associated with scan"
+        _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+        return
+
+    try:
+        result = await asyncio.to_thread(
+            _execute_scan, scan_id, target_entry, lab_name, cancel_event
+        )
+    except Exception as exc:
+        async with store.lock:
+            scan = store.scans.get(scan_id)
+            if scan is not None:
+                scan["state"] = RunState.FAILED
+            _SCAN_META[scan_id] = {"error": str(exc)[:300]}
+        _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+        return
+
+    # Update scan record with results
+    async with store.lock:
+        scan = store.scans.get(scan_id)
+        if scan is None:
+            _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+            _SCAN_LABS.pop(scan_id, None)
+            _SCAN_META.pop(scan_id, None)
+            return
+
+        stop_reason = result.stop_reason.lower()
+        if stop_reason == "completed":
+            scan["state"] = RunState.COMPLETED
+        elif stop_reason == "cancelled":
+            scan["state"] = RunState.CANCELLED
+        else:
+            scan["state"] = RunState.FAILED
+
+        scan["findings_count"] = len(result.findings)
+        scan["requests_used"] = result.requests_used
+
+        # Store internal metadata separately (not in ScanResponse schema)
+        _SCAN_META[scan_id].update({
+            "stop_reason": result.stop_reason,
+            "duration_ms": result.duration_ms,
+        })
+
+        # Persist findings associated with this scan
+        for finding in result.findings:
+            fid = _new_id()
+            store.findings[fid] = {
+                "id": fid,
+                "session_id": result.session_id,
+                "target_id": target_entry["target_id"],
+                "scan_id": scan_id,
+                "state": finding.verification.state,
+                "severity": finding.candidate.severity.value,
+                "summary": finding.candidate.summary,
+                "mode": LabelMode.SIMULATED,
+                "model_provider": None,
+                "model_name": None,
+                "created_at": datetime.now(UTC),
+            }
+
+    _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+
+
+def _execute_scan(
+    scan_id: UUID,
+    target_entry: dict[str, Any],
+    lab_name: str,
+    cancel_event: threading.Event,
+) -> Any:
+    """Run a scan in a worker thread. Creates its own SQLite connection
+    (connections cannot cross threads)."""
+
+    # Build TargetAuthorization from the stored target entry
+    parsed = urlparse(target_entry["url"])
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or 80
+
+    target = TargetAuthorization(
+        target_id=target_entry["target_id"],
+        base_url=target_entry["url"],
+        scope=TargetScope(
+            schemes=["http"],
+            hosts=[host],
+            ports=[port],
+        ),
+        lab=True,
+        ownership_method="lab_registration",
+        verification_token_hash="",
+        verified_at=None,
+        status=TargetStatus.VERIFIED,
+    )
+
+    # Load scan profile
+    profile = _load_scan_profile()
+
+    # Create a fresh SQLite connection for this scan (cannot cross threads)
+    db_path = Path(__file__).resolve().parents[2] / "evaluations" / "final" / "evidence.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=10)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    _evidence_migrate(conn)
+
+    try:
+        labs_root = Path(__file__).resolve().parents[2] / "labs"
+        result = run_scan(
+            target=target,
+            profile=profile,
+            labs_root=labs_root,
+            lab_name=lab_name,
+            conn=conn,
+            cancel_event=cancel_event,
+        )
+        return result
+    finally:
+        conn.close()
+
+
+@router.post("/scans/{scan_id}/cancel", tags=["scans"])
+async def cancel_scan(
+    scan_id: UUID,
+    user: str = Depends(_require_auth),
+):
+    """Request cancellation of a running scan. Sets the cancel event that
+    run_scan() checks between checks. The scan stops at the next check
+    boundary and leaves honest evidence of what was completed."""
+    async with store.lock:
+        scan = store.scans.get(scan_id)
+        if scan is None:
+            raise HTTPException(status_code=404, detail="scan not found")
+        if scan["state"] not in (RunState.PENDING, RunState.RUNNING):
+            raise HTTPException(
+                status_code=400,
+                detail=f"scan is in {scan['state']} state, cannot cancel",
+            )
+        cancel_event = _SCAN_CANCEL_EVENTS.get(scan_id)
+        if cancel_event is not None:
+            cancel_event.set()
+        scan["state"] = RunState.CANCELLED
+
+    return {"scan_id": scan_id, "state": RunState.CANCELLED}
 
 
 @router.get("/scans/{scan_id}/findings", response_model=list[FindingResponse], tags=["scans"])
@@ -882,14 +1089,13 @@ async def get_scan_findings(
     if scan is None:
         raise HTTPException(status_code=404, detail="scan not found")
 
-    # Scan execution is not yet integrated, so scans remain PENDING with
-    # no findings. If a scan were completed, its findings would be listed
-    # here (filtered by scan association if such tracking existed).
+    # Unknown scan: 404 (raised above). Known pending scan: honest empty response.
+    # Completed scan: return findings associated with THIS scan only.
     if scan["state"] != RunState.COMPLETED:
         return []
 
     async with store.lock:
-        items = list(store.findings.values())
+        items = [f for f in store.findings.values() if f.get("scan_id") == scan_id]
     return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
 
 
