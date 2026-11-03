@@ -22,10 +22,10 @@ Last updated: 2026-11-03
 | Item | Value |
 |------|-------|
 | Branch | work/ds |
-| Worker SHA | 7a7ab19 |
+| Worker SHA | 16a6a7c |
 | Main SHA | e035f379b246a0d5dbcb7ae57ffc2ab642718052 |
 | Origin/main SHA | e035f379b246a0d5dbcb7ae57ffc2ab642718052 |
-| Ahead of main | 8 commits |
+| Ahead of main | 10 commits |
 | Behind main | 0 commits |
 | Worktree status | clean |
 | Merged | NO |
@@ -43,6 +43,7 @@ Last updated: 2026-11-03
 | ef9a625 | Implement scanner API execution and fix CI packaging |
 | 1ed9a7f | Implement gated shield activation |
 | 7a7ab19 | Add scanner/shield regression tests and fix dashboard Tailwind |
+| 16a6a7c | Fix scanner execution and restore fail-closed shield approval |
 
 ## Verified Results (current session)
 
@@ -78,11 +79,12 @@ Last updated: 2026-11-03
 | Area | Fix | Status |
 |------|-----|--------|
 | CI packaging | `pip install -e sdk/python` added to CI workflow | COMPLETE |
-| Scanner API execution | `create_scan` runs `run_scan()` in background thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted | COMPLETE |
-| Shield activation | `approve_shield_rule` uses RuleLifecycle.approve_rule() with benign-replay gate, returns ACTIVE only when gate passes | COMPLETE |
-| Scan findings endpoint | GET /scans/{scan_id}/findings returns 404 for unknown, empty for PENDING, findings for COMPLETED (filtered by scan_id) | COMPLETE |
-| Dashboard Tailwind | Replaced unprocessed @tailwind directives with plain CSS utility classes | COMPLETE |
+| Scanner API execution | `create_scan` runs `run_scan()` in background daemon thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted, separate scan evidence DB | COMPLETE |
+| Shield approval | Fail-closed: `approve_shield_rule` rejects all activations with 400, rules stay PROPOSED | COMPLETE (fail-closed, not actual activation) |
+| Scan findings endpoint | GET /scans/{scan_id}/findings returns 404 for unknown, findings for any state (filtered by scan_id) | COMPLETE |
+| Scan status endpoint | GET /scans/{scan_id} returns current scan state | COMPLETE |
 | Shield list serialization | Explicit ShieldRuleResponse conversion, pagination applied before serialization | COMPLETE |
+| Dashboard Tailwind | Replaced unprocessed @tailwind directives with plain CSS utility classes | COMPLETE |
 
 ## Implemented Features
 
@@ -91,8 +93,8 @@ Last updated: 2026-11-03
 | Policy gateway | POST /api/v1/policy/decide | PASS |
 | Session management | POST /api/v1/sessions | PASS |
 | Approval workflow | POST /api/v1/approvals | PASS |
-| Shield rules | POST/GET/POST-approve /api/v1/shield/rules | PASS (gated activation) |
-| Scan execution | POST /api/v1/scans, GET /scans/{id}/findings, POST /scans/{id}/cancel | PASS |
+| Shield rules | POST/GET/POST-approve /api/v1/shield/rules | PASS (fail-closed, no actual activation) |
+| Scan execution | POST /api/v1/scans, GET /scans/{id}, GET /scans/{id}/findings, POST /scans/{id}/cancel | PASS |
 | Evidence verification | POST /evidence/verify | PASS |
 | SSE event stream | GET /api/v1/events/stream | PASS |
 | Metrics | GET /api/v1/metrics | PASS |
@@ -110,14 +112,15 @@ Last updated: 2026-11-03
 | CI on GitHub | Not run for these commits (no push authorized) | NOT_RUN |
 | LICENSE | Not chosen (owner decision) | HUMAN_ACTION |
 | Repository visibility | Not public (owner decision) | HUMAN_ACTION |
+| Actual shield activation | Fail-closed only; real activation needs proxy runtime, benign-replay gate, scoped approval | NOT_RUN (feature incomplete) |
 
 ## Resolved Blockers
 
 | Blocker | Resolution |
 |---------|------------|
 | CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
-| Shield: fabricated ACTIVE state | RuleLifecycle.approve_rule() with benign-replay gate; ACTIVE only when gate passes |
-| Scan: fabricated COMPLETED state | run_scan() actually executes; PENDING→RUNNING→COMPLETED/FAILED/CANCELLED |
+| Shield: no gated activation | Fail-closed: approve_shield_rule rejects all activations with 400 |
+| Scan: no execution pipeline | create_scan runs run_scan() in background daemon thread |
 | Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
 | Shield list: no pagination | _paginate applied before serialization |
 | Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
@@ -132,6 +135,7 @@ Last updated: 2026-11-03
 6. Live model credentials for benchmark (owner)
 7. Docker Desktop daemon for PHP scanner tests (owner)
 8. Playwright Chromium for browser E2E (owner)
+9. Actual shield activation implementation (owner - new feature development)
 
 MERGED: NO
 PUSHED: NO

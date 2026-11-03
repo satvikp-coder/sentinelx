@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** 7a7ab19
+**Worker SHA:** 16a6a7c
 
 ---
 
@@ -17,16 +17,16 @@
 | Dashboard Attack Lab crashes | Creates real session + run via API before making decisions; defensive `ruleIds` access |
 | Evidence UI: SSE named events not received | Server no longer sends `event:` lines; all events arrive as `message` events via `onmessage` |
 | API targets: URL validation bypassable | Proper `urlparse()` host parsing; rejects `http://localhost:80@example.invalid/`, `file://localhost/etc/passwd` |
-| API scans: fabricated COMPLETED state | Initial state is `PENDING`; note field explains execution not integrated |
-| API shield: fabricated ACTIVE state | Initial state is `PROPOSED`; `expires_at` from TTL; note field explains activation not integrated |
+| API scans: fabricated COMPLETED state | Initial state is `PENDING`; scan execution runs `run_scan()` in background thread |
+| API shield: fabricated ACTIVE state | Fail-closed: `approve_shield_rule` rejects all activations with 400 |
 | labctl: socket ownership fails open | `_socket_owner_pid(port, host)` requires TCP socket type and matching host address; fail closed on lookup failure |
 | fresh_clone_check: copies .env | `.env` and `.env.local` added to EXCLUDE_NAMES |
 | Evidence events: action_id string used as UUID | `uuid4()` used for event `id`; `action_id` kept in payload |
-| Scan endpoint: hangs when lab unavailable | Scan creates PENDING record without executing; no hang |
+| Scan endpoint: hangs when lab unavailable | Scan creates PENDING record; background execution in daemon thread |
 | Socket ownership: accepts UDP/non-LISTEN/different address | Requires SOCK_STREAM + LISTEN state; matches host address; fails closed when ownership unknown |
 | CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
-| Shield: no gated activation | RuleLifecycle.approve_rule() with benign-replay gate; ACTIVE only when gate passes |
-| Scan: no execution pipeline | create_scan runs run_scan() in background thread; state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED |
+| Shield: no gated activation | Fail-closed: approve_shield_rule rejects all activations with 400 |
+| Scan: no execution pipeline | create_scan runs run_scan() in background daemon thread; state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED |
 | Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
 | Shield list: no pagination | _paginate applied before serialization |
 | Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
@@ -109,6 +109,25 @@
 
 ---
 
+## BLOCKERS REQUIRING FEATURE DEVELOPMENT
+
+### 9. Actual shield activation
+**Why:** Shield approval endpoint is fail-closed (rejects all activations with 400). Real activation requires:
+- Scoped approval bound to exact rule/session/target
+- Latest rejection/revocation enforcement
+- Benign-replay gate with representative benign traffic
+- Actual proxy/runtime integration (ShieldProxy)
+- Durable activation evidence
+- Kill switch, TTL, automatic expiry
+- Safe rollback/fail-closed behavior
+**Prerequisites:** Shield proxy runtime integration, benign-replay gate corpus
+**Expected cost/risk:** High (new feature development)
+**Safe command/procedure:** Implement activate_shield_rule through RuleLifecycle with actual ShieldProxy
+**Expected evidence:** Rule transitions PROPOSED→ACTIVE with real runtime enforcement
+**Who must authorize/execute:** Owner
+
+---
+
 ## NON-BLOCKERS (documented limitations)
 
 | Item | Status | Why not a blocker |
@@ -128,8 +147,9 @@
 | Blocker | Resolution |
 |---------|------------|
 | CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
-| Shield: no gated activation | RuleLifecycle.approve_rule() with benign-replay gate; ACTIVE only when gate passes |
-| Scan: no execution pipeline | create_scan runs run_scan() in background thread; state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED |
+| Shield: unsafe gated activation | Removed unsafe shortcut; restored fail-closed (400 rejection) |
+| Scan: no execution pipeline | create_scan runs run_scan() in background daemon thread |
+| Scan: invalid TargetAuthorization | Target registration now stores verification_token_hash and verified_at |
 | Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
 | Shield list: no pagination | _paginate applied before serialization |
 | Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
