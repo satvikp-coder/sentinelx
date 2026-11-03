@@ -136,9 +136,9 @@ class RuleCompiler:
         if scope.parameter is not None and scope.parameter == "":
             return CompileResult(None, True, "Parameter cannot be empty if provided")
 
-        # Validate TTL
+        # Validate TTL (honour the caller-provided value, not the default)
         try:
-            ttl = _parse_ttl(None)  # use default
+            ttl = _parse_ttl(ttl_minutes)
         except ValueError as e:
             return CompileResult(None, True, str(e))
 
@@ -217,20 +217,37 @@ class BenignReplayGate:
                 blocking.append(req)
 
         if blocking:
-            # Create escalation ticket
-            ticket = EscalationTicket(
-                id=f"esc_{uuid.uuid4().hex[:12]}",
-                finding_id=rule.linked_finding_id or f"finding_{uuid.uuid4().hex[:12]}",
-                evidence_event_ids=rule.intent_event_ids,
-                explanation=(
-                    f"Benign-replay gate rejected rule {rule.id}: "
-                    f"{len(blocking)} benign request(s) would be blocked/altered"
-                ),
-                options=["DISCARD_RULE", "NARROW_SCOPE"],
-                suggested_interim_shield_id=rule.id,
-                status=EscalationStatus.OPEN,
-                created_at=_now(),
-            )
+            # Escalation tickets require at least one evidence reference. When the
+            # rule carries none (an API-proposed rule with no cited intent events),
+            # record the gate rejection itself as real evidence - never fabricate
+            # an unrelated reference. If even that write fails, return the
+            # rejection without a ticket: the gate must never crash the caller.
+            evidence_ids = list(rule.intent_event_ids)
+            if not evidence_ids:
+                try:
+                    evt = self.store.append(
+                        self.session_id, "shield_gate_rejection", EvidenceState.OBSERVED,
+                        "sentinelx.shield",
+                        {"rule_id": rule.id, "benign_blocked": len(blocking),
+                         "benign_total": len(self._benign_requests)})
+                    evidence_ids = [evt.id]
+                except Exception:  # noqa: BLE001 - evidence failure must not crash the gate
+                    evidence_ids = []
+            ticket = None
+            if evidence_ids:
+                ticket = EscalationTicket(
+                    id=f"esc_{uuid.uuid4().hex[:12]}",
+                    finding_id=rule.linked_finding_id or f"finding_{uuid.uuid4().hex[:12]}",
+                    evidence_event_ids=evidence_ids,
+                    explanation=(
+                        f"Benign-replay gate rejected rule {rule.id}: "
+                        f"{len(blocking)} benign request(s) would be blocked/altered"
+                    ),
+                    options=["DISCARD_RULE", "NARROW_SCOPE"],
+                    suggested_interim_shield_id=rule.id,
+                    status=EscalationStatus.OPEN,
+                    created_at=_now(),
+                )
             return GateResult(False, len(blocking), len(self._benign_requests), blocking, ticket,
                               rule_hash(rule), _now())
 
@@ -427,6 +444,27 @@ class RuleLifecycle:
         if not rule:
             return False
         rule = rule.model_copy(update={"status": ShieldStatus.REMOVED})
+        self._rules[rule_id] = rule
+        return True
+
+    def expire_rule(self, rule_id: Id) -> bool:
+        """Manually expire one rule. Returns False when the rule does not exist
+        or is already terminal (EXPIRED/REMOVED)."""
+        rule = self._rules.get(rule_id)
+        if not rule or rule.status in (ShieldStatus.EXPIRED, ShieldStatus.REMOVED):
+            return False
+        rule = rule.model_copy(update={"status": ShieldStatus.EXPIRED})
+        self._rules[rule_id] = rule
+        return True
+
+    def deactivate_rule(self, rule_id: Id) -> bool:
+        """Transaction compensation: return an ACTIVE rule to PROPOSED after a
+        downstream persistence failure. This is the ONLY non-activation exit
+        from ACTIVE; it never assigns ACTIVE."""
+        rule = self._rules.get(rule_id)
+        if not rule or rule.status != ShieldStatus.ACTIVE:
+            return False
+        rule = rule.model_copy(update={"status": ShieldStatus.PROPOSED})
         self._rules[rule_id] = rule
         return True
 

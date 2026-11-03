@@ -75,7 +75,8 @@ class ShieldApp:
         await self.proxy(scope, receive, send)
 
 
-def build_app(config: ShieldConfig, benign: list[dict[str, Any]] | None = None) -> ShieldApp:
+def build_app(config: ShieldConfig, benign: list[dict[str, Any]] | None = None,
+              runtime_store: Any = None) -> ShieldApp:
     conn = connect(":memory:")
     migrate(conn)
     store = EvidenceStore(conn)
@@ -86,9 +87,14 @@ def build_app(config: ShieldConfig, benign: list[dict[str, Any]] | None = None) 
     recorder = ShieldRecorder(store, session.id, config.evidence_batch_interval_s,
                               config.suspicious_rate_cap_per_min)
     return ShieldApp(ShieldProxy(config, store, session.id, detector, recorder,
-                                 benign_requests=benign))
+                                 benign_requests=benign, runtime_store=runtime_store))
 
 
 def create_shield_app() -> ShieldApp:
     benign_file = os.environ.get("SHIELD_BENIGN_FILE")
-    return build_app(build_config(), load_benign_requests(benign_file) if benign_file else [])
+    from .runtime import ShieldRuntimeStore, default_runtime_db
+
+    runtime = ShieldRuntimeStore(default_runtime_db(os.environ.get("SHIELD_RUNTIME_DB")))
+    return build_app(build_config(),
+                     load_benign_requests(benign_file) if benign_file else [],
+                     runtime_store=runtime)

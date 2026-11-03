@@ -51,7 +51,8 @@ def _clean_path(path: str) -> str:
 class ShieldProxy:
     def __init__(self, config: ShieldConfig, store, session_id: str, detector: Detector,
                  recorder: ShieldRecorder, http_client: httpx.AsyncClient | None = None,
-                 clock=time.monotonic, benign_requests: list[dict] | None = None
+                 clock=time.monotonic, benign_requests: list[dict] | None = None,
+                 runtime_store: Any = None
                  ) -> None:
         self.config = config
         self.store = store
@@ -64,6 +65,9 @@ class ShieldProxy:
         self._upstream_url = config.upstream.rstrip("/")
         self._model_calls: dict[str, list[float]] = {}
         self.rules = RuleLifecycle(store, session_id)
+        # Optional shared runtime store: rules activated by the API control
+        # plane are enforced by this proxy even in a separate process.
+        self.runtime_store = runtime_store
         self._compiler = RuleCompiler(store, session_id)
         self._benign = list(benign_requests or [])
         self._seen_rules: set[tuple] = set()
@@ -168,7 +172,20 @@ class ShieldProxy:
                     headers: dict[str, str]) -> EvalDecision:
         req = {"method": method, "path": path, "params": params, "headers": headers,
                "client_key": client_key}
-        return evaluate_rules(self.rules.list_rules(), req)
+        # Local lifecycle rules (auto-shield and single-process demo paths).
+        decision = evaluate_rules(self.rules.list_rules(), req)
+        if not decision.allowed:
+            return decision
+        # Shared runtime rules activated by the API control plane. The store
+        # re-validates payload hashes; invalid rows are never enforced.
+        if self.runtime_store is not None:
+            try:
+                shared = self.runtime_store.active_rules()
+            except Exception:  # noqa: BLE001 - an unreadable store must not block traffic
+                shared = []
+            if shared:
+                return evaluate_rules(shared, req)
+        return decision
 
     @staticmethod
     def _rule_spec(intent: str, path: str, params: dict[str, str]
@@ -436,8 +453,15 @@ class ShieldProxy:
         await self._send_response(send, resp.status_code, resp.headers, content, None)
 
     def _log(self, entry: dict[str, Any]) -> None:
+        # Redact the raw path before retention: request paths may carry
+        # credential-shaped values. Normalize ids with path_template first so
+        # the log stays useful, then redact any remaining secret shapes.
+        from .recorder import path_template
+
+        safe = dict(entry)
+        safe["path"] = str(redact(path_template(str(entry.get("path", "")))).value)
         if len(self.request_log) < 20000:
-            self.request_log.append(entry)
+            self.request_log.append(safe)
 
     # ---- model path (off request path)
 

@@ -81,10 +81,12 @@ class ShieldRecorder:
                latency_ms: float, signals: list, suspicious: bool, shield_error: bool = False
                ) -> None:
         now = self.clock()
+        from sentinelx.policy.redaction import redact as _redact
+
         entry = {
             "client_key": client_key,
             "method": method,
-            "path_template": path_template(path),
+            "path_template": str(_redact(path_template(path)).value),
             "status": status,
             "size": size,
             "latency_ms": round(latency_ms, 2),
