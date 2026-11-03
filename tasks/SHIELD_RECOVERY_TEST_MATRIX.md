@@ -59,6 +59,7 @@
 | `pytest tests/unit/test_shield_rules.py tests/unit/test_shield_proxy.py tests/unit/test_shield_modes_approval.py tests/unit/test_shield_modes_sim_isolation.py tests/unit/test_shield_model.py tests/unit/test_shield_intent.py tests/unit/test_shield_intent_aggregate.py tests/unit/test_shield_isolation.py tests/unit/test_shield_evidence.py tests/unit/test_shield_detect.py tests/unit/test_shield_config.py tests/unit/test_shield_activation_integration.py tests/unit/test_shield_e2e_public_api.py tests/unit/test_shield_recovery_failures.py tests/unit/test_api_units.py tests/unit/test_api_security_repair2.py` | all passed, exit 0 |
 | `pytest tests/integration/test_labs.py` | 26 passed, 8 docker-skipped, exit 0 |
 | `pytest tests/integration/test_scanner_against_labs.py` | 10 passed, 4 docker-skipped, exit 0 |
+| Full fast suite `pytest -m "not slow"` (after lab process stopped) | **all passed, exit 0** — 1411 collected, 0 failures, 0 errors, 0 silently-skipped (docker/browser counts printed: 0) |
 | `ruff check .` | All checks passed, exit 0 |
 | `git diff --check` | clean, exit 0 |
 
