@@ -2,9 +2,9 @@
 
 **Audit date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** 1933b80
+**Worker SHA:** b4f2ec1
 **Main/origin main SHA:** 83030082641fca857df39f0db77ae4024efcbc21
-**Ahead of main:** 46 commits | **Behind main:** 0 commits
+**Ahead of main:** 53 commits | **Behind main:** 0 commits
 **Both worktrees:** clean
 **Merged:** NO | **Pushed:** NO | **Deployed:** NO | **Published:** NO
 
@@ -103,7 +103,7 @@ All integration blockers from the independent review were resolved:
 | npm audit | `npm audit` (apps/web) | 0 vulnerabilities | 0 |
 | git diff --check | `git diff --check` | clean | 0 |
 
-**Total focused tests:** 121 passed (43 API units + 26 security repair + 16 metrics + 18 evidence + 9 final_run + 9 agent_guard)
+**Total focused tests:** 121 passed (43 API units + 26 security repair + 16 metrics + 18 evidence + 9 final run + 9 agent guard)
 **Full fast suite:** 1363 passed, 0 failed, 150 deselected
 
 ---
