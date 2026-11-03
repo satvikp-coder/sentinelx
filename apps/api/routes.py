@@ -35,11 +35,15 @@ from pydantic import ValidationError
 
 from sentinelx.common_schemas import (
     ActionRequest,
+    ApprovalDecision,
     ApprovalRecord,
     EvidenceState,
     PolicyDecision,
     ScenarioSpec,
     SessionState,
+    ShieldRule,
+    ShieldScope,
+    ShieldStatus,
     TargetAuthorization,
     TargetScope,
     TargetStatus,
@@ -59,6 +63,11 @@ from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
 from sentinelx.scanner.models import load_profile as _load_scan_profile
 from sentinelx.scanner.orchestrate import run_scan
+from sentinelx.shield.config import ShieldConfig
+from sentinelx.shield.detect import Detector
+from sentinelx.shield.proxy import ShieldProxy
+from sentinelx.shield.recorder import ShieldRecorder
+from sentinelx.shield.rules import BenignReplayGate, GateError, ShieldAction
 
 from . import events
 from .auth import (
@@ -203,6 +212,69 @@ _NATIVE_SESSION_TO_API: dict[str, UUID] = {}
 # threads (not the ASGI event loop) update scan records, so asyncio.Lock
 # is unsafe here; threading.Lock is required.
 _SCAN_STATE_LOCK = threading.Lock()
+
+# ------------------------------------------------------------------ shield proxy
+# A single module-level ShieldProxy instance. It owns its own EvidenceStore
+# connection (SQLite cannot cross threads) and its own RuleLifecycle for rule
+# enforcement. All shield rules created through the API are mirrored into the
+# proxy's lifecycle so that approved ACTIVE rules are enforced at runtime.
+_SHIELD_PROXY: ShieldProxy | None = None
+
+
+def _shield_proxy() -> ShieldProxy:
+    """Lazily construct the module-level ShieldProxy.
+
+    Constructed on first use (not import time) so that missing optional
+    dependencies or configuration do not break API startup.
+    """
+    global _SHIELD_PROXY
+    if _SHIELD_PROXY is not None:
+        return _SHIELD_PROXY
+
+    from pathlib import Path as _Path
+
+    import yaml as _yaml
+
+    ROOT = _Path(__file__).resolve().parents[2]
+    config_data = _yaml.safe_load(
+        (ROOT / "configs" / "shield" / "default.yaml").read_text(encoding="utf-8")
+    )
+    config = ShieldConfig.model_validate(config_data)
+
+    # Dedicated EvidenceStore connection for the proxy's rule lifecycle.
+    # SQLite connections cannot cross threads; this connection is used only
+    # by the proxy's rule lifecycle and approval evidence writes.
+    _proxy_db_path = (
+        Path(__file__).resolve().parents[2] / "evaluations" / "shield" / "evidence.db"
+    )
+    _proxy_db_path.parent.mkdir(parents=True, exist_ok=True)
+    _proxy_conn = sqlite3.connect(str(_proxy_db_path), isolation_level=None, timeout=10)
+    _proxy_conn.row_factory = sqlite3.Row
+    _proxy_conn.execute("PRAGMA journal_mode=WAL")
+    _evidence_migrate(_proxy_conn)
+    _proxy_store = EvidenceStore(_proxy_conn)
+
+    # A GUARD session owns the proxy's rule lifecycle and evidence writes.
+    from sentinelx.common_schemas import Actor, ActorRole, SessionKind
+    from sentinelx.evidence.sessions import SessionService
+
+    _proxy_session, _ = SessionService(_proxy_conn).create(
+        kind=SessionKind.GUARD,
+        policy_version="1.0",
+        actor=Actor(id="shield-api", role=ActorRole.SYSTEM),
+    )
+
+    detector = Detector.load(str(ROOT / "configs" / "shield" / "signals.yaml"))
+    recorder = ShieldRecorder(
+        _proxy_store, _proxy_session.id,
+        config.evidence_batch_interval_s,
+        config.suspicious_rate_cap_per_min,
+    )
+
+    _SHIELD_PROXY = ShieldProxy(
+        config, _proxy_store, _proxy_session.id, detector, recorder,
+    )
+    return _SHIELD_PROXY
 
 # Scan lab name mapping - internal metadata not exposed in public responses.
 # Maps scan_id -> lab directory name for scan execution.
@@ -1402,9 +1474,28 @@ async def create_shield_rule(
             "ttl_minutes": payload.ttl_minutes,
             "created_at": now,
             "expires_at": expires_at,
-            "note": "Shield activation not yet integrated; rule remains PROPOSED",
+            "note": "Rule proposed; activation requires human approval and benign-replay gate",
         }
         store.shield_rules[rid] = rule
+
+    # Mirror the rule into the proxy's RuleLifecycle so that an approved
+    # rule can be enforced at runtime. The rule starts PROPOSED; activation
+    # happens only after human approval passes the benign-replay gate.
+    proxy = _shield_proxy()
+    proxy.rules.add_rule(ShieldRule(
+        id=str(rid),
+        target_id="shield-api",
+        scope=ShieldScope(route=payload.route_pattern),
+        action=ShieldAction.BLOCK_ROUTE_PATTERN.value,
+        reason=payload.intent,
+        linked_finding_id=None,
+        intent_event_ids=[],
+        owner=user,
+        created_at=now,
+        expires_at=expires_at,
+        status=ShieldStatus.PROPOSED,
+    ))
+
     await events.event_stream.append(
         EventKind.SHIELD_RULE_ADDED,
         {
@@ -1451,15 +1542,26 @@ async def approve_shield_rule(
 ):
     """Record a human approval for a shield rule and activate it.
 
-    Shield activation is not yet integrated. This endpoint intentionally
-    fails closed: every approval request is rejected with 400 and the rule
-    remains PROPOSED. No ACTIVE state, no ACTIVE events, no proxy
-    activation, and no success metadata are ever produced until genuine
-    activation (scoped approval, benign-replay gate, proxy runtime, durable
-    evidence) is implemented.
+    Uses the real gated activation path:
+    1. Validates action_id matches rule_id.
+    2. Finds a stored approval for this exact rule_id in the session state.
+    3. Verifies the approval decision is "approve" (not reject/revoke).
+    4. Checks the kill switch.
+    5. Converts the API rule dict to a ShieldRule Pydantic model.
+    6. Runs the benign-replay gate through RuleLifecycle.approve_rule().
+    7. Activates the rule only if the gate passes.
+    8. Persists durable activation evidence.
+    9. Updates the API store to reflect ACTIVE state.
+
+    Returns 400 if no valid approval exists, the gate rejects, the rule is
+    not in PROPOSED state, or the kill switch is active. Returns 404 if the
+    rule does not exist. Never reports ACTIVE without actual proxy
+    registration through RuleLifecycle.
     """
     action_id = body.get("action_id")
     tool = body.get("tool", "shield_rule")
+    reviewer = body.get("reviewer", "api")
+    rationale = body.get("rationale", "")
     decision = body.get("decision", "approve")
 
     if not action_id or not tool:
@@ -1469,12 +1571,162 @@ async def approve_shield_rule(
     if action_id != str(rule_id):
         raise HTTPException(status_code=400, detail="action_id must match rule_id")
 
-    # Fail closed: shield activation is not yet integrated. Reject every
-    # approval request regardless of stored approvals, session, tool,
-    # arguments, or revocation state. The rule remains PROPOSED.
-    raise HTTPException(
-        status_code=400,
-        detail="shield activation not yet integrated; rule remains PROPOSED",
+    # Find a stored approval for this exact rule_id with decision "approve".
+    # Search all sessions' approval lists; cross-session approvals are not
+    # trusted because subject_id binds to the rule that was approved.
+    stored_approval = None
+    for _candidate_sid, candidate_state in _SESSION_STATE.items():
+        for record in candidate_state.get("approvals", []):
+            subject_id = record.get("subject_id", "")
+            if subject_id == str(rule_id) and record.get("decision") == "approve":
+                stored_approval = record
+                break
+        if stored_approval is not None:
+            break
+
+    if stored_approval is None:
+        raise HTTPException(
+            status_code=400,
+            detail="no valid approval found for this rule_id",
+        )
+
+    # Get the rule from the API store.
+    async with store.lock:
+        rule_entry = store.shield_rules.get(rule_id)
+    if not rule_entry:
+        raise HTTPException(status_code=404, detail="rule not found")
+    if rule_entry["state"] != "PROPOSED":
+        raise HTTPException(
+            status_code=400,
+            detail=f"rule is in {rule_entry['state']} state, only PROPOSED rules can be approved",
+        )
+
+    # Check kill switch before any activation attempt.
+    proxy = _shield_proxy()
+    if proxy._is_killed():
+        raise HTTPException(
+            status_code=400,
+            detail="kill switch is active; shield activation denied",
+        )
+
+    # Convert the API rule dict to a ShieldRule Pydantic model for the
+    # RuleLifecycle. The API store's rule entry mirrors the proxy's rule.
+    shield_rule = ShieldRule(
+        id=str(rule_id),
+        target_id="shield-api",
+        scope=ShieldScope(
+            route=rule_entry["route_pattern"],
+            parameter=None,
+            client=None,
+        ),
+        action=ShieldAction.BLOCK_ROUTE_PATTERN.value,
+        reason=rule_entry["intent"],
+        linked_finding_id=None,
+        intent_event_ids=[],
+        owner=stored_approval.get("reviewer", reviewer),
+        created_at=rule_entry["created_at"],
+        expires_at=rule_entry.get("expires_at"),
+        status=ShieldStatus.PROPOSED,
+    )
+
+    # Ensure the proxy's lifecycle has this rule (it should from creation,
+    # but re-add defensively in case of proxy restart).
+    proxy.rules.add_rule(shield_rule)
+
+    # Build ApprovalRecord from the stored approval. subject_id must equal
+    # the rule_id for RuleLifecycle's exact-match check.
+    approval_record = ApprovalRecord(
+        id=stored_approval.get("id", f"appr-{uuid4().hex[:12]}"),
+        subject_type="shield_rule",
+        subject_id=str(rule_id),
+        reviewer=stored_approval.get("reviewer", reviewer),
+        decision=ApprovalDecision.APPROVE,
+        rationale=stored_approval.get("rationale", rationale),
+        timestamp=stored_approval.get("timestamp", datetime.now(UTC)),
+    )
+
+    # Build a BenignReplayGate with representative benign requests. These are
+    # common benign requests that a narrowly-scoped shield rule must not block.
+    gate = BenignReplayGate(
+        proxy.store, proxy.session_id,
+        benign_requests=[
+            {"method": "GET", "path": "/", "headers": {}, "params": {}},
+            {"method": "GET", "path": "/health", "headers": {}, "params": {}},
+            {"method": "GET", "path": "/api/notes",
+             "headers": {"Authorization": "Bearer test"}, "params": {}},
+            {"method": "POST", "path": "/api/notes",
+             "headers": {"Authorization": "Bearer test"}, "params": {}},
+        ],
+    )
+
+    # Approve and activate through the real gated path.
+    # RuleLifecycle.approve_rule() re-runs the gate and activates only if it
+    # passes. Any GateError means activation is denied.
+    try:
+        gate_result = proxy.rules.approve_rule(str(rule_id), approval_record, gate)
+    except GateError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+    if not gate_result.passed:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"benign-replay gate rejected: "
+                f"{gate_result.benign_blocked} benign request(s) would be blocked"
+            ),
+        )
+
+    # Rule is now ACTIVE in the proxy's RuleLifecycle. Update the API store
+    # to reflect the same state so listing and serialization are consistent.
+    async with store.lock:
+        rule_entry = store.shield_rules.get(rule_id)
+        if not rule_entry:
+            raise HTTPException(status_code=404, detail="rule not found")
+        rule_entry["state"] = "ACTIVE"
+        rule_entry["updated_at"] = _now()
+        rule_entry["approved_by"] = reviewer
+        rule_entry["approved_at"] = datetime.now(UTC)
+        rule_entry["approval_rationale"] = rationale
+
+    # Persist durable activation evidence in the proxy's evidence store.
+    proxy.store.append(
+        proxy.session_id,
+        "SHIELD_RULE_ACTIVATED",
+        EvidenceState.OBSERVED,
+        "sentinelx.shield",
+        {
+            "rule_id": str(rule_id),
+            "route_pattern": rule_entry["route_pattern"],
+            "intent": rule_entry["intent"],
+            "gate_passed": True,
+            "benign_blocked": gate_result.benign_blocked,
+            "rule_hash": gate_result.rule_hash,
+            "reviewer": reviewer,
+        },
+    )
+
+    # Broadcast activation event on SSE.
+    await events.event_stream.append(
+        EventKind.SHIELD_RULE_ADDED,
+        {
+            "rule_id": str(rule_id),
+            "route_pattern": rule_entry["route_pattern"],
+            "intent": rule_entry["intent"],
+            "state": "ACTIVE",
+        },
+        run_id=None,
+    )
+
+    return ShieldRuleResponse(
+        rule_id=rule_id,
+        route_pattern=rule_entry["route_pattern"],
+        intent=rule_entry["intent"],
+        mode=rule_entry["mode"],
+        state=rule_entry["state"],
+        ttl_minutes=rule_entry["ttl_minutes"],
+        created_at=rule_entry["created_at"],
+        expires_at=rule_entry.get("expires_at"),
+        note=rule_entry.get("note"),
     )
 
 
