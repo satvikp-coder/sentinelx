@@ -117,6 +117,7 @@ async function request<T>(
 ): Promise<T> {
   const resp = await fetch(`${BASE_URL}${path}`, {
     ...opts,
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${DEMO_TOKEN}`,
       "Content-Type": "application/json",
@@ -167,6 +168,7 @@ export const api = {
   eventStream: (onEvent: (event: EventData) => void, afterSeq = 0) => {
     const es = new EventSource(
       `${BASE_URL}/api/v1/events/stream?after_seq=${afterSeq}`,
+      { withCredentials: true },
     );
     es.onmessage = (e) => {
       try {

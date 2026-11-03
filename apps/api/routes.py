@@ -56,7 +56,14 @@ from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
 
 from . import events
-from .auth import DEMO_TOKEN, _bearer, require_demo_auth
+from .auth import (
+    _SSE_TTL_SECONDS,
+    DEMO_TOKEN,
+    _bearer,
+    _sign_sse_session,
+    _verify_sse_session,
+    require_demo_auth,
+)
 from .events import event_stream, sse_response
 from .schemas import (
     ApprovalRecordResponse,
@@ -326,7 +333,16 @@ async def _gateway_decide(
     # Also mirror into the in-memory events log so the /events list endpoint
     # (and the evidence timeline UI) can surface persisted decisions.
     async with store.lock:
-        store.events_log.append(ev_payload)
+        store.events_log.append(
+            {
+                "id": action_request.action_id,
+                "seq": state["last_step"],
+                "run_id": None,
+                "kind": EventKind.ACTION_DECIDED,
+                "payload": ev_payload,
+                "timestamp": datetime.now(UTC),
+            }
+        )
     await event_stream.append(
         EventKind.ACTION_DECIDED,
         ev_payload,
@@ -643,14 +659,16 @@ async def create_sse_session(
     """Create an SSE session. Sets an HttpOnly cookie that the SSE stream
     endpoint reads for authentication, avoiding query-param tokens that
     would appear in server access logs."""
+    sid = secrets.token_hex(16)
+    token = _sign_sse_session(sid)
     response.set_cookie(
         key="sse_token",
-        value="authenticated",
+        value=token,
         httponly=True,
         secure=False,  # local dev only; set True behind HTTPS
         samesite="lax",
         path="/api/v1/events/stream",
-        max_age=3600,
+        max_age=_SSE_TTL_SECONDS,
     )
     return {"status": "ok"}
 
@@ -675,8 +693,9 @@ async def stream_events(
                 detail="authentication required",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-    if not authenticated and sse_token == "authenticated":
-        authenticated = True
+    if not authenticated and sse_token is not None:
+        if _verify_sse_session(sse_token):
+            authenticated = True
     if not authenticated:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

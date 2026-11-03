@@ -188,16 +188,22 @@ export class Guard {
       // arguments match the executed arguments. If fixedArguments is not
       // provided, positional args become arg0, arg1, ...
       let arguments_: Record<string, unknown>;
+      let execArgs: unknown[];
       if (fixedArguments) {
         const argNames = Object.keys(fixedArguments);
         arguments_ = {};
+        execArgs = [];
         for (let i = 0; i < argNames.length; i++) {
-          arguments_[argNames[i]] = i < args.length ? args[i] : fixedArguments[argNames[i]];
+          const value = i < args.length ? args[i] : fixedArguments[argNames[i]];
+          arguments_[argNames[i]] = value;
+          execArgs.push(value);
         }
       } else {
         arguments_ = {};
+        execArgs = [];
         for (let i = 0; i < args.length; i++) {
           arguments_[`arg${i}`] = args[i];
+          execArgs.push(args[i]);
         }
       }
 
@@ -218,12 +224,12 @@ export class Guard {
 
       if (this.mode === "monitor") {
         // Monitor mode: record decision but always execute
-        return fn(...args);
+        return fn(...(execArgs as TArgs));
       }
 
       // Enforce mode
       if (validated.decision === "ALLOW") {
-        return fn(...args);
+        return fn(...(execArgs as TArgs));
       }
 
       if (validated.decision === "BLOCK") {
@@ -269,7 +275,7 @@ export class Guard {
           }
           throw e;
         }
-        return fn(...args);
+        return fn(...(execArgs as TArgs));
       }
 
       // Should be unreachable (decision is validated)
