@@ -2,9 +2,9 @@
 
 **Audit date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** f46e7e6
+**Worker SHA:** 1933b80
 **Main/origin main SHA:** 83030082641fca857df39f0db77ae4024efcbc21
-**Ahead of main:** 44 commits | **Behind main:** 0 commits
+**Ahead of main:** 46 commits | **Behind main:** 0 commits
 **Both worktrees:** clean
 **Merged:** NO | **Pushed:** NO | **Deployed:** NO | **Published:** NO
 
@@ -15,14 +15,14 @@
 | Check | Result |
 |-------|--------|
 | Starting worker SHA | b757a9a |
-| Ending worker SHA | f46e7e6 |
+| Ending worker SHA | 1933b80 |
 | Main/origin main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
-| Ahead of main | 44 |
+| Ahead of main | 46 |
 | Behind main | 0 |
 | Worktree status (sentinelx-ds) | clean |
 | Worktree status (AI Cybersecurity/main) | clean |
 | Protected-path changes | none (forbidden paths unchanged vs main) |
-| Commits created in this session | 9609840, 51e99d8, f46e7e6 (+ Security Repair 3 commits: beac82f, 649726b, 18a1978, 4ab4fb5, 171ce8c, c80b0d5, 75e9a12, 8037272) |
+| Commits created | 9609840, 51e99d8, 846ff57, 1fe055a, d3b0fbb, 1933b80 (+ Security Repair 3 commits) |
 
 ---
 
@@ -49,22 +49,23 @@
 
 ---
 
-## INTEGRATION BLOCKER FIXES (commit f46e7e6)
+## INTEGRATION BLOCKER FIXES
 
 All integration blockers from the independent review were resolved:
 
 | Blocker | Fix | Verification |
 |---------|-----|--------------|
-| SDK rejects localhost URLs with ports | validateBaseUrl uses URL.hostname | tsc 0 errors, unit tests pass |
-| SDK expects rule_ids API omits | rule_ids optional, defaults to [] | tsc 0 errors |
+| SDK rejects localhost URLs with ports | validateBaseUrl uses URL.hostname | tsc 0 errors |
+| SDK expects rule_ids API omits | rule_ids optional, defaults to [] | tsc 0 errors, unit tests pass |
 | SDK hardcoded "sdk-default" session ID | Removed; tool() requires sessionId | tsc 0 errors, clear GuardConfigError |
-| Dashboard SSE returns 401 | SSE endpoint accepts token query param | API route tested, dashboard passes token |
+| Dashboard SSE returns 401 | SSE endpoint accepts token query param | API route tested |
 | Dashboard hardcoded invalid session | Attack Lab creates real session | Dashboard unit tests pass |
-| API targets: JSON/query mismatch, owned=True | TargetCreate Pydantic model, owned=False | API unit tests pass |
-| API scans: fabricated COMPLETED | PENDING state | API unit tests pass |
-| API shield: ACTIVE, no expiry | PROPOSED state, expires_at from TTL | API unit tests pass |
-| labctl: lost process-ownership proof | netstat -ano verifies socket owner PID | Lab loopback tests pass |
-| fresh_clone_check: .env copy, caller's interpreter | .env excluded, fresh venv in clone | Ruff clean, tests pass |
+| Evidence UI: SSE named events not received | Server no longer sends event: lines | Lab tests pass, unit tests pass |
+| API target URL validation bypassable | urlparse() proper host parsing | Unit tests pass |
+| API scans fabricated COMPLETED | PENDING state + note field | Unit tests pass |
+| API shield fabricated ACTIVE | PROPOSED state + expires_at + note | Unit tests pass |
+| labctl socket ownership fails open | netstat/psutil lookup + bind test fallback | Lab loopback tests pass |
+| fresh_clone_check copies .env | .env and .env.local excluded, fresh venv | Ruff clean, tests pass |
 
 ---
 
@@ -79,7 +80,7 @@ All integration blockers from the independent review were resolved:
 | Budgets and concurrency | VERIFIED_LOCAL | Per-session threading.Lock; rate limit burst tested deterministically; step/rate limits enforced |
 | Secret redaction | VERIFIED_LOCAL | tool + arguments redacted via redact().value before SSE/storage; error responses use generic messages (no sensitive echo) |
 | Evidence integrity/persistence | VERIFIED_LOCAL | verify_chain() reports OK/MODIFIED/MISSING/REORDERED; persist-before-broadcast; tampering detected |
-| Scanner scope | VERIFIED_LOCAL | Localhost-only; ownership token enforced; no external targets; host:port validation |
+| Scanner scope | VERIFIED_LOCAL | Localhost-only; ownership token enforced; no external targets; urlparse host validation |
 | Shield activation | VERIFIED_LOCAL | Broad routes rejected; TTL enforced; kill switch present; monitor mode never blocks; PROPOSED state until verified |
 | Production modification | NONE | No production systems modified |
 
@@ -119,6 +120,7 @@ None identified — all implemented code passes tests and Ruff.
 | Docker-dependent scanner tests (Task 23/30) | PHP lab scoring (vibe_shop_php) | Docker Desktop daemon running | Medium (start Docker Desktop) |
 | Browser E2E (Task 29) | React dashboard E2E flows | Playwright Chromium installed | Medium (playwright install chromium) |
 | SDK runtime E2E vs real backend | Verify SDK works with live API | API server running on known port | Low |
+| Scans/shields execution/activation | Scans stay PENDING, shields stay PROPOSED | Scanner/shield execution pipeline | High (new feature development) |
 
 ### Independent-review gates
 | Gate | Status | Who must execute |
@@ -144,7 +146,7 @@ None identified — all implemented code passes tests and Ruff.
 | Implementation complete locally | YES |
 | Required local gates green | YES (Ruff clean, 1363 tests passed, tsc 0 errors, vite build success) |
 | Independent review pending | YES |
-| Entire project release-ready | NO (awaiting independent review + human actions) |
+| Project release-ready | NO (awaiting independent review + human actions + scan/shield execution pipeline) |
 | Merged | NO |
 | Pushed | NO |
 | Deployed | NO |

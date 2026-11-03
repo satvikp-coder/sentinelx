@@ -22,10 +22,10 @@ Last updated: 2026-11-03
 | Item | Value |
 |------|-------|
 | Branch | work/ds |
-| Worker SHA | f46e7e6 |
+| Worker SHA | 1933b80 |
 | Main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
 | Origin/main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
-| Ahead of main | 44 commits |
+| Ahead of main | 46 commits |
 | Behind main | 0 commits |
 | Worktree status | clean (both worktrees) |
 | Merged | NO |
@@ -70,13 +70,14 @@ Last updated: 2026-11-03
 
 ## Integration blocker fixes (all resolved)
 
-- SDK: validateBaseUrl allows ports; rule_ids optional; no hardcoded session ID
-- Dashboard: SSE token query param; Attack Lab creates real session
-- API targets: JSON body, owned=False, proper host:port validation
-- API scans: PENDING instead of COMPLETED
-- API shield: PROPOSED instead of ACTIVE, expires_at from TTL
-- labctl: netstat process-ownership proof for loopback verification
-- fresh_clone_check: .env excluded, fresh venv in clone
+- SDK: validateBaseUrl allows ports; ruleIds optional; no hardcoded session ID
+- Dashboard: SSE token query param; Attack Lab creates real session + run
+- Evidence UI: SSE events arrive via onmessage (no named events)
+- API targets: JSON body, owned=False, proper urlparse host validation
+- API scans: PENDING instead of COMPLETED + note field
+- API shield: PROPOSED instead of ACTIVE + expires_at + note field
+- labctl: netstat/psutil process-ownership proof; fall back to bind test
+- fresh_clone_check: .env and .env.local excluded; fresh venv
 
 ## Implemented Features (VERIFIED_LOCAL)
 
@@ -107,6 +108,7 @@ Tasks 21A–33 are all implemented and verified locally:
 - Docker-dependent tests (Tasks 23/30): Docker daemon not running; PHP scanner tests unrun
 - Browser E2E (Task 29): Playwright not installed; browser tests not run
 - SDK runtime E2E vs real backend: Not run; requires API server + SDK together
+- Scans stay PENDING, shields stay PROPOSED: Execution/activation pipeline not built
 - LICENSE: not chosen (owner decision)
 - Repo visibility: not changed (kept private)
 - CI: not run on GitHub for these commits (no push authorized)
@@ -125,6 +127,7 @@ External resources required:
 5. Live model credentials (owner)
 6. Docker Desktop daemon (owner)
 7. Playwright Chromium installation (owner)
+8. Scanner/shield execution pipeline (owner - new feature development)
 
 ## Next Step
 

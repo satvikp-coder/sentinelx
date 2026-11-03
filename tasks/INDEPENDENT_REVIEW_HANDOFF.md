@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** f46e7e6
+**Worker SHA:** 1933b80
 **Main/origin main SHA:** 83030082641fca857df39f0db77ae4024efcbc21
 **Reviewer:** Independent security reviewer (not the implementation worker)
 
@@ -10,10 +10,10 @@
 
 ## 1. What Was Done
 
-Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implemented and verified locally on branch `work/ds`. Additionally, all integration blockers from the independent review were resolved. The implementation worker completed:
+Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implemented and verified locally on branch `work/ds`. All integration blockers from the independent review were resolved. The implementation worker completed:
 
 - **F1-F9 Security Repair 3**: Evidence persistence, SSE redaction, session lifecycle, approval identity, test isolation, concurrency, scenario snapshots, SSE reconnect, metrics integration
-- **Integration blocker fixes**: SDK port validation, SDK rule_ids optional, SDK session ID, Dashboard SSE auth, Dashboard session creation, API target validation, API scan state, API shield state, labctl process-ownership proof, fresh_clone_check safety
+- **Integration blocker fixes**: SDK port validation, SDK rule_ids optional, SDK session ID, Dashboard SSE auth, Dashboard session creation, API target validation, API scan state, API shield state, labctl process-ownership proof, fresh_clone_check safety, Evidence UI SSE named events
 - **Ruff stabilization**: 23 errors fixed (StrEnum, unused imports, long lines, import sorting)
 - **Test fixes**: Node lab loopback check (Windows-compatible), deterministic rate limit burst test
 - **Full project**: Tasks 22-33 all implemented and VERIFIED_LOCAL
@@ -32,14 +32,15 @@ Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implement
 | Demo video recorded | Human task |
 | Hackathon submission | Human task, Nov 4 deadline |
 | SDK runtime E2E vs real backend | Requires API server running + SDK connected |
+| Scans/shields execution/activation | New feature development required |
 
 ## 3. Where to Review
 
 ### Key Security Files (read-only reference, do not modify)
 - `apps/api/routes.py` — API routes, `_gateway_decide`, `_evidence_store`, approval workflow, targets, scans, shield rules
 - `apps/api/auth.py` — Demo authentication, bearer token validation
-- `apps/api/events.py` — SSE event stream
-- `apps/api/schemas.py` — Pydantic schemas (StrEnum conversions, TargetCreate)
+- `apps/api/events.py` — SSE event stream (no named events)
+- `apps/api/schemas.py` — Pydantic schemas (StrEnum conversions, TargetCreate, ScanResponse.note, ShieldResponse.note)
 - `apps/labctl.py` — Lab lifecycle, loopback verification with netstat process-ownership proof
 - `packages/evaluation/harness.py` — Evaluation harness
 - `packages/evaluation/metrics.py` — Metrics computation
@@ -49,9 +50,9 @@ Security Repair 3 (F1-F9) and all remaining project tasks (22-33) were implement
 - `packages/shield/intent.py` — Shield intent classification
 - `packages/scanner/checks/` — Scanner checks (stored_xss, authz_post, etc.)
 - `sdk/typescript/src/client.ts` — Sidecar API client (URL validation, rule_ids optional)
-- `sdk/typescript/src/guard.ts` — Guard (no hardcoded session ID)
+- `sdk/typescript/src/guard.ts` — Guard (no hardcoded session ID, ruleIds optional)
 - `apps/web/src/api.ts` — Dashboard API layer (SSE token query param)
-- `apps/web/src/screens/AttackLab.tsx` — Dashboard Attack Lab (creates real session)
+- `apps/web/src/screens/AttackLab.tsx` — Dashboard Attack Lab (creates real session + run)
 - `scripts/fresh_clone_check.py` — Fresh clone smoke test (.env excluded, fresh venv)
 
 ### Test Files (for independent reproduction)
@@ -110,7 +111,7 @@ The independent reviewer should pay particular attention to:
 5. **SSE reconnect** (`events.py`): Integer seq cursor instead of UUID, no duplicate replay
 6. **SSE auth** (`routes.py`, `auth.py`): Token query parameter support for EventSource
 7. **Scenario binding** (`routes.py`): ScenarioSpec.model_copy(deep=True), immutable snapshot
-8. **Target validation** (`routes.py`): host:port parsing, owned=False, .lab.test suffix check
+8. **Target validation** (`routes.py`): host:port parsing via urlparse, owned=False, .lab.test suffix check
 9. **Scan state** (`routes.py`): PENDING instead of COMPLETED, no fabricated findings
 10. **Shield state** (`routes.py`): PROPOSED instead of ACTIVE, expires_at from TTL
 
@@ -125,6 +126,7 @@ The independent reviewer should pay particular attention to:
 | Live model credentials | Repository owner | Optional (for Task 25 validation) |
 | Docker Desktop | Repository owner | Optional (for PHP scanner tests) |
 | Playwright Chromium | Repository owner | Optional (for browser E2E) |
+| Scanner/shield execution pipeline | Repository owner | New feature development |
 
 ## 7. What Must NOT Be Done by Reviewer
 
@@ -142,7 +144,7 @@ The independent reviewer should pay particular attention to:
 | Implementation complete locally | YES |
 | Required local gates green | YES (1363 tests passed, Ruff clean, tsc 0 errors, vite build success) |
 | Independent review pending | YES |
-| Project release-ready | NO (awaiting review + human actions) |
+| Project release-ready | NO (awaiting review + human actions + scan/shield execution pipeline) |
 | Merged | NO |
 | Pushed | NO |
 | Deployed | NO |

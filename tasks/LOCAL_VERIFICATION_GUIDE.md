@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** 51e99d8
+**Worker SHA:** 1933b80
 **Python:** C:\Users\satvi\Desktop\sentinelx-ds\.venv\Scripts\python.exe
 
 ---
@@ -118,7 +118,7 @@ git log --oneline -5
 git diff --check
 ```
 
-Expected: Clean working tree, current SHA 51e99d8, `git diff --check` exit 0.
+Expected: Clean working tree, current SHA 1933b80, `git diff --check` exit 0.
 
 ---
 
@@ -173,3 +173,4 @@ playwright install chromium
 - Do not run destructive commands (`reset --hard`, `clean`, etc.).
 - Do not push or merge without independent review.
 - All model-related results are from scripted/planned agents, clearly labeled SIMULATED.
+- Scans stay PENDING and shields stay PROPOSED; execution/activation pipeline not yet built.

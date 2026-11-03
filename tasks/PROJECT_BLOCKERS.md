@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-11-03
 **Worker branch:** work/ds
-**Worker SHA:** f46e7e6
+**Worker SHA:** 1933b80
 
 ---
 
@@ -14,14 +14,13 @@
 | SDK expects `rule_ids` field API omits | Made `rule_ids` optional in `RawSidecarDecision`, defaults to `[]` |
 | SDK hardcoded "sdk-default" session ID | Removed; `tool()` requires explicit `sessionId` parameter, throws clear `GuardConfigError` if missing |
 | Dashboard SSE returns 401 (no auth) | SSE endpoint accepts `token` query parameter; dashboard passes it in EventSource URL |
-| Dashboard hardcoded invalid session_id | Attack Lab creates real session via `POST /api/v1/sessions` before making decisions |
-| API targets: JSON/query-parameter mismatch | Changed to `TargetCreate` Pydantic model accepting JSON body |
-| API targets: `owned=True` without verification | Changed to `owned=False`; registration doesn't verify ownership |
-| API targets: loose URL check (`.lab.test in url`) | Proper host:port parsing; checks `url_host == "127.0.0.1"` or `url_host.endswith(".lab.test")` |
-| API scans: fabricated COMPLETED state | Initial state is `PENDING`; no fabricated findings/requests |
-| API shield: ACTIVE with no expiry | Initial state is `PROPOSED`; `expires_at` set from TTL |
-| labctl: lost process-ownership proof | `netstat -ano` verifies socket-owning PID matches pid file PID |
-| fresh_clone_check: copies .env | `.env` added to EXCLUDE_NAMES |
+| Dashboard Attack Lab crashes | Creates real session + run via API before making decisions; defensive `ruleIds` access |
+| Evidence UI: SSE named events not received | Server no longer sends `event:` lines; all events arrive as `message` events via `onmessage` |
+| API targets: URL validation bypassable | Proper `urlparse()` host parsing; rejects `http://localhost:80@example.invalid/`, `file://localhost/etc/passwd` |
+| API scans: fabricated COMPLETED state | Initial state is `PENDING`; note field explains execution not integrated |
+| API shield: fabricated ACTIVE state | Initial state is `PROPOSED`; `expires_at` from TTL; note field explains activation not integrated |
+| labctl: socket ownership fails open | `netstat -ano` on Windows, `psutil` on other platforms; falls back to socket bind test when PID lookup fails |
+| fresh_clone_check: copies .env | `.env` and `.env.local` added to EXCLUDE_NAMES |
 | fresh_clone_check: uses caller's interpreter | Creates fresh venv in clone directory |
 
 ---
@@ -88,11 +87,19 @@
 **Expected evidence:** Browser tests pass
 **Who must authorize/execute:** Owner
 
+### 8. Scanner/shield execution pipeline
+**Why:** Scans stay PENDING and shields stay PROPOSED without execution/activation integration. The API returns honest states but doesn't actually execute scans or activate shields.
+**Prerequisites:** Scanner execution engine, shield activation logic (benign-replay gate)
+**Expected cost/risk:** High (new feature development)
+**Safe command/procedure:** Implement scan execution that actually runs the scanner against the target; implement shield activation that runs the benign-replay gate
+**Expected evidence:** Scan transitions from PENDING to COMPLETED with real findings; shield transitions from PROPOSED to ACTIVE after gate passes
+**Who must authorize/execute:** Owner
+
 ---
 
 ## BLOCKERS REQUIRING CI INFRASTRUCTURE
 
-### 8. GitHub Actions CI run
+### 9. GitHub Actions CI run
 **Why:** Verify CI configuration (.github/workflows/ci.yml) passes on pushed commits.
 **Prerequisites:** Repository pushed to origin
 **Expected cost/risk:** Low
@@ -130,7 +137,8 @@
 | SDK hardcoded session ID | Removed; requires explicit sessionId |
 | Dashboard SSE 401 auth | Token query parameter support |
 | Dashboard hardcoded invalid session | Attack Lab creates real session |
-| API target fabrication (owned=True, loose URL) | owned=False, proper host:port validation, JSON body |
-| API scan fabrication (COMPLETED with 0 requests) | PENDING state |
-| API shield fabrication (ACTIVE, no expiry) | PROPOSED state, expires_at from TTL |
-| fresh_clone_check (.env copy, caller's interpreter) | .env excluded, fresh venv in clone |
+| Evidence UI: SSE named events | Server no longer sends named events |
+| API target fabrication (owned=True, loose URL) | owned=False, proper host:port validation via urlparse, JSON body |
+| API scan fabrication (COMPLETED with 0 requests) | PENDING state + note field |
+| API shield fabrication (ACTIVE, no expiry) | PROPOSED state + expires_at + note field |
+| fresh_clone_check (.env copy, caller's interpreter) | .env and .env.local excluded, fresh venv in clone |
