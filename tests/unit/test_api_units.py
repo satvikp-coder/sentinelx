@@ -416,6 +416,57 @@ def test_expire_shield_rule(client):
     assert r.json()["state"] == "EXPIRED"
 
 
+# ----------------------------------------------------------- shield list pagination regressions
+
+def test_shield_list_pagination_limit1_offsets(client):
+    """Three rules, limit=1, offsets 0/1/2 return the correct single item."""
+    ids = []
+    for i in range(3):
+        r = client.post("/api/v1/shield/rules",
+                        json={"route_pattern": f"/api/p{i}", "intent": "recon",
+                              "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                        headers=AUTH)
+        assert r.status_code == 200
+        ids.append(r.json()["rule_id"])
+
+    for offset in range(3):
+        r = client.get(f"/api/v1/shield/rules?limit=1&offset={offset}", headers=AUTH)
+        assert r.status_code == 200
+        page = r.json()
+        assert len(page) == 1, f"offset {offset}: expected 1 item, got {len(page)}: {page}"
+        assert page[0]["rule_id"] == ids[offset], \
+            f"offset {offset}: expected {ids[offset]}, got {page[0]['rule_id']}"
+
+    # Offset past end returns empty
+    r = client.get("/api/v1/shield/rules?limit=1&offset=3", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json() == []
+
+    # Invalid limit rejected
+    r = client.get("/api/v1/shield/rules?limit=0", headers=AUTH)
+    assert r.status_code == 422
+
+
+def test_shield_list_response_schema(client):
+    """List response objects validate as ShieldRuleResponse (no internal metadata leakage)."""
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/z", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    rules = r.json()
+    rule = next(rr for rr in rules if rr["rule_id"] == rid)
+    # Only schema-compliant fields present
+    assert set(rule.keys()) <= {
+        "rule_id", "route_pattern", "intent", "mode", "state",
+        "ttl_minutes", "created_at", "expires_at", "note",
+    }, f"unexpected fields: {set(rule.keys())}"
+
+
 # ------------------------------------------------------------------ shield approval regressions
 
 def test_shield_approve_rejects_missing_approval(client):

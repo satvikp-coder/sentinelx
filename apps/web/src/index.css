@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -14,4 +10,189 @@ html, body {
 button:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
+}
+
+/* Utility classes (simple replacements for common Tailwind patterns) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.p-8 {
+  padding: 2rem;
+}
+
+.m-4 {
+  margin: 1rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.leading-tight {
+  line-height: 1.25;
+}
+
+.border {
+  border-width: 1px;
+}
+
+.border-gray-300 {
+  border-color: #d1d5db;
+}
+
+.rounded {
+  border-radius: 0.25rem;
+}
+
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
+.bg-white {
+  background-color: #ffffff;
+}
+
+.bg-gray-50 {
+  background-color: #f9fafb;
+}
+
+.bg-gray-100 {
+  background-color: #f3f4f6;
+}
+
+.bg-blue-600 {
+  background-color: #2563eb;
+}
+
+.bg-red-600 {
+  background-color: #dc2626;
+}
+
+.bg-green-600 {
+  background-color: #16a34a;
+}
+
+.bg-yellow-600 {
+  background-color: #ca8a04;
+}
+
+.text-white {
+  color: #ffffff;
+}
+
+.text-gray-900 {
+  color: #111827;
+}
+
+.text-gray-600 {
+  color: #4b5563;
+}
+
+.text-red-600 {
+  color: #dc2626;
+}
+
+.text-green-600 {
+  color: #16a34a;
+}
+
+.shadow {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.overflow-auto {
+  overflow: auto;
+}
+
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.top-0 {
+  top: 0;
+}
+
+.right-0 {
+  right: 0;
+}
+
+.z-50 {
+  z-index: 50;
 }
