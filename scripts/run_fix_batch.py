@@ -23,6 +23,10 @@ from sentinelx.evidence.db import connect, migrate  # noqa: E402
 from sentinelx.fixer.orchestrate import run_fix  # noqa: E402
 from sentinelx.fixer.policy import load_fix_policy  # noqa: E402
 from sentinelx.model_clients import ModelClient, load_models_config, resolve_task  # noqa: E402
+from sentinelx.model_clients.profiles import (  # noqa: E402
+    UNKNOWN_FREE_TIER_COST,
+    format_cost,
+)
 
 
 def select_findings(report: dict, policy, *, max_auto: int = 3) -> tuple[list[dict], dict | None]:
@@ -121,6 +125,9 @@ def main() -> int:
     from sentinelx.model_clients import check_budget
 
     budget = check_budget(conn, models_config, routed.profile_name)
+    profile = models_config.profiles[routed.profile_name]
+    unknown_label = UNKNOWN_FREE_TIER_COST if profile.provider == "nvidia" else "unknown"
+    spent = budget.spent_usd if profile.price_per_1m.verified else None
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -129,8 +136,9 @@ def main() -> int:
             "fix_policy_version": policy.policy_version, "generated_at_utc": time.strftime(
                 "%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
-        "spend": {"spent_usd": budget.spent_usd, "hard_cap_usd": budget.hard_cap_usd,
-                  "remaining_usd": budget.remaining_usd},
+        "spend": {"spent_usd": spent, "hard_cap_usd": budget.hard_cap_usd,
+                  "remaining_usd": budget.remaining_usd,
+                  "cost_note": unknown_label if spent is None else None},
         "results": results,
         "limitations": [
             "This batch was selected BY RULE (first 3 AUTO classes + 1 NEEDS_HUMAN per lab, "
@@ -138,16 +146,17 @@ def main() -> int:
             "Verification measures the scanner's own check plus the lab's benign traffic, not "
             "completeness of security - a VERIFIED patch is not a guarantee of no other bugs.",
             "NEEDS_HUMAN findings are never auto-fixed, regardless of verification outcome.",
-            "Estimated spend is computed from Baseten's published per-token prices, not a real "
-            "invoice - check the Baseten dashboard for the actual bill.",
+            "Known estimates use configured verified prices, not a provider invoice. "
+            "Unpriced calls remain unknown; check the provider dashboard for actual billing.",
             "The sample is small (2 labs, up to 8 findings); it demonstrates the mechanism, not "
             "statistical confidence in the fixer's overall success rate.",
         ],
     }
     (out_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\nwrote {out_dir / 'report.json'}")
-    print(f"spend: ${budget.spent_usd:.5f} / ${budget.hard_cap_usd:.2f} "
-         f"(${budget.remaining_usd:.5f} remaining)")
+    print(f"spend: {format_cost(spent, unknown_label=unknown_label, precision=5)} / "
+          f"{format_cost(budget.hard_cap_usd)} "
+          f"({format_cost(budget.remaining_usd, precision=5)} remaining)")
     return 0
 
 

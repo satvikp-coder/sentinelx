@@ -6,8 +6,8 @@ The historical placeholder table below is not a complete current dependency/lice
 inventory. Python/FastAPI/Pydantic/httpx/PyYAML/Uvicorn/psutil, React/Vite/TypeScript
 and test/build tooling are used; see `pyproject.toml`, `package-lock.json` and the
 SDK manifests for exact dependency declarations. Owner must verify redistribution
-notices and applicable licenses before public release. No project license has been
-selected. Reference-tool license labels below are relayed/unverified, not a claim
+notices and applicable licenses before public release. Owner selected the project
+MIT license, copyright 2026 Satvik Patel. Reference-tool license labels below are relayed/unverified, not a claim
 that those tools were installed or their source copied.
 
 Historical provider traces were reviewed separately in

@@ -16,6 +16,10 @@ sys.path.insert(0, str(ROOT))
 
 from sentinelx.evidence.db import connect, migrate  # noqa: E402
 from sentinelx.model_clients import check_budget, estimate_cost, load_models_config  # noqa: E402
+from sentinelx.model_clients.profiles import (  # noqa: E402
+    UNKNOWN_FREE_TIER_COST,
+    format_cost,
+)
 
 
 def main() -> int:
@@ -35,10 +39,12 @@ def main() -> int:
         return 2
 
     per_call = estimate_cost(profile, args.tokens_in, args.tokens_out, args.cached_tokens)
-    worst_case_total = per_call * args.calls
+    worst_case_total = per_call * args.calls if per_call is not None else None
+    unknown_label = UNKNOWN_FREE_TIER_COST if profile.provider == "nvidia" else "unknown"
     print(f"{args.calls} calls x worst-case ({args.tokens_in} in / {args.tokens_out} out"
          f"{f' / {args.cached_tokens} cached' if args.cached_tokens else ''} tokens) "
-         f"@ {profile.name} -> ${worst_case_total:.4f} worst case (${per_call:.4f}/call)")
+         f"@ {profile.name} -> {format_cost(worst_case_total, unknown_label=unknown_label)} "
+         f"worst case ({format_cost(per_call, unknown_label=unknown_label)}/call)")
     if not profile.price_per_1m.verified:
         print(f"NOTE: {profile.name}'s prices are UNVERIFIED (placeholder) - "
              f"{profile.price_per_1m.note or 'no published rate found'}")
@@ -50,6 +56,9 @@ def main() -> int:
         print(f"{profile.name} has no configured budget - nothing to check against.")
         return 0
     budget = config.budget[args.profile]
+    if bc.status == "COST_UNKNOWN" or worst_case_total is None:
+        print("REFUSED: cannot verify the budget with unknown usage or pricing.")
+        return 1
     usable_remaining = bc.remaining_usd - budget.reserved_usd if bc.remaining_usd else 0.0
     print(f"spend so far: ${bc.spent_usd:.4f} / ${bc.hard_cap_usd:.2f} hard cap "
          f"(${budget.reserved_usd:.2f} reserved, never spent by experiments) "

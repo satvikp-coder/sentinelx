@@ -709,3 +709,14 @@ visibility and portal submission remain owner actions. No “hackathon win” pr
 passed in the recorded scope; resolve owner/security/publication gates above first.
 
 MERGED THIS REVIEW: NO. PUSHED THIS REVIEW: NO. PUBLIC: NO. DEPLOYED: NO.
+
+## Subsequent owner-authorized licensing/cost follow-up
+
+The report above is historical evidence for the previous submission check. The
+owner subsequently authorized integrating fc6d639 locally, selected MIT (Satvik
+Patel, 2026), and requested unknown NVIDIA pricing be preserved rather than shown
+as zero. These corrections and fresh successful verification are documented in
+[LICENSE_AND_COST_CHECK.md](LICENSE_AND_COST_CHECK.md). Full fast result:
+**1,448 passed, 2 skipped, 150 deselected, exit 0**; Ruff passed. No push was made.
+The license blocker and numeric-zero pricing issue are resolved. Other owner
+submission/security gates are not silently marked complete by this follow-up.

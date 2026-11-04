@@ -1,9 +1,10 @@
 # Sentinel X — final submission handoff
 
 Verified code release: `d855c4ece913775306295a8fec54254e7c2181d1`.
-Documentation is prepared separately on `review/submission-package-d855c4e` in
-`C:/Users/satvi/Desktop/sentinelx-submission-review`. No merge/push/visibility or
-license change is authorized by this handoff. The release remains on main.
+Documentation was prepared on `review/submission-package-d855c4e` and subsequently
+merged locally into main at the owner's request. The owner also selected MIT,
+copyright 2026 Satvik Patel. No push or visibility change was authorized; the
+previous hosted CI result still applies only to the code SHA named above.
 
 ## Owner-review package
 
@@ -26,7 +27,7 @@ license change is authorized by this handoff. The release remains on main.
 - [x] Demo script prepared.
 - [x] Recording guide prepared.
 - [x] Submission description prepared — placeholders require genuine owner information.
-- [ ] License decision recorded — no project license exists; owner decision required.
+- [x] License decision recorded — owner selected MIT, copyright 2026 Satvik Patel; LICENSE and Python package metadata added.
 - [ ] Repository access decision recorded — GitHub reports PRIVATE; no visibility change made.
 - [ ] Official eligibility confirmed by owner.
 - [ ] Official rules accepted by owner.
@@ -67,7 +68,7 @@ verified history. Keep old reports intact and label fresh observations separatel
    versions locally without disclosing values; confirm there are no actual secrets.
 2. Confirm accepted rules, participant/track/team status, chronology and AI coding
    assistance. The local organizer-reply placeholder is not correspondence.
-3. Resolve project license and complete third-party redistribution/notice review.
+3. Project license is MIT; complete third-party redistribution/notice review.
 4. Decide compliant judge access/visibility only after security clearance. Do not
    make public merely to test a link; do not expose local demo services publicly.
 5. Rehearse and record the three-minute plan with actual outputs. Publish a video

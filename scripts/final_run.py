@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sentinelx.model_clients import estimate_cost, load_models_config
+from sentinelx.model_clients.profiles import UNKNOWN_FREE_TIER_COST
 from sentinelx.policy import redaction as _redact
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,8 @@ def _worst_case_usd_pure(step: PlannedStep) -> str | None:
         if prof is None:
             return None
         per_call = estimate_cost(prof, step.est_tokens_in, step.est_tokens_out)
+        if per_call is None:
+            return None
         total = per_call * step.est_calls
         return f"{total:.4f}"
     except Exception:
@@ -116,6 +119,22 @@ class StepRecord:
                 "exit_code": self.exit_code, "duration_s": self.duration_s,
                 "skipped_reason": self.skipped_reason, "estimated": self.estimated,
                 "output_tail": output_tail}
+
+
+def _cost_display(profile: str | None, worst: str | None) -> str:
+    if worst is not None:
+        return f"${worst}"
+    return UNKNOWN_FREE_TIER_COST if profile == "nvidia_glimmer" else "unknown"
+
+
+def _spend_totals(records: list[StepRecord]) -> dict:
+    estimates = [r for r in records if r.estimated]
+    unknown = [r.name for r in estimates if r.estimated.get("worst_case_usd") is None]
+    known = round(sum(float(r.estimated["worst_case_usd"]) for r in estimates
+                      if r.estimated.get("worst_case_usd") is not None), 4)
+    return {"estimated_spend_usd_total": None if unknown else known,
+            "known_estimated_spend_usd_subtotal": known,
+            "unknown_cost_steps": unknown}
 
 
 def cli_cmd() -> list[str]:
@@ -256,10 +275,7 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
                 print(f"      $ {' '.join(cmd)}")
             if step.live:
                 worst = _worst_case_usd_pure(step)
-                if worst is not None:
-                    print(f"      worst-case estimate: ${worst}")
-                else:
-                    print("      worst-case estimate: not computed in dry-run")
+                print(f"      worst-case estimate: {_cost_display(step.profile, worst)}")
         # Build records for manifest without launching anything
         for step in steps:
             if only and step.name != only:
@@ -271,6 +287,7 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
                 rec.estimated = {"profile": step.profile,
                                  "expected_model_calls": step.est_calls,
                                  "worst_case_usd": worst,
+                                 "cost_display": _cost_display(step.profile, worst),
                                  "guard_exit_code": None,
                                  "prerequisite_note": step.note or None}
             records.append(rec)
@@ -283,9 +300,7 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
             "steps": [r.to_json() for r in records],
             "model_providers": sorted({r.estimated.get("profile") for r in records
                                        if r.estimated.get("profile")}),
-            "estimated_spend_usd_total": round(sum(
-                float(r.estimated["worst_case_usd"]) for r in records
-                if r.estimated.get("worst_case_usd") is not None), 4),
+            **_spend_totals(records),
         }
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -314,17 +329,20 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
         if step.live:
             code, worst = estimate_spend(step)
             record.estimated = {"profile": step.profile, "expected_model_calls": step.est_calls,
-                                "worst_case_usd": worst, "guard_exit_code": code}
+                                "worst_case_usd": worst, "guard_exit_code": code,
+                                "cost_display": _cost_display(step.profile, worst)}
             if code != 0:
                 print(f"SPEND GUARD REFUSED step {step.name}: estimate_cost exited {code} "
-                      f"(worst case ${worst}); remaining budget minus reserve exceeded.",
+                      f"(worst case {_cost_display(step.profile, worst)}); "
+                      "budget or cost could not be verified.",
                       file=sys.stderr, flush=True)
                 records.append(record)
                 _write_manifest(manifest_path, started, records, dry_run=dry_run)
                 if started_labs:
                     shutdown_labs()
                 return 3
-            print(f"--- {step.name}: spend guard OK (worst case ${worst}, "
+            print(f"--- {step.name}: spend guard OK "
+                  f"(worst case {_cost_display(step.profile, worst)}, "
                   f"{step.est_calls} expected calls)", flush=True)
 
         # print commands with redaction
@@ -383,9 +401,7 @@ def _write_manifest(manifest_path: Path, started: datetime, records: list[StepRe
         "steps": [r.to_json() for r in records],
         "model_providers": sorted({r.estimated.get("profile") for r in records
                                    if r.estimated.get("profile")}),
-        "estimated_spend_usd_total": round(sum(
-            float(r.estimated["worst_case_usd"]) for r in records
-            if r.estimated.get("worst_case_usd") is not None), 4),
+        **_spend_totals(records),
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

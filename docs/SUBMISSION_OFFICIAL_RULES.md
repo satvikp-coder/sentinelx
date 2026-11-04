@@ -17,7 +17,7 @@ Primary sources:
 | Track / theme | Indie and startup tracks; proposed project choice is Indie / Push the Frontier, subject to owner's accepted registration. |
 | Participation | Selection and geographic/affiliation restrictions apply. Owner must verify acceptance and eligibility; repository activity does not prove acceptance. |
 | Repository visibility | Existing local participant notes say public required. Not established by accessible public page text. Obtain current accepted guide; owner decides access/visibility after security clearance. PRIVATE unchanged. |
-| License | No accessible event-specific license requirement found. No project license exists. Owner must choose permitted terms; do not infer an MIT/Apache requirement or grant rights automatically. |
+| License | No accessible event-specific license requirement found. Owner subsequently selected MIT, copyright 2026 Satvik Patel; see LICENSE. This is the owner's choice, not an inferred event requirement. |
 | Video / duration | Existing participant notes say three minutes. Full requirements not independently accessible. Prepared plan is three minutes; owner confirms required duration, host and judge access. |
 | Submission fields / team size / bonus category | Authenticated portal or accepted guide required. Proposed copy is content preparation, not an asserted schema of the form. |
 | Rules acceptance | Public pages say selected participants must accept Official Rules. No acceptance evidence inspected. HUMAN ACTION REQUIRED. |

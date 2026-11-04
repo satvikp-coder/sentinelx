@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sentinelx.model_clients.profiles import UNKNOWN_FREE_TIER_COST, format_cost
+
 # Metrics that only mean something for defended (gateway-on) arms. The paired reports'
 # manifest describes arm A as "no gateway (sandbox boundary only)", so these are n/a there.
 DEFENDED_ONLY_METRICS = frozenset({"task_preservation"})
@@ -323,6 +325,28 @@ class FixData:
     model_label: str | None
 
 
+def _reported_spend(d: dict[str, Any]) -> dict[str, Any] | None:
+    """Normalize legacy unknown-price zeros for display; never rewrite old evidence."""
+    original = d.get("spend")
+    if not isinstance(original, dict):
+        return None
+    spend = dict(original)
+    prov = d.get("provenance") or {}
+    model = prov.get("model")
+    provider = prov.get("provider") or (model.get("provider") if isinstance(model, dict) else None)
+    nvidia = provider == "nvidia" or prov.get("model_profile") == "nvidia_glimmer"
+    if nvidia and spend.get("spent_usd") in (None, 0) and not prov.get("price_verified"):
+        spend.update(spent_usd=None, remaining_usd=None, cost_note=UNKNOWN_FREE_TIER_COST)
+    return spend
+
+
+def spend_description(spend: dict[str, Any]) -> str:
+    spent = format_cost(spend.get("spent_usd"),
+                        unknown_label=spend.get("cost_note") or "unknown")
+    return (f"spent {spent} of hard cap {format_cost(spend.get('hard_cap_usd'))} "
+            f"(remaining {format_cost(spend.get('remaining_usd'))})")
+
+
 def _build_fix(d: dict[str, Any], src: str) -> FixData:
     counts: dict[str, int] = {}
     results: list[FixResult] = []
@@ -337,7 +361,7 @@ def _build_fix(d: dict[str, Any], src: str) -> FixData:
             status=status, patch_status=r.get("patch_status"),
             verification_status=r.get("verification_status"), failed_checks=failed,
             explanation=r.get("explanation"), patch_format=r.get("patch_format")))
-    spend = d.get("spend") if isinstance(d.get("spend"), dict) else None
+    spend = _reported_spend(d)
     return FixData(counts, results, spend, model_label(d.get("provenance") or {}))
 
 
@@ -393,10 +417,9 @@ def _build_provenance(d: dict[str, Any], src: str) -> ProvenanceRow:
     prov = d.get("provenance", {})
     git = prov.get("git") or {}
     spend = None
-    if isinstance(d.get("spend"), dict):
-        s = d["spend"]
-        spend = (f"spent ${s.get('spent_usd')} of hard cap ${s.get('hard_cap_usd')} "
-                 f"(remaining ${s.get('remaining_usd')})")
+    s = _reported_spend(d)
+    if s is not None:
+        spend = spend_description(s)
     commit = git.get("commit", prov.get("git_commit"))
     manifest_hash = prov.get("manifest_hash")
     return ProvenanceRow(

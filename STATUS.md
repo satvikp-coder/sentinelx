@@ -1,3 +1,14 @@
+## Owner-authorized MIT and cost follow-up (2026-11-04, local only)
+
+Integrated documentation commit fc6d639 into main by fast-forward. Added MIT,
+copyright 2026 Satvik Patel, to the project and Python SDK. Unknown NVIDIA prices
+are null/explicitly unknown; incomplete totals no longer imply zero. Budgeted
+unknown usage refuses further calls; 70/50/30 USD thresholds unchanged.
+Ruff: All checks passed, exit 0. Focused: 52 passed, 2 skipped. Full fast:
+1448 passed, 2 skipped, 150 deselected in 587.84s, exit 0. Both wheels include
+MIT licenses. No protected tracked paths changed, provider calls or push.
+See tasks/LICENSE_AND_COST_CHECK.md for authentic tails and limitations.
+
 ## Completion review: 2026-11-04
 
 Current implementation and submission gates are documented in

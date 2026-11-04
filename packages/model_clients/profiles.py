@@ -23,13 +23,20 @@ from .config import REPO_ROOT, ModelConfig, parse_env_file
 
 CONFIG_PATH = REPO_ROOT / "configs" / "models.yaml"
 KEY_REQUIRED_PROVIDERS = {"nvidia", "baseten", "together", "fireworks", "meta_api"}
+UNKNOWN_FREE_TIER_COST = "unknown (free tier, not billed)"
+
+
+def format_cost(value: float | None, *, unknown_label: str = "unknown",
+                precision: int = 4) -> str:
+    """Format a known USD estimate without inventing a zero for missing prices."""
+    return f"${value:.{precision}f}" if isinstance(value, (int, float)) else unknown_label
 
 
 class PriceInfo(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    input_usd: float
-    cached_input_usd: float
-    output_usd: float
+    input_usd: float | None
+    cached_input_usd: float | None
+    output_usd: float | None
     verified: bool
     note: str | None = None
     source: str | None = None
@@ -78,28 +85,36 @@ def load_models_config(path: Path = CONFIG_PATH) -> ModelsConfig:
 
 
 def estimate_cost(profile: Profile, tokens_in: int, tokens_out: int,
-                  cached_tokens: int = 0) -> float:
+                  cached_tokens: int = 0) -> float | None:
     """USD, from the profile's published per-1M-token prices. Reasoning tokens are already
     inside `tokens_out` (the provider bills them as completion/output tokens)."""
     p = profile.price_per_1m
+    if not p.verified or None in (p.input_usd, p.cached_input_usd, p.output_usd):
+        return None
     billed_in = max(tokens_in - cached_tokens, 0)
     return (billed_in * p.input_usd + cached_tokens * p.cached_input_usd
             + tokens_out * p.output_usd) / 1_000_000
 
 
-def cumulative_spend(conn: sqlite3.Connection, profile_name: str) -> float:
-    """Sum of `usage.estimated_cost` already recorded for this profile. This is the running
-    total of ACTUAL estimated spend from completed calls, not a projection."""
+def cumulative_spend(conn: sqlite3.Connection, profile_name: str) -> float | None:
+    """Recorded estimated spend, or None if any recorded call's cost is unknown.
+
+    An empty ledger is zero usage; a ledger with NULL costs is not zero spend.
+    This is never a provider bill.
+    """
     row = conn.execute(
-        "SELECT COALESCE(SUM(estimated_cost), 0) FROM usage WHERE profile = ?",
+        "SELECT COUNT(*), COUNT(estimated_cost), SUM(estimated_cost) "
+        "FROM usage WHERE profile = ?",
         (profile_name,)).fetchone()
-    return float(row[0])
+    if row[0] != row[1]:
+        return None  # SQL SUM alone silently excludes unknown-cost calls.
+    return float(row[2]) if row[0] else 0.0
 
 
 @dataclass(frozen=True)
 class BudgetCheck:
-    status: str  # "UNBUDGETED" | "OK" | "WARNING" | "BUDGET_EXHAUSTED"
-    spent_usd: float
+    status: str  # "UNBUDGETED" | "OK" | "WARNING" | "BUDGET_EXHAUSTED" | "COST_UNKNOWN"
+    spent_usd: float | None
     hard_cap_usd: float | None
     remaining_usd: float | None
 
@@ -108,9 +123,11 @@ def check_budget(conn: sqlite3.Connection, config: ModelsConfig, profile_name: s
     """Call before EVERY call on a budgeted profile. BUDGET_EXHAUSTED is a hard stop - the
     caller must not make the request, retry, or fall through to it silently."""
     budget = config.budget.get(profile_name)
-    if budget is None:
-        return BudgetCheck("UNBUDGETED", 0.0, None, None)
     spent = cumulative_spend(conn, profile_name)
+    if budget is None:
+        return BudgetCheck("UNBUDGETED", spent, None, None)
+    if spent is None:
+        return BudgetCheck("COST_UNKNOWN", None, budget.hard_cap_usd, None)
     remaining = budget.hard_cap_usd - spent
     if spent >= budget.hard_cap_usd:
         return BudgetCheck("BUDGET_EXHAUSTED", spent, budget.hard_cap_usd, max(remaining, 0.0))
@@ -177,6 +194,9 @@ def resolve_task(conn: sqlite3.Connection, config: ModelsConfig, task: str, *,
             reasons.append(f"{name}: {profile.api_key_env} is not set")
             continue
         bc = check_budget(conn, config, name)
+        if bc.status == "COST_UNKNOWN":
+            reasons.append(f"{name}: COST_UNKNOWN (recorded usage needs reconciliation)")
+            continue
         if bc.status == "BUDGET_EXHAUSTED":
             reasons.append(f"{name}: BUDGET_EXHAUSTED (${bc.spent_usd:.2f} >= "
                            f"${bc.hard_cap_usd:.2f})")

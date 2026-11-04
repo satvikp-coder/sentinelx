@@ -7,6 +7,7 @@ name = "sentinelx"
 version = "0.0.0"
 description = "Sentinel X - Agent Guard and Site Guard local security prototype"
 readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",

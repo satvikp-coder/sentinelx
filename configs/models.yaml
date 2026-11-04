@@ -12,12 +12,12 @@ profiles:
     reasoning_effort: low
     max_tokens: 2048
     price_per_1m:
-      input_usd: 0.0        # free hosted endpoint (NVIDIA build.nvidia.com), no published price
-      cached_input_usd: 0.0
-      output_usd: 0.0
+      input_usd: null       # unknown; no published per-token price
+      cached_input_usd: null
+      output_usd: null
       verified: false
-      note: "NVIDIA's free hosted tier has no published per-token price; treated as $0 for the
-        spend guard, which does not apply to this profile."
+      note: "NVIDIA's free hosted tier has no published per-token price; estimate and total
+        cost are unknown. No monetary spend guard is configured for this profile."
 
   baseten_spark_open:
     provider: baseten

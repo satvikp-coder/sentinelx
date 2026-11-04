@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sentinelx-agent-guard"
 version = "0.0.0"
 description = "Agent Guard SDK: policy-enforced tool calls backed by the Sentinel X gateway"
+license = {file = "LICENSE"}
 requires-python = ">=3.11"
 dependencies = [
   "sentinelx",

@@ -22,6 +22,7 @@ from .loader import (
     FixData,
     Metric,
     Section,
+    spend_description,
 )
 
 _TEMPLATE = Path(__file__).resolve().parent / "templates" / "report.html"
@@ -268,8 +269,7 @@ def render_fix(section: Section) -> str:
                    for r in data.results if r.explanation)
     parts.append(f"<ul>{expl}</ul>" if expl else "<p class='muted'>none recorded</p>")
     if data.spend:
-        parts.append(f'<div class="muted">spend: {esc(data.spend.get("spent_usd"))} USD of '
-                     f'hard cap {esc(data.spend.get("hard_cap_usd"))} USD</div>')
+        parts.append(f'<div class="muted">{esc(spend_description(data.spend))}</div>')
     return "".join(parts)
 
 

@@ -111,7 +111,7 @@ need their stated prerequisites; do not silently count unexecuted tests as passe
 - Video: **[OWNER: INSERT ACCESSIBLE DEMO VIDEO URL AFTER RECORDING]**.
 - Team/contributors: **[OWNER: CONFIRM REGISTERED TEAM AND NAMES]**.
 - Proposed track/theme: Indie / Push the Frontier — owner confirms registration.
-- License: **[OWNER DECISION REQUIRED; NO LICENSE SELECTED]**.
+- License: **MIT — copyright (c) 2026 Satvik Patel**, selected by the owner.
 - AI coding assistance: OpenCode and Codex contributed to implementation, repair,
   testing and documentation; owner verifies permitted assistance and accurate attribution.
 - Eligibility, source chronology and accepted rules: **[OWNER CONFIRMATION REQUIRED]**.

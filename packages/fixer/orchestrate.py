@@ -110,6 +110,15 @@ def run_fix(finding: dict, *, lab: str, conn, client: ModelClient, policy: FixPo
         while True:
             if models_config is not None and profile_name is not None:
                 budget = check_budget(conn, models_config, profile_name)
+                if budget.status == "COST_UNKNOWN":
+                    ticket_id = escalate(
+                        conn, finding_id=finding_id, evidence_event_ids=[],
+                        explanation="Recorded model usage has unknown cost; "
+                                    "refused before another model call.",
+                        options=["Reconcile the usage ledger with the provider before retrying.",
+                                 "Have a human write the fix directly."])
+                    return FixOutcome(finding_id, vuln_class, "ESCALATED", ticket_id=ticket_id,
+                                      diagnosis=diag, retries_used=retries)
                 if budget.status == "BUDGET_EXHAUSTED":
                     ticket_id = escalate(
                         conn, finding_id=finding_id, evidence_event_ids=[],
