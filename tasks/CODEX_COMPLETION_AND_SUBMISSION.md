@@ -57,6 +57,8 @@ away from existing project evaluations. No providers or external targets are cal
 - Project Ruff and `git diff --check`: exit 0.
 - Initial clean-copy smoke failed because it lacked Git metadata, not because the
   secret assertion found a leak. The replacement is a genuine local-clone gate.
+- Genuine clean clone, new venv, core smoke tests and CLI import subsequently
+  passed (exit 0). This smoke mode does not replace the full fast suite.
 
 Final premerge/postmerge test summaries, exact integrated SHA and remote/CI status
 must be checked in the final reviewer output/workflow; no earlier count is a

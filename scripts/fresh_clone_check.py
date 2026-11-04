@@ -102,7 +102,7 @@ def main() -> int:
         tests = (["tests/unit/test_schemas.py", "tests/unit/test_policy_engine.py",
                   "tests/unit/test_fixer_edits.py", "tests/unit/test_agent_guard_sdk.py",
                   "tests/unit/test_shield_completion_regressions.py"] if args.smoke else [])
-        r = run([python, "-m", "pytest", "-q", "-m", "not slow", *tests,
+        r = run([python, "-m", "pytest", "-m", "not slow", *tests,
                  "--basetemp", str(tmp / "pytest"), "-p", "no:cacheprovider"],
                 cwd=clone, timeout=1800)
         if r.returncode != 0:
