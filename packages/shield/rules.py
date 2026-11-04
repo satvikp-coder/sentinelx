@@ -19,6 +19,7 @@ from sentinelx.common_schemas import (
     EscalationStatus,
     EscalationTicket,
     EvidenceState,
+    ShieldMode,
     ShieldRule,
     ShieldScope,
     ShieldStatus,
@@ -364,6 +365,12 @@ class RuleEvaluator:
         # Check scope match
         if not _scope_matches(rule.scope, request):
             return EvalDecision(True, None, None, "scope mismatch")
+
+        # Monitor/recommend modes never block; only enforce mode takes action.
+        if rule.mode != ShieldMode.ENFORCE:
+            return EvalDecision(
+                True, None, None, f"rule mode is {rule.mode.value}, not enforcing"
+            )
 
         # Rule matches - apply action
         action = ShieldAction(rule.action)

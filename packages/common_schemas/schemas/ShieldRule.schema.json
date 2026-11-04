@@ -1,5 +1,14 @@
 {
   "$defs": {
+    "ShieldMode": {
+      "enum": [
+        "monitor",
+        "recommend",
+        "enforce"
+      ],
+      "title": "ShieldMode",
+      "type": "string"
+    },
     "ShieldScope": {
       "additionalProperties": false,
       "properties": {
@@ -109,6 +118,10 @@
       ],
       "default": null,
       "title": "Linked Finding Id"
+    },
+    "mode": {
+      "$ref": "#/$defs/ShieldMode",
+      "default": "enforce"
     },
     "owner": {
       "minLength": 1,

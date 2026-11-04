@@ -137,6 +137,12 @@ class ShieldStatus(StrEnum):
     REJECTED = "REJECTED"
 
 
+class ShieldMode(StrEnum):
+    MONITOR = "monitor"
+    RECOMMEND = "recommend"
+    ENFORCE = "enforce"
+
+
 class EscalationStatus(StrEnum):
     OPEN = "OPEN"
     ACKNOWLEDGED = "ACKNOWLEDGED"

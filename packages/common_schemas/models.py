@@ -22,6 +22,7 @@ from .enums import (
     SessionKind,
     SessionState,
     Severity,
+    ShieldMode,
     ShieldStatus,
     SignalKind,
     Surface,
@@ -519,6 +520,7 @@ class ShieldRule(SXModel):
     created_at: UTCDatetime
     expires_at: UTCDatetime
     status: ShieldStatus
+    mode: ShieldMode = ShieldMode.ENFORCE
     label: Literal["TEMPORARY SHIELD, NOT A FIX"] = SHIELD_LABEL
 
     @model_validator(mode="after")

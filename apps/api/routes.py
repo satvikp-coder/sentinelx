@@ -13,6 +13,7 @@ import json
 import secrets
 import sqlite3
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -315,7 +316,44 @@ def _shield_proxy() -> ShieldProxy:
     )
     return _SHIELD_PROXY
 
-# Scan lab name mapping - internal metadata not exposed in public responses.
+
+def _reconcile_runtime_to_api(now: datetime) -> None:
+    """Mirror ACTIVE rules from the shared runtime store into the API store.
+
+    The runtime store is the durable authority for shield-rule state. After an
+    API restart the in-memory ``store.shield_rules`` is empty while the proxy
+    may still enforce ACTIVE rows. Without reconciliation the API would list no
+    rules and refuse to remove them, even though enforcement continues.
+
+    Only ACTIVE, non-expired runtime rows are mirrored; PROPOSED rules live
+    only in the API store until approved, and EXPIRED/REMOVED rows are left
+    alone so a previously expired/removed rule never revives.
+    """
+    try:
+        runtime_rules = _shield_runtime().active_rules(now)
+    except Exception:  # noqa: BLE001 - degrade gracefully; list still works
+        return
+    with store.lock:
+        for rule in runtime_rules:
+            rid = UUID(rule.id)
+            existing = store.shield_rules.get(rid)
+            if existing is not None:
+                # Already tracked; keep the authoritative state (ACTIVE here).
+                if existing.get("state") != "ACTIVE":
+                    existing["state"] = "ACTIVE"
+                continue
+            store.shield_rules[rid] = {
+                "rule_id": rid,
+                "route_pattern": rule.scope.route,
+                "intent": rule.reason,
+                "mode": "enforce",
+                "state": "ACTIVE",
+                "ttl_minutes": int((rule.expires_at - rule.created_at).total_seconds() // 60),
+                "created_at": rule.created_at,
+                "expires_at": rule.expires_at,
+                "note": "Restored from runtime store after API restart",
+                "runtime_reconciled": True,
+            }
 # Maps scan_id -> lab directory name for scan execution.
 _SCAN_LABS: dict[UUID, str] = {}
 
@@ -549,10 +587,23 @@ def _record_approval(session_id: UUID, action_id: str, tool: str,
         "decision": "approve" if approved else "reject",
         "rationale": rationale,
         "timestamp": datetime.now(UTC),
+        "seq": _next_approval_seq(session_id),
     }
     # Also store in per-session state for SessionContext (as list of dicts)
     # that get converted to ApprovalRecord objects.
 
+
+def _next_approval_seq(session_id: UUID) -> int:
+    """Monotonic per-session counter for approval ordering.
+
+    Used to break timestamp ties so a later revocation always defeats an
+    earlier approval even when both share the same wall-clock timestamp.
+    """
+    state = _SESSION_STATE.get(session_id)
+    if state is None:
+        return 0
+    state["approval_seq"] = int(state.get("approval_seq", 0)) + 1
+    return state["approval_seq"]
 
 
 # ------------------------------------------------------------------ in-memory store
@@ -689,6 +740,7 @@ async def create_session(
                 "blocked_destinations": (),
             },
             "approvals": [],  # list of ApprovalRecord-compatible dicts
+            "approval_seq": 0,  # monotonic per-session counter for approval ordering
             "page_origin": None,
             "lock": threading.Lock(),  # per-session lock for concurrency safety
         }
@@ -1491,7 +1543,12 @@ _SHIELD_ACTIVATION_LOCK = threading.Lock()
 
 
 def _shield_rule_digest(rule_entry: dict[str, Any]) -> str:
-    """Canonical digest over the enforcement-relevant fields of an API rule."""
+    """Canonical digest over the enforcement-relevant fields of an API rule.
+
+    Binds the approval to the exact rule identity, target scope, action,
+    mode, and TTL/expiry so that any enforcement-relevant modification
+    invalidates prior approvals.
+    """
     doc = json.dumps(
         {
             "rule_id": str(rule_entry["rule_id"]),
@@ -1499,6 +1556,9 @@ def _shield_rule_digest(rule_entry: dict[str, Any]) -> str:
             "intent": rule_entry["intent"],
             "mode": rule_entry["mode"],
             "action": ShieldAction.BLOCK_ROUTE_PATTERN.value,
+            "expires_at": rule_entry.get("expires_at").isoformat()
+            if rule_entry.get("expires_at")
+            else None,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -1556,12 +1616,20 @@ async def list_shield_rules(
     offset: int = Query(0, ge=0),
     user: str = Depends(_require_auth),
 ):
+    # Reconcile the in-memory API store with the authoritative runtime store so
+    # rules activated before an API restart remain visible and manageable.
     # Expire overdue rules in the shared store, then mirror any lapsed TTL
     # into the API store so list output is truthful (natural expiry contract).
     now = datetime.now(UTC)
     try:
         _shield_runtime().expire_overdue(now)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - degrade gracefully: list still works
+        pass
+    # Reconcile ACTIVE rules persisted in the runtime store into the API store
+    # so an API restart does not lose visibility of enforced rules.
+    try:
+        _reconcile_runtime_to_api(now)
+    except Exception:  # noqa: BLE001 - degrade gracefully
         pass
     async with store.lock:
         for entry in store.shield_rules.values():
@@ -1671,33 +1739,45 @@ async def create_shield_rule(
 @router.delete("/shield/rules/{rule_id}", tags=["shield"])
 async def remove_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
     """Manually remove a rule. Propagates to the proxy lifecycle and the shared
-    runtime store so enforcement actually stops - API state alone is not enough."""
-    async with store.lock:
-        rule = store.shield_rules.get(rule_id)
-        if not rule:
-            raise HTTPException(status_code=404, detail="rule not found")
-        rule["state"] = "REMOVED"
+    runtime store so enforcement actually stops - API state alone is not enough.
 
+    Runtime is updated first; if the runtime write fails we return an error
+    rather than claiming success while enforcement continues.
+    """
     proxy = _shield_proxy()
     runtime_stopped = False
     try:
         runtime_stopped = _shield_runtime().set_status(str(rule_id), "REMOVED")
-    except Exception:  # noqa: BLE001 - report unresolved runtime state honestly
-        runtime_stopped = False
+    except Exception as exc:  # noqa: BLE001 - report unresolved runtime state honestly
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"runtime store unavailable; removal cannot be confirmed "
+                f"({type(exc).__name__})"
+            ),
+        ) from None
+
+    async with store.lock:
+        rule = store.shield_rules.get(rule_id)
+        if not rule:
+            # Runtime said REMOVED but API no longer has the rule; idempotent.
+            return {"rule_id": rule_id, "state": "REMOVED", "runtime_enforcement_stopped": True}
+        rule["state"] = "REMOVED"
+
     local_removed = proxy.rules.remove_rule(str(rule_id), user, "manual removal")
 
     await events.event_stream.append(
         EventKind.SHIELD_RULE_REMOVED,
         {
             "rule_id": str(rule_id),
-            "runtime_enforcement_stopped": bool(local_removed or runtime_stopped),
+            "runtime_enforcement_stopped": bool(local_removed and runtime_stopped),
         },
         run_id=None,
     )
     return {
         "rule_id": rule_id,
         "state": "REMOVED",
-        "runtime_enforcement_stopped": bool(local_removed or runtime_stopped),
+        "runtime_enforcement_stopped": bool(local_removed and runtime_stopped),
     }
 
 
@@ -1705,24 +1785,31 @@ async def remove_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
 async def expire_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
     """Manually expire a rule. Propagates to the proxy lifecycle and the shared
     runtime store so enforcement actually stops - API state alone is not enough."""
-    async with store.lock:
-        rule = store.shield_rules.get(rule_id)
-        if not rule:
-            raise HTTPException(status_code=404, detail="rule not found")
-        rule["state"] = "EXPIRED"
-
     proxy = _shield_proxy()
     runtime_stopped = False
     try:
         runtime_stopped = _shield_runtime().set_status(str(rule_id), "EXPIRED")
-    except Exception:  # noqa: BLE001
-        runtime_stopped = False
+    except Exception as exc:  # noqa: BLE001 - report unresolved runtime state honestly
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"runtime store unavailable; expiry cannot be confirmed "
+                f"({type(exc).__name__})"
+            ),
+        ) from None
+
+    async with store.lock:
+        rule = store.shield_rules.get(rule_id)
+        if not rule:
+            return {"rule_id": rule_id, "state": "EXPIRED", "runtime_enforcement_stopped": True}
+        rule["state"] = "EXPIRED"
+
     local_expired = proxy.rules.expire_rule(str(rule_id))
 
     return {
         "rule_id": rule_id,
         "state": "EXPIRED",
-        "runtime_enforcement_stopped": bool(local_expired or runtime_stopped),
+        "runtime_enforcement_stopped": bool(local_expired and runtime_stopped),
     }
 
 
@@ -1801,7 +1888,13 @@ async def approve_shield_rule(
             status_code=400,
             detail="no valid approval found for this rule revision in this session",
         )
-    latest = max(candidates, key=lambda r: r.get("timestamp") or datetime.min.replace(tzinfo=UTC))
+    latest = max(
+        candidates,
+        key=lambda r: (
+            r.get("timestamp") or datetime.min.replace(tzinfo=UTC),
+            int(r.get("seq") or 0),
+        ),
+    )
     if latest.get("decision") != "approve":
         raise HTTPException(
             status_code=400,
@@ -1909,11 +2002,26 @@ async def approve_shield_rule(
                 },
             )
         except Exception as exc:  # noqa: BLE001 - compensation path
+            # Roll back the runtime rule first so the proxy stops enforcing.
             proxy.rules.deactivate_rule(str(rule_id))
-            try:
-                _shield_runtime().set_status(str(rule_id), ShieldStatus.PROPOSED.value)
-            except Exception:  # noqa: BLE001
-                pass
+            # Persist the rollback to the shared runtime store; retry briefly
+            # because a transient SQLite busy error must not leave an orphaned
+            # ACTIVE rule that the proxy continues to enforce.
+            rollback_ok = False
+            for _attempt in range(3):
+                try:
+                    _shield_runtime().set_status(str(rule_id), ShieldStatus.PROPOSED.value)
+                    rollback_ok = True
+                    break
+                except Exception:  # noqa: BLE001 - retry on busy/contention
+                    time.sleep(0.05)
+            if not rollback_ok:
+                # Last resort: mark in the API store so at least the API does
+                # not claim ACTIVE, and surface the inconsistency.
+                async with store.lock:
+                    if rule_entry.get("state") == "ACTIVE":
+                        rule_entry["state"] = "PROPOSED"
+                        rule_entry["runtime_reconciliation_failed"] = True
             async with store.lock:
                 if rule_entry.get("state") == "ACTIVE":
                     rule_entry["state"] = "PROPOSED"
