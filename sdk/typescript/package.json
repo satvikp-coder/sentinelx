@@ -21,7 +21,7 @@
     "security",
     "policy"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "devDependencies": {
     "typescript": "^5.5.0"
   },

@@ -1,33 +1,113 @@
-# Sentinel X - Agent Security Digital Twin
+# Sentinel X
 
-Built for the Meta Global AI Developer Hackathon 2026 (Indie track, "Push the Frontier").
+**Sentinel X: a verification-first guard for AI agents and vibe-coded sites. Models propose; deterministic code and independent tests decide.**
 
-Sentinel X tests hostile inputs against AI agents and authorized local applications.
-Deterministic policy, independent verification and human-approved temporary Shield
-rules separate proposed actions from observed outcomes.
+Sentinel X checks an AI agent's proposed actions and tests vulnerabilities in applications you are authorized to inspect.
+It records evidence, independently checks outcomes and proposed patches, and offers narrow, human-approved temporary proxy rules while fixes are reviewed.
 
-[Submission copy](docs/SUBMISSION_READY_TEXT.md) ·
-[Three-minute demo](docs/SUBMISSION_DEMO_SCRIPT.md) ·
-[Recording/setup guide](docs/SUBMISSION_RECORDING_GUIDE.md) ·
-Demo video: **OWNER TO RECORD AND INSERT URL**.
-The verified release is `d855c4e`; these documentation updates are for owner review.
+[![CI](https://github.com/satvikp-coder/sentinelx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/satvikp-coder/sentinelx/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Two sides on one shared evidence and verification core:
-- **Agent Guard** - an isolated lab where an autonomous browser agent is attacked through synthetic page/tool content; deterministic policy gateway, tamper-evident evidence, paired unprotected/protected runs, independent verifier, IncidentTwin containment branches.
-- **Site Guard** - a scanner, fix engine and reverse-proxy shield for authorized local labs; remote scanning is disabled in this release.
+**Local lab prototype. Non-lab scanning is disabled.**
+Demo video: **TO ADD BY OWNER** · [Demo script](docs/SUBMISSION_DEMO_SCRIPT.md) · [Recording guide](docs/SUBMISSION_RECORDING_GUIDE.md) · [Submission copy](docs/SUBMISSION_READY_TEXT.md)
 
-## Protect your AI agent in 5 minutes
+## The problem
 
-Lab targets only in this version. The SDK is offline: no network, no model calls.
+Agents read pages, retrieved text and tool results that can contain hostile instructions.
+A successful legitimate task does not prove that an agent avoided an unauthorized action.
+Vibe-coded shops and note apps can also ship authorization, injection and configuration flaws;
+a plausible model explanation is not proof that a vulnerability exists or that a patch fixes it.
 
-1. Install:
+## Real-world use cases — demonstrated on our own lab targets only
+
+1. **An agent developer** wraps a browsing agent's tools with Agent Guard. In the
+   controlled hostile-page fixture, a hidden instruction attempts secret egress;
+   scenario-specific policy and page-egress controls prevent the forbidden action.
+   The independent verifier checks executed outcomes. This does not establish
+   universal prompt-injection prevention for arbitrary agents or websites.
+2. **A solo founder** tests an AI-generated shop or notes app in an authorized local
+   lab. Site Guard produces independently rechecked findings, proposes patches on
+   disposable source copies, and escalates rejected or human-required work.
+   A narrowly scoped temporary Shield can protect the proxy path while a human
+   reviews the fix. Shield is **TEMPORARY MITIGATION, NOT A FIX**.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    Models[Meta models: untrusted proposals] -.-> Agent
+    Models -.-> Fix
+    Agent[AI agent: untrusted pages and tool results] --> AG[Agent Guard policy gateway]
+    AG --> Tools[Permitted tools in an isolated lab]
+    Site[Authorized local app] --> Scan[Site Guard scanner: guarded requests]
+    Scan --> Verify[Independent finding verification]
+    Verify --> Fix[Fix engine: disposable source copy]
+    Fix --> PatchCheck[Syntax, benign behavior and exploit recheck]
+    PatchCheck --> Human[Human approval or escalation]
+    Verify --> Proposal[Temporary Shield proposal]
+    Proposal --> Gate[Compiler and representative benign replay]
+    Gate --> Approval[Scoped human approval]
+    Approval --> Proxy[Shield proxy: monitor or explicit enforce]
+    AG --> Evidence[Shared evidence and verification core]
+    Tools --> Evidence
+    Scan --> Evidence
+    PatchCheck --> Evidence
+    Human --> Evidence
+    Proxy --> Evidence
+    Evidence --> Assertions[Independent assertions and evidence-chain checks]
+    Assertions --> UI[Reports and dashboard: observed state and limitations]
 ```
-pip install -e .
-pip install -e sdk/python
+
+A model cannot authorize a tool, approve its own patch or supply its own verifier verdict.
+Tamper-evident hash chains are not authentication against a malicious database writer.
+
+## Results — historical stored examples, not a new benchmark
+
+These are the latest **committed example snapshots**, with different run dates and
+coverage. They are not measurements of every later code change. Every outcome below
+links to stored JSON; scanner recall also requires its companion ground-truth scoring
+artifact. None was regenerated or relabeled as a fresh live-model run for this README.
+
+| Component / label | Recorded result and denominator | Source |
+|---|---|---|
+| Agent Guard — **SIMULATED** scripted agent | Gated arm blocked **15/15** observed attack attempts; **0/81** benign tool actions falsely blocked. There were **3/81** confirmations and **12/15** benign tasks completed. | [report.json](evaluations/example_report/report.json), `arms.B.overall` |
+| Agent Guard — **OBSERVED**, recorded historical LIVE NVIDIA model | `meta/muse-glimmer-30b`: forbidden outcomes in **2/5** valid unprotected attack runs versus **0/4** valid gated attack runs. Tiny sample; **4/20** total runs invalid. No statistical improvement claim. | [report.json](evaluations/example_report_model/report.json), `arms.A/B.overall.attack_success_rate`, `invalid_runs` |
+| Scanner — **OBSERVED / SCORED** on the Node lab | **6/10** planted weaknesses matched by the stored scorer; **36/37** check/endpoint ledger cells exercised (**97.3%**). Coverage is not vulnerability recall. | [report.json](evaluations/example_scan_report/vibe_notes_node/report.json), `coverage_ledger.rows`; [scoring.json](evaluations/example_scan_report/vibe_notes_node/scoring.json), `overall_recall` |
+| Fix engine — **independently VERIFIED** recorded proposals | **2/8** proposals independently verified and awaiting human approval; **6/8** escalated. Verified does not mean applied or deployed. | [report.json](evaluations/example_fix_report/report.json), `results[].verification_status`, `results[].status` |
+| Shield — **OBSERVED** synthetic local HTTP traffic | Enforce arm blocked **38/65** attack requests; **0/40** benign requests blocked/altered. Injection stage: **0/8** blocked — **injection NOT protected** in this example. | [report.json](evaluations/example_shield_report/report.json), `arms.C.attack`, `arms.C.benign` |
+| Shield intent labels — **OBSERVED**, low accuracy | Correct labels for **0/19** object-enumeration requests and **0/6** admin probes in the recorded enforce arm. Model confidence grants no permission. | [report.json](evaluations/example_shield_report/report.json), `arms.C.intent_accuracy` |
+
+**Shield benign caveat:** the example scopes rules to the attacker's client key;
+benign replay uses another key. Its zero benign blocks are by construction, not
+evidence of zero collateral blocking on arbitrary applications. The original
+report explicitly records this caveat.
+
+The historical clean-reference report also contains a false-positive public-settings
+GET finding. It is retained, explained in [the final check](tasks/FINAL_CHECK.md),
+and must not be counted as a genuine unplanted vulnerability. Missing evidence
+databases remain NO_DB/MISSING; an export cannot recreate them.
+
+## Agent Guard quickstart — offline
+
+Windows CMD, from a clean source checkout; Python 3.11+ required. These commands
+need no model credential file. For macOS/Linux use the equivalent venv activation.
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate.bat
+python -m pip install -e .
+python -m pip install -e sdk/python
+sentinelx doctor
+python examples/agent_guard_basic.py
+sentinelx agent check --policy configs/policy/default.yaml --action examples/agent_guard_action.json
 ```
 
-2. Wrap a tool with the guard. The policy file has exactly four keys - `allowed_hosts`,
-`allowed_tools`, `high_impact_actions`, `secret_patterns` (unknown keys are rejected):
+The example uses synthetic hostile input and stubbed tools: **SIMULATED, no LLM,
+no external request**. Enforce mode prints BLOCKED and the legitimate read still
+prints COMPLETED. Monitor mode logs what would be blocked and allows its stubbed
+tool to run; do not confuse that mode with enforcement.
+
+Python SDK usage (the function below deliberately does not perform network I/O):
 
 ```python
 from sentinelx_agent_guard import Guard, GuardBlocked
@@ -36,32 +116,29 @@ guard = Guard("examples/agent_guard_policy.yaml", mode="enforce")
 
 @guard.tool("fetch_page")
 def fetch_page(url: str) -> str:
-    return "page text"
+    return "synthetic page"
 
+print(fetch_page("http://orders.lab.test/cart"))
 try:
-    fetch_page("http://orders.lab.test/cart")
+    fetch_page("https://outside.example/collect")
 except GuardBlocked as exc:
     print("BLOCKED:", exc.reason_code)
 ```
 
-3. Run the offline demo: a naive agent follows a hostile page instruction and the guard
-blocks the send while the legitimate task still completes:
-```
-python examples/agent_guard_basic.py
-```
+The example policy accepts exactly `allowed_hosts`, `allowed_tools`,
+`high_impact_actions` and `secret_patterns`. Unknown configuration fields fail.
+The [TypeScript SDK](sdk/typescript) uses an authenticated local sidecar; it needs
+a real server-issued session/run. Its [runtime tests](sdk/typescript/tests/runtime.cjs)
+exercise wrapped-tool counters and fail-closed behavior. Do not use a made-up
+session identifier as proof of a successful integration.
 
-4. Check one action with the real policy gateway (action.json holds `tool`, `arguments`,
-optional `allowed_hosts`):
-```
-sentinelx agent check --policy configs/policy/default.yaml --action action.json
-```
+## Site Guard quickstart — authorized Node lab only
 
-## Harden your site in 10 minutes (lab demo)
+Needs Node.js; Docker is not required for this Node workflow. Use only the disposable
+synthetic application shipped here. Ensure ports 18081 and 18090 are free; do not
+terminate unrelated services. The reset command discards only the lab's synthetic data.
 
-Lab targets only in this version; non-lab scanning is DISABLED. The demo needs Node.js and
-runs against the local `vibe_notes_node` lab.
-
-```
+```bat
 python scripts/lab_up.py vibe_notes_node
 python scripts/lab_reset.py vibe_notes_node
 sentinelx init
@@ -70,63 +147,108 @@ sentinelx site verify vibe_notes_node
 sentinelx site scan vibe_notes_node
 python scripts/lab_up.py vibe_notes_node
 sentinelx site guard --upstream http://127.0.0.1:18081 --listen 127.0.0.1:18090 --mode monitor
-#   in another terminal, one benign request through the shield:
-#   curl http://127.0.0.1:18090/health
+```
+
+The guard command stays running. In another activated CMD terminal, send a benign
+request through the proxy:
+
+```bat
+curl http://127.0.0.1:18090/health
+```
+
+Stop only that guard process with Ctrl+C, then inspect results and stop your lab:
+
+```bat
 sentinelx site report vibe_notes_node
 sentinelx shield list
 python scripts/lab_down.py vibe_notes_node
 ```
 
-`site scan` stops the lab when it finishes, so bring it back up before the guard demo.
-The shield is a TEMPORARY SHIELD, NOT A FIX; monitor mode never blocks. This exact
-sequence (with the benign request sent by httpx) is run by `python scripts/readme_smoke.py`.
+`site scan` stops its lab when finished, hence the restart before the proxy.
+Monitor mode never blocks. A successful monitor request is not proof of enforce mode.
+The repeatable [README smoke script](scripts/readme_smoke.py) runs these quickstart
+flows, sends an actual benign proxy request and checks cleanup. For actual public
+proposal → approval → enforce → removal, use the [recording guide](docs/SUBMISSION_RECORDING_GUIDE.md)
+and [separate-process regression](tests/integration/test_shield_public_processes.py).
+No paid/live stage is needed for either quickstart.
 
-## Honest status
-**Local security prototype.** Agent Guard, the lab-only scanner/fixer, a FastAPI
-backend, TypeScript/Python SDKs, and a React dashboard are implemented. The default
-agent evaluation is SIMULATED; no live model benchmark was run in this completion
-review. Shield was exercised through separate local API/proxy/upstream processes,
-including approval, real HTTP blocking, restart recovery and removal. The dashboard
-Shield workflow was exercised in Chromium. This is a single-operator local demo,
-not production multi-user authorization. See
-[completion and submission gates](tasks/CODEX_COMPLETION_AND_SUBMISSION.md).
+## Models used and provenance
 
-## Planned vs implemented
-
-| Component | Status |
+| Recorded integration | Role and evidence status |
 |---|---|
-| Common schemas (strict Pydantic) | implemented (local) |
-| Model adapter (OpenAI-compatible, Meta open-weight) | implemented; historical NVIDIA Muse Glimmer 30B and Baseten Muse Spark Open traces reviewed, no new live calls; see [provenance](docs/SUBMISSION_MODEL_EVIDENCE.md) |
-| Policy gateway | implemented (local; no model calls) |
-| Evidence store (SQLite WAL, tamper-evident) | implemented (local) |
-| Agent runtime + fixture lab | implemented for Scenarios A/B with SIMULATED scripted agent |
-| Hand-authored attack + benign case set (15 + 15), sealed manifest | implemented |
-| Paired experiment runner, metrics, reports | implemented (scripted agent only; no model) |
-| Adversarial scenario generation (model-driven) | tooling implemented; historical generated-subset evidence exists; no new model generation in this review |
-| Verifier (independent assertions) | implemented for Scenario A/B (ledger-based) |
-| Investigator (evidence-cited) | implemented (model + baseline) |
-| IncidentTwin containment (EVCS) | implemented (15 attack cases) |
-| Scanner (Site Guard) | authorization gate + GuardedClient + 11-check catalog + independent verifier + coverage ledger; stored XSS + POST authz checks added |
-| Fixer | implemented (structured edits + unified diff; secret-safe retry diagnostics) |
-| Shield (reverse proxy) | implemented (deterministic narrow rules, human approval, representative benign replay, SQLite runtime/evidence, TTL and kill switch; no blanket injection-protection claim) |
-| Agent Guard SDK (Python / TypeScript) | Python SDK implemented; TypeScript SDK implemented |
-| Site Guard CLI | implemented (local; lab targets only) |
-| API (FastAPI) | implemented (/api/v1, event streaming, SSE) |
-| Dashboard (React) | implemented (React + Vite + TypeScript, 10 screens) |
-| Lab 1: vibe_shop_php (+ reference, PLANTED ground truth, benign traffic) | implemented (local; Docker required) |
-| Lab 2: vibe_notes_node (+ reference, PLANTED ground truth, benign traffic) | implemented (local) |
-| Reproducible benchmark | implemented (30-case sealed manifest; harness ready) |
-| Final-run orchestrator | implemented (scripts/final_run.py --dry-run) |
-| External scanner QA harness (Strix/PentAGI) | implemented (disabled by default; dry-run only) |
+| Meta open-weight `meta/muse-glimmer-30b` via NVIDIA | Historical LIVE planner/investigator traces and model-assisted examples. Current quickstarts are offline. |
+| Meta open-weight `meta-models/muse-spark-open-1026` via Baseten | Historical usage record and `baseten_spark_open` fix-report attribution; not a new live run or independently authenticated provider receipt. |
 
-## Responsible use
-Scan only systems you own or are authorized to test. See [SECURITY.md](SECURITY.md).
+See [model evidence](docs/SUBMISSION_MODEL_EVIDENCE.md) for distinctions between
+historical LIVE traces, recorded artifacts, scripted simulation, mocks and the
+aborted full run. The full live-model benchmark was not completed. No new model
+calls are made by this README. Provider availability and prices require owner
+verification; unknown NVIDIA cost is not summed as a billed zero. Never commit
+credentials or infer event eligibility merely from a configured model identifier.
 
-## Development
+## Development and CLI
+
+From the activated venv and repository root:
+
+```bat
+python -m pip install -e ".[dev]"
+sentinelx --help
+python -m ruff check .
+python -m pytest -m "not slow" -p no:cacheprovider --basetemp=%TEMP%\sentinelx-readme-fast
+npm install
+npm run build
+npm test --workspace sdk/typescript
 ```
-python -m venv .venv
-.venv\Scripts\activate          # macOS/Linux: . .venv/bin/activate
-pip install -e ".[dev]"
-ruff check . && pytest
-npm install && npm run build
-```
+
+Use a fresh basetemp name each run; do not delete an unknown existing directory.
+The fast suite excludes slow/browser/Docker/live cases. Hosted CI separately runs
+the full configured suite; the badge links to actual results. A skipped live test
+is not a passed model evaluation. The API/dashboard setup is described in the
+[recording guide](docs/SUBMISSION_RECORDING_GUIDE.md), not required by the offline SDK example.
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `packages/` | Policy, evidence, agent runtime, independent verifier, evaluation, scanner, fixer, Shield and reports |
+| `apps/` | API, dashboard and local fixture/lab management |
+| `sdk/python/`, `sdk/typescript/` | Tool-wrapping SDKs |
+| `labs/`, `fixtures/` | Intentionally vulnerable synthetic apps and controlled agent scenarios |
+| `evaluations/` | Committed historical example reports; generated runs remain local |
+| `tests/` | Unit, integration, browser and Docker checks with explicit prerequisites |
+| `scripts/`, `docs/`, `tasks/` | Reproduction tools, scope/attribution, evidence and handoffs |
+
+## Safety and honest limitations
+
+- **Lab-only:** non-lab scanning is disabled in this release. An authorization gate
+  guards scanner requests, scope, redirects and budgets. Only test targets you own
+  or have explicit permission to assess; see [SECURITY.md](SECURITY.md).
+- Kill switches and request/cost/call budgets exist; no auto-apply or production
+  deployment is part of the quickstarts. Shield defaults to monitor; enforce requires
+  explicit scoped approval and representative benign replay.
+- One trusted local API writer and loopback proxy readers share a private runtime
+  database. Demo Bearer authentication is not production multi-user authorization.
+  Database hashes detect certain tampering, not a malicious authorized writer.
+- Attempted is not executed; candidate is not confirmed; proposed is not VERIFIED;
+  VERIFIED is not applied. A temporary Shield is not a source-code fix.
+- Results are small synthetic lab snapshots, not protection guarantees, universal
+  detection/recall, zero false positives or a production-grade security assessment.
+  Injection was not protected in the recorded Shield example; intent accuracy is low.
+- External scanner operation was not performed and remains disabled pending separate
+  approval. Docker/PHP and browser tests require their prerequisites; count only
+  actual executions. The demo video and portal receipt remain owner actions.
+
+## AI assistance, scope and license
+
+Built with AI coding agents including OpenCode and Codex, under human developer
+direction and review. Independent automated checks provide the executed evidence;
+this is not a claim that a human manually audited every line or that a formal
+third-party security certification occurred.
+
+See [hackathon scope](docs/HACKATHON_SCOPE.md), [third-party inventory](docs/THIRD_PARTY_INVENTORY.md)
+and [rules/compliance](docs/RULES_COMPLIANCE.md). Organizer correspondence and
+accepted-participant requirements must be supplied/confirmed by the owner.
+
+**MIT License — Copyright (c) 2026 Satvik Patel.** See [LICENSE](LICENSE).
+Third-party dependencies retain their own licenses. No package publication or
+hackathon submission is performed by these instructions.

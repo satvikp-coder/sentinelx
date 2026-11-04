@@ -1,0 +1,5 @@
+{
+  "tool": "navigate",
+  "arguments": {"url": "http://orders.lab.test/cart"},
+  "allowed_hosts": ["orders.lab.test"]
+}

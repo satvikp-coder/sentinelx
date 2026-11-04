@@ -11,7 +11,8 @@ required to resolve chronology; the reply remains absent.
 
 OpenCode and Codex assisted implementation, repair, testing and documentation.
 The owner must confirm permitted AI assistance and attribution with organizers.
-No license, visibility change, rules acceptance or portal submission was made.
+Owner selected the MIT license (Satvik Patel, 2026). No visibility change, rules
+acceptance or portal submission is implied by these notes.
 
 ## Facts (from the official participant guide as relayed by the developer; no others are assumed)
 
@@ -42,8 +43,12 @@ No license, visibility change, rules acceptance or portal submission was made.
 
 Organizers' reply (verbatim):
 
-> **[NOT YET RECORDED: the reply text was not supplied in the prompt (the paste placeholder was left empty). The developer must paste it here exactly. Not invented.]**
+> **TO PASTE BY OWNER — no verbatim organizer reply was found in the repository.**
 
-Timing note: the initial commit `865823f` is dated 2026-10-27 05:32 IST (2026-10-26 20:02 ET), which is before the official 2026-10-27 ET start. It contained scaffolding only (layout, docs, CI, placeholder tests). All feature work follows after it.
+Timing note: the initial commit `865823f` is dated 2026-10-27 05:32 IST
+(2026-10-26 20:02 ET). Earlier notes assumed an Oct 27 ET start, while public
+organizer pages describe an Oct 26 kickoff. The accepted guide/timezone and any
+written permission must be confirmed by the owner. Do not assert a violation or
+permission solely from the earlier assumption. See HACKATHON_SCOPE.md for actual milestones.
 
 The checklist item "Organizers' written permission to start before the official start recorded" stays UNCHECKED until the reply text above is filled in.

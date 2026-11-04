@@ -21,7 +21,7 @@ previous hosted CI result still applies only to the code SHA named above.
 - [x] GitHub CI verified — Python and web jobs SUCCESS in run 41845409978 at exact release SHA.
 - [x] Repository SHA verified — local main, work/ds and remote main match the release.
 - [x] History scanner candidates reviewed — 497 content hits classified individually; see CSV and exclusions.
-- [ ] Real secrets excluded or escalated — no actual credential confirmed; three historical template-file versions remain content-excluded for owner inspection. Regex scans cannot prove absence of arbitrary secrets.
+- [x] Publishable-tree credential candidates reviewed — the three historical template versions were inspected for the final-public gate and contain only empty/placeholder credential fields. No real credential confirmed; see FINAL_PUBLIC.md. Heuristics do not prove absence of arbitrary secrets.
 - [x] Meta model evidence classified — historical LIVE traces, simulated baseline, aborted run and missing fresh benchmark distinguished.
 - [x] Demo locally reproducible — release has real public-process regression evidence; fresh-clone SDK/evidence commands re-executed. Rehearse the owner's exact final recording take before publishing.
 - [x] Demo script prepared.
