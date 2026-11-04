@@ -59,6 +59,10 @@ away from existing project evaluations. No providers or external targets are cal
   secret assertion found a leak. The replacement is a genuine local-clone gate.
 - Genuine clean clone, new venv, core smoke tests and CLI import subsequently
   passed (exit 0). This smoke mode does not replace the full fast suite.
+- Final worker full fast suite: **1429 passed, 150 deselected, exit 0**,
+  581.30 seconds. Separate clean-clone smoke: **234 passed, exit 0**.
+- Project-wide Ruff, SDK/runtime tests, dashboard build/Chromium workflow and
+  forbidden-path audit passed. npm audit reported **0 vulnerabilities**.
 
 Final premerge/postmerge test summaries, exact integrated SHA and remote/CI status
 must be checked in the final reviewer output/workflow; no earlier count is a
