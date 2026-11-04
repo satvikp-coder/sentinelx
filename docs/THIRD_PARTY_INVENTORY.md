@@ -1,5 +1,19 @@
 # Third-Party Inventory
 
+## Current submission correction (2026-11-04)
+
+The historical placeholder table below is not a complete current dependency/license
+inventory. Python/FastAPI/Pydantic/httpx/PyYAML/Uvicorn/psutil, React/Vite/TypeScript
+and test/build tooling are used; see `pyproject.toml`, `package-lock.json` and the
+SDK manifests for exact dependency declarations. Owner must verify redistribution
+notices and applicable licenses before public release. No project license has been
+selected. Reference-tool license labels below are relayed/unverified, not a claim
+that those tools were installed or their source copied.
+
+Historical provider traces were reviewed separately in
+[SUBMISSION_MODEL_EVIDENCE.md](SUBMISSION_MODEL_EVIDENCE.md); pricing/terms claims
+below are historical, not freshly verified provider terms.
+
 Log an entry here BEFORE any use. All entries below are pre-filled placeholders; nothing is installed.
 
 | name | upstream_url | commit | component_path | license | use_type | local_modifications | owner | security_review_status |

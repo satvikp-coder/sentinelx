@@ -1,5 +1,9 @@
 # Sentinel X: submission draft requiring owner review
 
+Use [SUBMISSION_READY_TEXT.md](SUBMISSION_READY_TEXT.md) for the current copy and
+[SUBMISSION_MODEL_EVIDENCE.md](SUBMISSION_MODEL_EVIDENCE.md) for historical model
+provenance. This earlier draft is retained for context; the new package supersedes it.
+
 Sentinel X combines Agent Guard and Site Guard around one rule:
 **Models propose; deterministic code and independent verification decide.**
 

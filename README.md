@@ -2,9 +2,19 @@
 
 Built for the Meta Global AI Developer Hackathon 2026 (Indie track, "Push the Frontier").
 
+Sentinel X tests hostile inputs against AI agents and authorized local applications.
+Deterministic policy, independent verification and human-approved temporary Shield
+rules separate proposed actions from observed outcomes.
+
+[Submission copy](docs/SUBMISSION_READY_TEXT.md) ·
+[Three-minute demo](docs/SUBMISSION_DEMO_SCRIPT.md) ·
+[Recording/setup guide](docs/SUBMISSION_RECORDING_GUIDE.md) ·
+Demo video: **OWNER TO RECORD AND INSERT URL**.
+The verified release is `d855c4e`; these documentation updates are for owner review.
+
 Two sides on one shared evidence and verification core:
 - **Agent Guard** - an isolated lab where an autonomous browser agent is attacked through synthetic page/tool content; deterministic policy gateway, tamper-evident evidence, paired unprotected/protected runs, independent verifier, IncidentTwin containment branches.
-- **Site Guard** - a red-team scanner, fix engine and live reverse-proxy shield for sites you own.
+- **Site Guard** - a scanner, fix engine and reverse-proxy shield for authorized local labs; remote scanning is disabled in this release.
 
 ## Protect your AI agent in 5 minutes
 
@@ -86,20 +96,19 @@ not production multi-user authorization. See
 | Component | Status |
 |---|---|
 | Common schemas (strict Pydantic) | implemented (local) |
-| Model adapter (OpenAI-compatible, Meta open-weight) | implemented (local; no live credentials) |
+| Model adapter (OpenAI-compatible, Meta open-weight) | implemented; historical NVIDIA Muse Glimmer 30B and Baseten Muse Spark Open traces reviewed, no new live calls; see [provenance](docs/SUBMISSION_MODEL_EVIDENCE.md) |
 | Policy gateway | implemented (local; no model calls) |
 | Evidence store (SQLite WAL, tamper-evident) | implemented (local) |
 | Agent runtime + fixture lab | implemented for Scenarios A/B with SIMULATED scripted agent |
 | Hand-authored attack + benign case set (15 + 15), sealed manifest | implemented |
 | Paired experiment runner, metrics, reports | implemented (scripted agent only; no model) |
-| Adversarial scenario generation (model-driven) | planned |
+| Adversarial scenario generation (model-driven) | tooling implemented; historical generated-subset evidence exists; no new model generation in this review |
 | Verifier (independent assertions) | implemented for Scenario A/B (ledger-based) |
 | Investigator (evidence-cited) | implemented (model + baseline) |
 | IncidentTwin containment (EVCS) | implemented (15 attack cases) |
 | Scanner (Site Guard) | authorization gate + GuardedClient + 11-check catalog + independent verifier + coverage ledger; stored XSS + POST authz checks added |
 | Fixer | implemented (structured edits + unified diff; secret-safe retry diagnostics) |
-| Shield (reverse proxy) | implemented (deterministic narrow rules, human approval, representative benign replay,
-SQLite runtime/evidence, TTL and kill switch; no blanket injection-protection claim) |
+| Shield (reverse proxy) | implemented (deterministic narrow rules, human approval, representative benign replay, SQLite runtime/evidence, TTL and kill switch; no blanket injection-protection claim) |
 | Agent Guard SDK (Python / TypeScript) | Python SDK implemented; TypeScript SDK implemented |
 | Site Guard CLI | implemented (local; lab targets only) |
 | API (FastAPI) | implemented (/api/v1, event streaming, SSE) |

@@ -29,6 +29,8 @@ dist/
 *.db-wal
 *.db-shm
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
 evaluations/output/
 evaluations/results/
 evaluations/*.generated.*
@@ -41,6 +43,10 @@ playwright-report/
 Thumbs.db
 .idea/
 .vscode/
+# Local scratch directories (keep review artifacts outside the repository).
+/.tmp/
+/tmp/
+/temp/
 evaluations/runs/
 .venv*/
 

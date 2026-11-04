@@ -1,0 +1,463 @@
+commit,path,line,category,classification,matched_text
+WORKTREE_AT_d855c4e,STATUS.md,39,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,STATUS.md,40,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_model_assisted_scan/report.json,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_model_assisted_scan/report.json,8,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_model_assisted_scan/report.json,98,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_model_assisted_scan/report.json,112,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_model_assisted_scan/report.md,7,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_model_assisted_scan/report.md,12,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report/report.json,1421,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report/report.json,1424,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report/report.md,10,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report/report.md,12,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_evcs/approval_check.json,2,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_evcs/report.json,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_evcs/report.json,5,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_evcs/report.json,885,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_evcs/report.md,9,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_evcs/report.md,11,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_model/report.json,1044,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_model/report.json,1047,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_model/report.md,10,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_report_model/report.md,12,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node/report.json,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node/report.json,8,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node/report.json,177,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node/report.json,191,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node/report.md,7,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node/report.md,12,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node_reference/report.json,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node_reference/report.json,8,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node_reference/report.md,7,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_scan_report/vibe_notes_node_reference/report.md,12,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/example_shield_report/report.json,4,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,29,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,39,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,49,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,59,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,69,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,79,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,89,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,99,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,109,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,119,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,129,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,139,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,149,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,159,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,169,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,179,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,189,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,199,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,209,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,219,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,229,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,239,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,249,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,259,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,269,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,279,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,289,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,299,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,309,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,319,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest.json,322,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,31,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,41,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,51,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,61,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,71,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,81,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,91,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,101,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,111,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,121,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/manifest_subset.json,124,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/model-generated-1.log,16,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,evaluations/model-subset-1.log,28,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/benign_common.py,16,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/benign_common.py,17,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,20,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,33,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,39,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,63,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,72,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,85,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,101,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,113,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,122,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,131,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,137,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,146,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,155,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,165,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,179,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,185,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,194,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,203,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,212,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,224,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,230,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,239,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,285,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,303,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,312,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,321,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,330,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,354,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,367,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,379,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,391,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,403,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,419,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,431,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,437,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,446,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,455,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,464,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,473,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,482,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,494,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,503,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,515,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,521,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,530,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,542,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,554,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,563,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,569,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,586,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,601,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,610,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,625,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,645,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,651,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,675,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,684,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,690,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,705,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,711,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,730,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,746,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,764,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,783,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,792,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,801,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,814,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,823,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/package-lock.json,832,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node/public/backup/server.js.bak,3,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,20,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,33,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,39,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,63,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,72,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,85,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,101,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,113,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,122,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,131,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,137,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,146,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,155,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,165,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,179,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,185,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,194,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,203,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,212,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,224,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,230,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,239,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,285,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,303,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,312,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,321,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,330,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,354,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,367,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,379,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,391,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,403,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,419,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,431,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,437,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,446,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,455,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,464,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,473,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,482,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,494,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,503,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,515,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,521,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,530,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,542,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,554,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,563,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,569,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,586,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,601,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,610,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,625,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,645,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,651,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,675,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,684,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,690,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,705,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,711,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,730,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,746,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,764,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,783,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,792,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,801,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,814,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,823,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,labs/vibe_notes_node_reference/package-lock.json,832,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,34,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,44,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,61,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,78,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,95,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,112,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,129,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,146,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,163,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,180,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,197,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,214,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,231,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,248,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,265,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,282,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,299,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,314,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,325,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,335,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,365,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,402,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,415,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,450,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,471,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,478,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,488,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,495,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,505,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,523,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,537,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,552,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,582,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,603,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,624,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,645,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,666,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,687,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,708,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,729,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,750,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,771,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,792,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,813,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,832,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,842,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,849,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,863,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,893,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,900,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,910,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,922,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,956,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,962,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,972,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,979,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,996,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,1010,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,package-lock.json,1041,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,packages/shield/recorder.py,26,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,report/index.html,92,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/21.result.md,35,OpenAI-style API key,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_CI_RECOVERY.md,4,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,4,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,5,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,6,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,77,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,78,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,141,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,318,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,325,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,7,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/FINAL_FEATURE_MATRIX.md,39,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,tasks/INDEPENDENT_REVIEW_HANDOFF.md,6,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/LOCAL_VERIFICATION_GUIDE.md,129,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/OVERNIGHT_HANDOFF.md,6,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/OVERNIGHT_HANDOFF.md,43,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/OVERNIGHT_HANDOFF.md,44,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/PROJECT_COMPLETION_AUDIT.md,6,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/PROJECT_COMPLETION_AUDIT.md,19,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/SHIELD_RECOVERY.result.md,3,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/SHIELD_RECOVERY.result.md,5,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tasks/SHIELD_RECOVERY.result.md,62,long base64-like token (possible secret),False positive,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_evaluation_harness.py,114,long base64-like token (possible secret),Integrity hash,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_fixer_edit_generation.py,320,OpenAI-style API key,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_fixer_edit_secret_leak.py,16,OpenAI-style API key,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_fixer_edit_secret_leak.py,36,OpenAI-style API key,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_redaction.py,13,private key block,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_redaction.py,87,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_scanner_23_improvements.py,53,password assignment,Synthetic fixture,REDACTED
+WORKTREE_AT_d855c4e,tests/unit/test_scanner_23_improvements.py,55,password assignment,Synthetic fixture,REDACTED
+WORKTREE,CLAUDE.md,23,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,STATUS.md,23,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,apps/api/auth.py,22,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/auth.py,81,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/auth.py,87,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/main.py,5,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,apps/api/main.py,143,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/routes.py,839,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/routes.py,897,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/routes.py,1924,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/routes.py,1926,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/api/routes.py,1928,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/web/src/api.ts,145,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/web/src/api.ts,145,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/web/src/api.ts,188,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,apps/web/src/api.ts,188,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,docs/ARCHITECTURE.md,181,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,docs/DECISIONS.md,65,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,docs/DECISIONS.md,140,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,docs/DECISIONS.md,140,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,evaluations/evcs-all.log,17,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/evcs-all.log,17,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/evcs-all.log,17,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/evcs-all.log,18,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/investigation-1.log,123,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/model-generated-1.log,45,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/model-generated-1.log,45,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/model-generated-1.log,45,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/model-subset-1.log,57,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/model-subset-1.log,57,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,evaluations/model-subset-1.log,57,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,labs/vibe_notes_node/README.md,21,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,labs/vibe_notes_node/benign_traffic.py,33,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,labs/vibe_notes_node/benign_traffic.py,51,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,labs/vibe_notes_node/public/app.js,11,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/fixer/scope.py,63,personal-email,Synthetic local Git author identity,REDACTED
+WORKTREE,packages/model_clients/client.py,202,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/model_clients/profiles.py,185,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/scanner/models.py,40,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,packages/scanner/session.py,40,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,291,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,297,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,303,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,309,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,315,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,321,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,327,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,335,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,341,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,packages/shield/rules.py,347,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,scripts/demo_policy.py,29,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,scripts/diagnose_latency.py,35,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,scripts/hacker_sim.py,138,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,sdk/typescript/src/client.ts,80,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,sdk/typescript/src/client.ts,80,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,sdk/typescript/src/types.ts,17,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tasks/21.result.md,35,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tasks/21.result.md,77,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tasks/25.result.md,35,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/25.result.md,37,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/25.result.md,39,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/32.result.md,23,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,38,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,54,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,242,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,10,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,76,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,82,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,302,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,9,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/INDEPENDENT_REVIEW_HANDOFF.md,41,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tasks/INDEPENDENT_REVIEW_HANDOFF.md,83,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,6,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,25,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,37,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,48,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,61,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,80,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,91,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,104,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,115,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,128,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,152,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/LOCAL_VERIFICATION_GUIDE.md,162,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/OVERNIGHT_MASTER_LEDGER.md,4,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/PROJECT_BLOCKERS.md,29,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tasks/SHIELD_RECOVERY.result.md,57,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tasks/SHIELD_RECOVERY_TEST_MATRIX.md,4,local-path,Local developer path (not a credential),REDACTED
+WORKTREE,tests/e2e/test_model_runs.py,55,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/integration/test_authz_gate.py,508,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/integration/test_generator.py,124,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/integration/test_labs.py,187,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/integration/test_shield_public_processes.py,138,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_agent_runtime_units.py,146,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_agent_runtime_units.py,147,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_api_security_repair2.py,28,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_api_units.py,28,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_api_units.py,29,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_api_units.py,283,personal-email,URL-userinfo hostname-confusion fixture (not personal email),REDACTED
+WORKTREE,tests/unit/test_cli_basic.py,66,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_cli_site.py,197,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_containment.py,268,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_evidence_store.py,171,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_fix_patch_format_cli.py,55,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fix_patch_format_cli.py,55,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_generation.py,74,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_generation.py,223,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_generation.py,320,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_generation.py,74,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_generation.py,223,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_git_apply.py,49,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_secret_leak.py,16,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_secret_leak.py,36,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_secret_leak.py,57,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_fixer_edit_secret_leak.py,60,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_investigator.py,402,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_investigator.py,486,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_client.py,70,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_client.py,117,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_client.py,250,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_model_client.py,266,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_model_client.py,369,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_client.py,369,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_client.py,419,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_model_client.py,435,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_model_client.py,458,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_planner.py,63,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_model_profiles.py,145,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_policy_engine.py,245,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_policy_evidence_and_purity.py,97,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_policy_page_requests.py,61,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_redaction.py,13,credential-prefix,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_redaction.py,30,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_redaction.py,30,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_redaction.py,53,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_redaction.py,62,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_redaction.py,71,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_scanner_safety.py,91,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_shield_completion_regressions.py,13,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_shield_e2e_public_api.py,51,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_shield_model.py,16,auth-header-or-assignment,Synthetic fixture or redaction example,REDACTED
+WORKTREE,tests/unit/test_shield_recovery_failures.py,39,auth-header-or-assignment,Auth plumbing/configuration reference; no credential inference,REDACTED
+WORKTREE,tests/unit/test_urls.py,12,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_urls.py,13,personal-email,Synthetic/example identity,REDACTED
+WORKTREE,tests/unit/test_urls.py,57,personal-email,Synthetic/example identity,REDACTED

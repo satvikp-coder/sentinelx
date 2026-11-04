@@ -1,5 +1,18 @@
 # Rules Compliance
 
+## Current source-status correction (2026-11-04)
+
+The bullets below are developer-relayed participant notes, not independently
+verified current terms. See [SUBMISSION_OFFICIAL_RULES.md](SUBMISSION_OFFICIAL_RULES.md)
+for checked public sources and owner-only gaps. The public organizer pages describe
+an Oct 26 kickoff, so the early-start conclusion below must not be treated as a
+proven violation or permission. The actual accepted guide and organizer reply are
+required to resolve chronology; the reply remains absent.
+
+OpenCode and Codex assisted implementation, repair, testing and documentation.
+The owner must confirm permitted AI assistance and attribution with organizers.
+No license, visibility change, rules acceptance or portal submission was made.
+
 ## Facts (from the official participant guide as relayed by the developer; no others are assumed)
 
 - Building period: Oct 27 - Nov 4, 2026.

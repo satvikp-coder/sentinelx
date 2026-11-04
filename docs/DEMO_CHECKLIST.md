@@ -1,4 +1,8 @@
-# Sentinel X — Demo Checklist
+# Sentinel X — Historical Demo Checklist
+
+Superseded for submission by [SUBMISSION_DEMO_SCRIPT.md](SUBMISSION_DEMO_SCRIPT.md)
+and [SUBMISSION_RECORDING_GUIDE.md](SUBMISSION_RECORDING_GUIDE.md). Do not assume
+the planned attack-success or recall claims below occurred; use actual run output.
 
 ## Pre-Demo
 

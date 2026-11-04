@@ -1,0 +1,498 @@
+candidate,group,commit,path,line,pattern,classification,basis,matched_text
+1,1,d855c4ece913775306295a8fec54254e7c2181d1,tasks/CODEX_CI_RECOVERY.md,4,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+2,1,dae6eff59cff1f3c05d6c378e9f36be1c1a935da,tasks/CODEX_CI_RECOVERY.md,4,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+3,2,13212a5f11df845b07c1a675e8c2b542dbc0c85d,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+4,3,13212a5f11df845b07c1a675e8c2b542dbc0c85d,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,4,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+5,2,714e7a3c382a78c5b1a8cf497b509cd28a7b79d7,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+6,3,714e7a3c382a78c5b1a8cf497b509cd28a7b79d7,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,4,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+7,2,22007eacf98e856b97429f312529bc7c8c783cc9,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+8,3,22007eacf98e856b97429f312529bc7c8c783cc9,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,4,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+9,4,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,STATUS.md,39,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+10,5,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,STATUS.md,40,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+11,6,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,packages/shield/recorder.py,26,long base64-like token (possible secret),False positive,Literal ordered base64 character alphabet used by telemetry minimization,REDACTED
+12,2,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+13,3,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_COMPLETION_AND_SUBMISSION.md,4,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+14,7,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,5,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+15,8,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+16,9,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,77,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+17,10,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,78,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+18,11,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,141,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+19,12,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,318,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+20,13,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/CODEX_FINAL_SHIELD_RECOVERY_REPAIR_PROMPT.md,325,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+21,14,8803fb6f6ace60a3c591194fb04b84d751d0f2ec,tasks/FINAL_FEATURE_MATRIX.md,39,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+22,15,69df4762fe20ef58e6a9117ce438c3ee978cd62d,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+23,16,69df4762fe20ef58e6a9117ce438c3ee978cd62d,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+24,17,69df4762fe20ef58e6a9117ce438c3ee978cd62d,tasks/FINAL_FEATURE_MATRIX.md,27,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+25,18,69df4762fe20ef58e6a9117ce438c3ee978cd62d,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+26,19,69df4762fe20ef58e6a9117ce438c3ee978cd62d,tasks/SHIELD_RECOVERY.result.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+27,20,69df4762fe20ef58e6a9117ce438c3ee978cd62d,tasks/SHIELD_RECOVERY.result.md,5,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+28,21,69df4762fe20ef58e6a9117ce438c3ee978cd62d,tasks/SHIELD_RECOVERY.result.md,62,long base64-like token (possible secret),False positive,"Slash-separated URL path, status labels or prose; no credential assignment",REDACTED
+29,6,591ac8d3cae847a5710f12b047aae79a8bc55c35,packages/shield/recorder.py,26,long base64-like token (possible secret),False positive,Literal ordered base64 character alphabet used by telemetry minimization,REDACTED
+30,15,0afc543d783bef959ac364dd911b2fe180de5d04,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+31,16,0afc543d783bef959ac364dd911b2fe180de5d04,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+32,15,b6ae25e9cd62d5c7051c087c13a0cc4e0649c3d3,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+33,16,b6ae25e9cd62d5c7051c087c13a0cc4e0649c3d3,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+34,15,ea875f3605bc4b2056c25901127812dd56df25fb,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+35,16,ea875f3605bc4b2056c25901127812dd56df25fb,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+36,15,263dcc714809aea76a4ef380b29f2558cc3b0578,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+37,16,263dcc714809aea76a4ef380b29f2558cc3b0578,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+38,22,499afccf75b14e75128fb4ee1e2109f811a0e751,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+39,23,499afccf75b14e75128fb4ee1e2109f811a0e751,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+40,24,499afccf75b14e75128fb4ee1e2109f811a0e751,tasks/PROJECT_COMPLETION_AUDIT.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+41,25,499afccf75b14e75128fb4ee1e2109f811a0e751,tasks/PROJECT_COMPLETION_AUDIT.md,19,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+42,22,5878c5164b4992a805a8c65c4ecede6696f76ff7,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+43,23,5878c5164b4992a805a8c65c4ecede6696f76ff7,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+44,26,5878c5164b4992a805a8c65c4ecede6696f76ff7,tasks/INDEPENDENT_REVIEW_HANDOFF.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+45,27,5878c5164b4992a805a8c65c4ecede6696f76ff7,tasks/LOCAL_VERIFICATION_GUIDE.md,129,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+46,18,5878c5164b4992a805a8c65c4ecede6696f76ff7,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+47,24,5878c5164b4992a805a8c65c4ecede6696f76ff7,tasks/PROJECT_COMPLETION_AUDIT.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+48,25,5878c5164b4992a805a8c65c4ecede6696f76ff7,tasks/PROJECT_COMPLETION_AUDIT.md,19,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+49,22,d3b0fbbaad3b660c7615b0a67ed5c042e3550773,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+50,23,d3b0fbbaad3b660c7615b0a67ed5c042e3550773,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+51,26,d3b0fbbaad3b660c7615b0a67ed5c042e3550773,tasks/INDEPENDENT_REVIEW_HANDOFF.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+52,18,d3b0fbbaad3b660c7615b0a67ed5c042e3550773,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+53,24,d3b0fbbaad3b660c7615b0a67ed5c042e3550773,tasks/PROJECT_COMPLETION_AUDIT.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+54,25,d3b0fbbaad3b660c7615b0a67ed5c042e3550773,tasks/PROJECT_COMPLETION_AUDIT.md,19,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+55,22,846ff5789ad0068d723349c47a3ca5d10b036667,STATUS.md,26,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+56,23,846ff5789ad0068d723349c47a3ca5d10b036667,STATUS.md,27,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+57,26,846ff5789ad0068d723349c47a3ca5d10b036667,tasks/INDEPENDENT_REVIEW_HANDOFF.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+58,27,846ff5789ad0068d723349c47a3ca5d10b036667,tasks/LOCAL_VERIFICATION_GUIDE.md,129,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+59,18,846ff5789ad0068d723349c47a3ca5d10b036667,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+60,24,846ff5789ad0068d723349c47a3ca5d10b036667,tasks/PROJECT_COMPLETION_AUDIT.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+61,25,846ff5789ad0068d723349c47a3ca5d10b036667,tasks/PROJECT_COMPLETION_AUDIT.md,19,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+62,28,96098407fc0afd2fe3d4d61ca65499a45e57fd54,tests/unit/test_evaluation_harness.py,114,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+63,29,3b3d5823a4f64bfbbdeed66b35dab3003d2bea4d,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+64,29,75e9a122b3fbd996ae165c251045019b97cabd44,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+65,29,171ce8c745f544b8761a32e35982c40c5d6068ea,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+66,29,1d4aa9c40d6af3f1288659a374bfd635e61c7542,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+67,29,9a775ad6b2c4d9ee22a007f645518a43373d0ad0,tasks/CRITICAL_SECURITY_REPAIR_3.result.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+68,30,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,34,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+69,31,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,44,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+70,32,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,61,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+71,33,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,78,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+72,34,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,95,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+73,35,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,112,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+74,36,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,129,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+75,37,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,146,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+76,38,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,163,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+77,39,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,180,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+78,40,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,197,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+79,41,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,214,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+80,42,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,231,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+81,43,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,248,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+82,44,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,265,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+83,45,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,282,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+84,46,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,299,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+85,47,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,314,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+86,48,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,325,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+87,49,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,335,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+88,50,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,365,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+89,51,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,402,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+90,52,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,415,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+91,53,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,450,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+92,54,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,471,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+93,55,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,478,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+94,56,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,488,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+95,57,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,495,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+96,58,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,505,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+97,59,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,523,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+98,60,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,537,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+99,61,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,552,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+100,62,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,582,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+101,63,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,603,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+102,64,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,624,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+103,65,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,645,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+104,66,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,666,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+105,67,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,687,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+106,68,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,708,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+107,69,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,729,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+108,70,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,750,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+109,71,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,771,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+110,72,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,792,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+111,73,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,813,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+112,74,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,832,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+113,75,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,842,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+114,76,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,849,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+115,77,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,863,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+116,78,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,893,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+117,79,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,900,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+118,80,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,910,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+119,81,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,922,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+120,82,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,956,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+121,83,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,962,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+122,84,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,972,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+123,85,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,979,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+124,86,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,996,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+125,87,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,1010,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+126,88,f2ffb3fb80d5f080c5b581e531d8e1fe16d6f2dd,package-lock.json,1041,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+127,89,c9147885b7acf67b3b81035072641444f2fb0c82,tests/unit/test_evaluation_harness.py,116,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+128,18,63aebff0972e75f64470e8d65a6680761333e87e,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+129,90,63aebff0972e75f64470e8d65a6680761333e87e,tests/unit/test_scanner_23_improvements.py,53,password assignment,Synthetic fixture,FakeCtx test persona credentials; no service credential source,REDACTED
+130,91,63aebff0972e75f64470e8d65a6680761333e87e,tests/unit/test_scanner_23_improvements.py,55,password assignment,Synthetic fixture,FakeCtx test persona credentials; no service credential source,REDACTED
+131,92,6532b915c6f862f4fc1e43b066ab7da8660c96d8,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+132,18,6532b915c6f862f4fc1e43b066ab7da8660c96d8,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+133,93,4b864846c5a9230808172a8b8dfebbe859cd7179,tasks/OVERNIGHT_HANDOFF.md,6,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+134,94,4b864846c5a9230808172a8b8dfebbe859cd7179,tasks/OVERNIGHT_HANDOFF.md,43,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+135,95,4b864846c5a9230808172a8b8dfebbe859cd7179,tasks/OVERNIGHT_HANDOFF.md,44,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+136,18,84f37020c374cc636eb3ce4e150e2d49fe652c9a,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+137,92,9244d6054750a2c5dc3801bb5ecb0859b8791404,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+138,96,9244d6054750a2c5dc3801bb5ecb0859b8791404,tasks/21.result.md,35,OpenAI-style API key,Synthetic fixture,Explicit FAKE canary documented for setenv regression; not provider authentication,REDACTED
+139,18,9244d6054750a2c5dc3801bb5ecb0859b8791404,tasks/OVERNIGHT_MASTER_LEDGER.md,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+140,92,14c721f75030b0ff5979486b527582bdfa4c2044,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+141,96,14c721f75030b0ff5979486b527582bdfa4c2044,tasks/21.result.md,35,OpenAI-style API key,Synthetic fixture,Explicit FAKE canary documented for setenv regression; not provider authentication,REDACTED
+142,97,14c721f75030b0ff5979486b527582bdfa4c2044,tests/unit/test_fixer_edit_secret_leak.py,16,OpenAI-style API key,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+143,98,14c721f75030b0ff5979486b527582bdfa4c2044,tests/unit/test_fixer_edit_secret_leak.py,36,OpenAI-style API key,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+144,92,d10d8b7eeafa3bdea0d1be03d561c614d0af0d8f,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+145,96,d10d8b7eeafa3bdea0d1be03d561c614d0af0d8f,tasks/21.result.md,35,OpenAI-style API key,Synthetic fixture,Explicit FAKE canary documented for setenv regression; not provider authentication,REDACTED
+146,99,ccb59c121462b3973db1f4a00a83f9781a73ad77,tests/unit/test_fixer_edit_generation.py,320,OpenAI-style API key,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+147,100,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+148,101,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+149,102,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+150,103,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+151,102,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+152,104,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+153,105,5089cc2aab40279d664c58cff851982ad785a7f9,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+154,100,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+155,101,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+156,102,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+157,103,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+158,102,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+159,104,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+160,105,5b8f864a8ff7adab781c27b48e51823744efaad3,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+161,100,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+162,101,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+163,102,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+164,103,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+165,102,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+166,104,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+167,105,1b68f7ca52bd3fac2db59136375a30222c977e2a,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+168,100,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+169,101,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+170,102,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+171,103,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+172,102,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+173,104,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+174,105,0e966ce959a340ce24f2468f75c028d64843b7d4,report/index.html,92,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+175,106,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+176,107,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+177,108,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+178,109,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+179,108,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+180,110,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+181,111,dd2e45f583c6c7961d72d02305ddf831985b5d7c,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+182,106,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+183,107,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+184,108,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+185,109,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+186,108,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+187,110,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+188,111,684e98da6a387419408b713a16ea88ed7cb9263f,report/index.html,122,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+189,112,d949d6fd181891013f8c5de1118594d9e18eabeb,evaluations/example_shield_report/report.json,4,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+190,6,f5a050707c2b129f4fd6a4ec8fe0b30d51dd1f37,packages/shield/recorder.py,26,long base64-like token (possible secret),False positive,Literal ordered base64 character alphabet used by telemetry minimization,REDACTED
+191,92,8b355a5b0e1dbd9d79c0e35f24076c488a91bd5c,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+192,113,5c8adca907a391cb2d750c754fe06f5bea2cc380,tests/unit/test_redaction.py,13,private key block,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+193,114,5c8adca907a391cb2d750c754fe06f5bea2cc380,tests/unit/test_redaction.py,87,password assignment,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+194,92,d384a1b34ee04539b478d2d65351389799c233f0,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+195,113,83b98bcc13de9642532daaee40ec976bbc915bd8,tests/unit/test_redaction.py,13,private key block,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+196,114,83b98bcc13de9642532daaee40ec976bbc915bd8,tests/unit/test_redaction.py,87,password assignment,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+197,115,ec79b01d966e26c5fe407a8bbe7414b97ca324ce,evaluations/example_model_assisted_scan/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+198,116,ec79b01d966e26c5fe407a8bbe7414b97ca324ce,evaluations/example_model_assisted_scan/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+199,117,ec79b01d966e26c5fe407a8bbe7414b97ca324ce,evaluations/example_model_assisted_scan/report.json,98,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+200,118,ec79b01d966e26c5fe407a8bbe7414b97ca324ce,evaluations/example_model_assisted_scan/report.json,112,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+201,119,ec79b01d966e26c5fe407a8bbe7414b97ca324ce,evaluations/example_model_assisted_scan/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+202,120,ec79b01d966e26c5fe407a8bbe7414b97ca324ce,evaluations/example_model_assisted_scan/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+203,92,385dae6aa0c7c812ba6f9ab056a25288ed22b53c,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+204,121,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+205,122,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+206,123,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node/report.json,177,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+207,124,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node/report.json,191,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+208,125,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+209,126,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+210,127,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node_reference/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+211,128,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node_reference/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+212,129,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node_reference/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+213,130,efb9802d81d394a693ff7e243499a8b792ecb353,evaluations/example_scan_report/vibe_notes_node_reference/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+214,131,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_model_assisted_scan/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+215,116,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_model_assisted_scan/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+216,132,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_model_assisted_scan/report.json,97,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+217,133,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_model_assisted_scan/report.json,110,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+218,134,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_model_assisted_scan/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+219,120,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_model_assisted_scan/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+220,135,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+221,122,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+222,136,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node/report.json,177,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+223,137,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node/report.json,190,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+224,138,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+225,126,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+226,139,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node_reference/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+227,128,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node_reference/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+228,140,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node_reference/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+229,130,08ab94d3511d5a436f4377b691f833b54f41d52d,evaluations/example_scan_report/vibe_notes_node_reference/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+230,141,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_00c5dd8c/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+231,142,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_00c5dd8c/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+232,143,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_00c5dd8c/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+233,144,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_00c5dd8c/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+234,145,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_7761c3c1/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+235,146,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_7761c3c1/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+236,147,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_7761c3c1/report.json,177,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+237,148,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_7761c3c1/report.json,190,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+238,149,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_7761c3c1/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+239,150,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_7761c3c1/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+240,151,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_f36c45ea/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+241,152,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_f36c45ea/report.json,8,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+242,153,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_f36c45ea/report.md,7,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+243,154,c6093da4a2f283e2741c70693f7d05274825165b,evaluations/scan_runs/vibe_notes_node-ses_f36c45ea/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+244,92,be027e40c329b9d294d73c3920acb37831350b3e,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+245,155,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/benign_common.py,16,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+246,156,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/benign_common.py,17,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+247,157,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,20,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+248,158,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,33,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+249,159,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,39,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+250,160,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,63,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+251,161,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,72,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+252,162,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,85,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+253,163,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,101,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+254,164,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,113,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+255,165,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,122,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+256,166,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,131,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+257,167,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,137,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+258,168,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,146,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+259,169,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,155,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+260,170,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,165,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+261,171,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,179,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+262,172,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,185,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+263,173,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,194,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+264,174,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,203,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+265,175,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,212,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+266,176,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,224,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+267,177,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,230,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+268,178,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,239,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+269,179,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,285,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+270,180,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,303,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+271,181,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,312,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+272,182,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,321,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+273,183,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,330,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+274,184,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,354,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+275,185,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,367,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+276,186,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,379,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+277,187,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,391,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+278,188,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,403,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+279,189,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,419,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+280,190,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,431,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+281,191,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,437,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+282,192,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,446,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+283,193,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,455,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+284,194,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,464,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+285,195,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,473,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+286,196,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,482,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+287,197,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,494,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+288,198,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,503,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+289,199,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,515,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+290,200,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,521,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+291,201,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,530,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+292,202,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,542,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+293,203,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,554,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+294,204,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,563,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+295,205,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,569,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+296,206,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,586,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+297,207,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,601,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+298,208,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,610,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+299,209,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,625,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+300,210,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,645,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+301,211,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,651,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+302,212,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,675,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+303,213,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,684,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+304,214,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,690,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+305,215,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,705,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+306,216,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,711,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+307,217,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,730,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+308,218,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,746,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+309,219,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,764,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+310,220,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,783,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+311,221,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,792,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+312,222,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,801,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+313,223,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,814,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+314,224,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,823,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+315,225,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/package-lock.json,832,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+316,226,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node/public/backup/server.js.bak,3,password assignment,Synthetic fixture,Inert lab backup exposure excerpt or redacted synthetic lab-password example,REDACTED
+317,227,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,20,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+318,228,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,33,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+319,229,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,39,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+320,230,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,63,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+321,231,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,72,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+322,232,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,85,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+323,233,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,101,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+324,234,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,113,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+325,235,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,122,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+326,236,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,131,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+327,237,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,137,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+328,238,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,146,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+329,239,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,155,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+330,240,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,165,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+331,241,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,179,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+332,242,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,185,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+333,243,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,194,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+334,244,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,203,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+335,245,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,212,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+336,246,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,224,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+337,247,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,230,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+338,248,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,239,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+339,249,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,285,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+340,250,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,303,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+341,251,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,312,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+342,252,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,321,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+343,253,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,330,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+344,254,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,354,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+345,255,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,367,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+346,256,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,379,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+347,257,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,391,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+348,258,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,403,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+349,259,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,419,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+350,260,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,431,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+351,261,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,437,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+352,262,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,446,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+353,263,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,455,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+354,264,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,464,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+355,265,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,473,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+356,266,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,482,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+357,267,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,494,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+358,268,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,503,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+359,269,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,515,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+360,270,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,521,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+361,271,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,530,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+362,272,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,542,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+363,273,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,554,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+364,274,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,563,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+365,275,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,569,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+366,276,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,586,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+367,277,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,601,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+368,278,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,610,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+369,279,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,625,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+370,280,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,645,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+371,281,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,651,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+372,282,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,675,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+373,283,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,684,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+374,284,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,690,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+375,285,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,705,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+376,286,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,711,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+377,287,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,730,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+378,288,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,746,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+379,289,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,764,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+380,290,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,783,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+381,291,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,792,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+382,292,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,801,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+383,293,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,814,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+384,294,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,823,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+385,295,7848594bc39e2e9d5402d827e820373c723ac3b5,labs/vibe_notes_node_reference/package-lock.json,832,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+386,92,c4978ce482846d663ee123eb77c980e862cc867f,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+387,296,c4978ce482846d663ee123eb77c980e862cc867f,evaluations/example_report_evcs/report.json,3,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+388,297,c4978ce482846d663ee123eb77c980e862cc867f,evaluations/example_report_evcs/report.json,5,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+389,298,c4978ce482846d663ee123eb77c980e862cc867f,evaluations/example_report_evcs/report.json,885,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+390,299,c4978ce482846d663ee123eb77c980e862cc867f,evaluations/example_report_evcs/report.md,9,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+391,300,c4978ce482846d663ee123eb77c980e862cc867f,evaluations/example_report_evcs/report.md,11,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+392,301,0af4f1129be4f4ea11645423cd8bab12ae3cdfab,evaluations/example_report_evcs/approval_check.json,2,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+393,92,e9887d781a41ac1cd2f5ff7747491096a7182151,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+394,92,406acece2ad7e1f3d43c43f5de164fff81679104,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+395,92,17e4746a0aa57b888c42f3644921226a4df0972b,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+396,302,17e4746a0aa57b888c42f3644921226a4df0972b,evaluations/example_report_model/report.json,1044,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+397,303,17e4746a0aa57b888c42f3644921226a4df0972b,evaluations/example_report_model/report.json,1047,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+398,304,17e4746a0aa57b888c42f3644921226a4df0972b,evaluations/example_report_model/report.md,10,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+399,305,17e4746a0aa57b888c42f3644921226a4df0972b,evaluations/example_report_model/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+400,306,17e4746a0aa57b888c42f3644921226a4df0972b,evaluations/model-generated-1.log,16,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+401,307,17e4746a0aa57b888c42f3644921226a4df0972b,evaluations/model-subset-1.log,28,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+402,308,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,31,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+403,309,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,41,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+404,310,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,51,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+405,311,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,61,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+406,312,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,71,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+407,313,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,81,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+408,314,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,91,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+409,315,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,101,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+410,316,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,111,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+411,317,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,121,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+412,318,edf0782985857017b23b43de2c3c5fdff0e1a7f0,evaluations/manifest_subset.json,124,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+413,319,6abb47f82c22ed561207dd81f4fe8dcd2e92c555,evaluations/example_report/report.json,1421,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+414,320,6abb47f82c22ed561207dd81f4fe8dcd2e92c555,evaluations/example_report/report.json,1424,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+415,321,6abb47f82c22ed561207dd81f4fe8dcd2e92c555,evaluations/example_report/report.md,10,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+416,322,6abb47f82c22ed561207dd81f4fe8dcd2e92c555,evaluations/example_report/report.md,12,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+417,92,54ae3422263de3a5310aa42c1a7b99d1e33eb498,STATUS.md,25,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+418,323,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,29,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+419,324,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,39,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+420,325,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,49,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+421,326,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,59,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+422,327,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,69,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+423,328,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,79,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+424,329,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,89,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+425,330,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,99,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+426,331,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,109,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+427,332,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,119,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+428,333,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,129,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+429,334,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,139,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+430,335,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,149,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+431,336,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,159,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+432,337,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,169,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+433,338,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,179,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+434,339,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,189,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+435,340,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,199,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+436,341,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,209,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+437,342,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,219,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+438,343,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,229,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+439,344,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,239,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+440,345,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,249,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+441,346,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,259,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+442,347,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,269,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+443,348,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,279,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+444,349,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,289,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+445,350,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,299,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+446,351,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,309,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+447,352,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,319,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+448,353,2bf58a867115a79e70967dc91f919b7e4f2225a8,evaluations/manifest.json,322,long base64-like token (possible secret),Integrity hash,Hex digest or Git object identifier; no credential prefix,REDACTED
+449,113,125b83f7be17bfc0d393f19e570056b8d997ac6e,tests/unit/test_redaction.py,13,private key block,Synthetic fixture,Explicit synthetic/canary/redaction-test context,REDACTED
+450,354,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,31,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+451,355,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,41,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+452,356,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,58,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+453,357,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,75,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+454,358,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,92,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+455,359,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,109,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+456,360,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,126,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+457,361,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,143,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+458,362,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,160,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+459,363,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,177,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+460,364,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,194,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+461,365,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,211,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+462,366,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,228,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+463,367,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,245,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+464,368,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,262,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+465,369,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,279,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+466,370,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,296,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+467,371,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,311,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+468,372,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,322,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+469,373,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,332,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+470,374,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,362,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+471,375,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,369,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+472,376,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,379,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+473,377,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,397,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+474,378,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,412,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+475,379,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,442,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+476,380,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,463,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+477,381,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,484,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+478,382,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,505,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+479,383,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,526,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+480,384,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,547,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+481,385,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,568,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+482,386,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,589,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+483,387,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,610,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+484,388,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,631,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+485,389,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,652,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+486,390,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,673,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+487,391,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,692,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+488,392,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,699,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+489,393,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,713,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+490,394,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,742,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+491,395,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,752,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+492,396,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,764,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+493,397,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,798,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+494,398,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,804,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+495,399,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,814,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+496,400,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,831,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
+497,401,865823fdaf5a84460ed921ba44efb5e5f922c653,package-lock.json,845,long base64-like token (possible secret),Integrity hash,npm sha512 integrity field,REDACTED
