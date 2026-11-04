@@ -12,7 +12,13 @@ declare global {
   }
 }
 // Optional operator configuration loaded before the bundle; never a provider key.
-const BASE_URL = window.SENTINELX_API_BASE_URL ?? "http://127.0.0.1:8080";
+const endpoint = new URL(window.SENTINELX_API_BASE_URL ?? "http://127.0.0.1:8080");
+if (endpoint.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(endpoint.hostname)
+    || endpoint.username || endpoint.password || endpoint.search || endpoint.hash
+    || endpoint.pathname !== "/") {
+  throw new Error("The local demo API requires a loopback HTTP origin");
+}
+const BASE_URL = endpoint.origin;
 const DEMO_TOKEN = window.SENTINELX_DEMO_TOKEN ?? "sentinelx-demo-local-only";
 
 export type LabelMode = "LIVE" | "RECORDED" | "SIMULATED";
