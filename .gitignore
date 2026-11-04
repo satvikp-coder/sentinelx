@@ -83,3 +83,6 @@ sentinelx.site.yaml
 sentinelx.agent.yaml
 sentinelx.targets.json
 evaluations/final/
+
+# Demo renders, capture logs, synthetic runtime state, and raw video
+/demo/out/

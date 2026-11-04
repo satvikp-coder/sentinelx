@@ -9,7 +9,35 @@ It records evidence, independently checks outcomes and proposed patches, and off
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Local lab prototype. Non-lab scanning is disabled.**
-Demo video: **TO ADD BY OWNER** · [Demo script](docs/SUBMISSION_DEMO_SCRIPT.md) · [Recording guide](docs/SUBMISSION_RECORDING_GUIDE.md) · [Submission copy](docs/SUBMISSION_READY_TEXT.md)
+**[Watch/download the 2:55 demo](https://github.com/satvikp-coder/sentinelx/releases/tag/hackathon-demo-2026-11-05)** · [Direct MP4](https://github.com/satvikp-coder/sentinelx/releases/download/hackathon-demo-2026-11-05/sentinelx_demo.mp4)
+[Final demo script](demo/script.md) · [Storyboard](demo/storyboard.md) · [Build guide](demo/README.md) · [Submission copy](demo/SUBMISSION_TEXT.md)
+
+## Watch or reproduce the demo
+
+The final demo is **2:55, 1920×1080 at 30 fps**, with narration, burned-in captions
+and a silent captioned alternative. The MP4 files are deliberately gitignored
+and hosted as assets on the [hackathon demo prerelease](https://github.com/satvikp-coder/sentinelx/releases/tag/hackathon-demo-2026-11-05),
+not committed to source history. Download the narrated or silent captioned version
+from that page. This is a lab-prototype demonstration, not a production release.
+
+After a local build, open `demo/out/sentinelx_demo.mp4` or
+`demo/out/sentinelx_demo_silent.mp4`. Voiceover and subtitles are also exported as
+`demo/out/voice.wav` and `demo/out/narration.srt`. See the
+[reproduction guide](demo/README.md) for the capture and build commands.
+
+The video shows fresh offline SDK execution, a fresh authorized Node-lab scan,
+separate API/proxy processes enforcing a rule over actual loopback HTTP, removal
+restoring forwarding, and an evidence tamper check. It clearly distinguishes
+the **SIMULATED** agent from **OBSERVED** HTTP behavior and independently
+**VERIFIED** checks. Historical model, patch/PHP and three-way Shield results
+are labelled stored evidence, not new runs. No new model calls were made.
+
+All numerical claims are cross-checked in [the number audit](demo/number_check.md).
+The fresh scan's coverage is kept separate from historical coverage and planted
+recall. [Media verification](demo/MEDIA_VERIFICATION.md) records the actual export
+metadata and sampled-frame inspection. The owner should review the complete
+playback and narration before uploading. These are our own lab demonstrations,
+not evidence of complete protection or production readiness.
 
 ## The problem
 
@@ -215,6 +243,7 @@ is not a passed model evaluation. The API/dashboard setup is described in the
 | `sdk/python/`, `sdk/typescript/` | Tool-wrapping SDKs |
 | `labs/`, `fixtures/` | Intentionally vulnerable synthetic apps and controlled agent scenarios |
 | `evaluations/` | Committed historical example reports; generated runs remain local |
+| `demo/` | Final narration, storyboard, numerical audit, build scripts and portal copy; rendered media stays local in ignored `demo/out/` |
 | `tests/` | Unit, integration, browser and Docker checks with explicit prerequisites |
 | `scripts/`, `docs/`, `tasks/` | Reproduction tools, scope/attribution, evidence and handoffs |
 
@@ -236,7 +265,9 @@ is not a passed model evaluation. The API/dashboard setup is described in the
   Injection was not protected in the recorded Shield example; intent accuracy is low.
 - External scanner operation was not performed and remains disabled pending separate
   approval. Docker/PHP and browser tests require their prerequisites; count only
-  actual executions. The demo video and portal receipt remain owner actions.
+  actual executions. Final video review, portal submission and saving its receipt
+  remain owner actions. Confirm that the portal accepts the linked video hosting;
+  upload the same MP4 to the required host if its rules specify one.
 
 ## AI assistance, scope and license
 

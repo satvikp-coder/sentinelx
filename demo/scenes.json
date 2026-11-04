@@ -1,0 +1,82 @@
+[
+  {
+    "seconds": 20,
+    "title": "One guard. Two attack surfaces.",
+    "eyebrow": "SENTINEL X / VERIFICATION FIRST",
+    "label": "LAB DEMONSTRATION",
+    "kind": "hook",
+    "narration": "A developer's AI agent browses the web. One hidden line tells it to leak a secret. A founder ships an AI-generated site with holes nobody checked. Sentinel X guards both, and shows its evidence. These demonstrations use our own lab targets."
+  },
+  {
+    "seconds": 20,
+    "title": "Hostile instructions meet a real gate.",
+    "eyebrow": "AGENT GUARD / FRESH COMMAND CAPTURE",
+    "label": "SIMULATED AGENT / ACTUAL SDK EXECUTION",
+    "kind": "agent",
+    "narration": "Here, the offline agent follows a hostile page instruction. The SDK blocks its off-scope send with HOST NOT ALLOWED, while the legitimate task completes. Monitor mode reports what would have been blocked. These are actual command results, using stubbed tools, not a live browsing model."
+  },
+  {
+    "seconds": 20,
+    "title": "Small results. Visible denominators.",
+    "eyebrow": "AGENT GUARD / STORED EVALUATIONS",
+    "label": "SIMULATED + HISTORICAL OBSERVED",
+    "kind": "agent-results",
+    "narration": "Stored simulation results show fifteen of fifteen attacks blocked, with zero false blocks across eighty-one benign actions. There were still false confirmations. In a tiny recorded muse-glimmer sample, attacks succeeded twice in five unprotected runs, versus zero in four gated runs. This is not statistically conclusive."
+  },
+  {
+    "seconds": 18,
+    "title": "Findings need a fresh-session re-check.",
+    "eyebrow": "SITE GUARD / FRESH NODE LAB SCAN",
+    "label": "OBSERVED / INDEPENDENT RE-CHECK",
+    "kind": "scan",
+    "narration": "Now a real scanner runs against our vulnerable Node lab. Findings include evidence identifiers and fresh-session verification. The historical scoring found six of ten planted weaknesses, missing stored cross-site scripting and other classes. Today's coverage differs, as shown. Coverage is not vulnerability recall."
+  },
+  {
+    "seconds": 17,
+    "title": "A patch proposal is not a fix.",
+    "eyebrow": "SITE GUARD / STORED FIX RESULTS",
+    "label": "VERIFIED CHECKS / HISTORICAL RECORD",
+    "kind": "fix",
+    "narration": "The stored fix report records two of eight proposals passing independent checks, still awaiting approval. Six escalated to a human. This rejected candidate failed its actual Git application check. No patch is silently deployed. PHP verification shown here is historical; Docker is unavailable for this recording."
+  },
+  {
+    "seconds": 22,
+    "title": "Approval. Activation. Actual HTTP enforcement.",
+    "eyebrow": "SHIELD / SEPARATE API + PROXY PROCESSES",
+    "label": "OBSERVED / TEMPORARY SHIELD, NOT A FIX",
+    "kind": "shield",
+    "narration": "Shield uses a real local API, a separate proxy, and a synthetic upstream. We propose a narrow rule, record operator approval, then activate it. The matching request receives HTTP four-oh-three. The upstream receives nothing. Benign health traffic gets two hundred. Removing the rule restores forwarding. The measured activation time is on screen."
+  },
+  {
+    "seconds": 18,
+    "title": "Protection has boundaries.",
+    "eyebrow": "SHIELD / STORED THREE-WAY REPLAY",
+    "label": "OBSERVED / HISTORICAL LAB REPLAY",
+    "kind": "shield-results",
+    "narration": "The historical replay blocked thirty-eight of sixty-five attacker requests, with zero of forty benign requests blocked. Benign clients were outside the attacker-scoped rules, so this is no general false-positive guarantee. Injection remained unprotected. Intent labels were weak. Human escalation is part of the design, not a hidden failure."
+  },
+  {
+    "seconds": 15,
+    "title": "Models propose. Independent checks decide.",
+    "eyebrow": "SHARED CORE / TAMPER-EVIDENT RECORDS",
+    "label": "OBSERVED + VERIFIED CHAIN CHECK",
+    "kind": "evidence",
+    "narration": "Shared evidence separates attempted actions from executed actions. A fresh hash-chain test verifies clean records, then detects tampering. Historical report databases are absent here and honestly marked NO DB. Models explain and propose; deterministic policy and independent verification decide."
+  },
+  {
+    "seconds": 10,
+    "title": "For agent builders and small teams.",
+    "eyebrow": "ADOPT / CLI + PYTHON SDK",
+    "label": "NO NEW MODEL CALLS IN THIS DEMO",
+    "kind": "adopt",
+    "narration": "Start with the CLI or Python SDK. Meta model integrations use NVIDIA and Baseten. Model-backed results shown are recorded evidence; this video makes no new provider calls."
+  },
+  {
+    "seconds": 15,
+    "title": "Sentinel X",
+    "eyebrow": "VERIFICATION FIRST / OPEN SOURCE",
+    "label": "LAB-ONLY PROTOTYPE / HUMAN REVIEW REQUIRED",
+    "kind": "close",
+    "narration": "For agent builders, solo founders, and small teams: test before trusting. Lab-only scope, incomplete coverage, tiny model samples, and a temporary shield. Explore the code, reproduce the evidence, and review the limitations. Sentinel X."
+  }
+]
