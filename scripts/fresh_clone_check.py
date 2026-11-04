@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from argparse import ArgumentParser
 from pathlib import Path
 
 REPO_ROOT = Path(".").resolve()
@@ -38,6 +39,10 @@ def copy_repo(src: Path, dst: Path) -> None:
 
 
 def main() -> int:
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument("--smoke", action="store_true",
+                        help="fresh-environment core tests; default runs the full fast suite")
+    args = parser.parse_args()
     tmp = Path(tempfile.mkdtemp(prefix="sentinelx_fresh_clone_"))
     clone = tmp / "sentinelx"
     try:
@@ -94,7 +99,10 @@ def main() -> int:
 
         # Run a fast test subset
         print("Running fast test suite...")
-        r = run([python, "-m", "pytest", "-q", "-m", "not slow",
+        tests = (["tests/unit/test_schemas.py", "tests/unit/test_policy_engine.py",
+                  "tests/unit/test_fixer_edits.py", "tests/unit/test_agent_guard_sdk.py",
+                  "tests/unit/test_shield_completion_regressions.py"] if args.smoke else [])
+        r = run([python, "-m", "pytest", "-q", "-m", "not slow", *tests,
                  "--basetemp", str(tmp / "pytest"), "-p", "no:cacheprovider"],
                 cwd=clone, timeout=1800)
         if r.returncode != 0:
