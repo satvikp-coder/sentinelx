@@ -94,6 +94,22 @@ def _node_exe() -> str:
     return shutil.which("node") or "node"
 
 
+def _prepare_docker_data(lab: Lab) -> None:
+    """Prepare only registered synthetic lab scratch storage for Apache's UID."""
+    uploads = lab.data_dir / "uploads"
+    expected = lab.dir.resolve() / "data"
+    if (lab.dir.resolve().parent != LABS_DIR.resolve()
+            or lab.data_dir.resolve() != expected or uploads.resolve() != expected / "uploads"):
+        raise LabError("lab data directories must not redirect outside the lab")
+    uploads.mkdir(parents=True, exist_ok=True)
+    if os.name == "posix":
+        # The bind mount hides the image's /data ownership. This is synthetic
+        # scratch data only: both Apache's container UID and the host runner
+        # must write/remove fixture files. No source or production path is changed.
+        lab.data_dir.chmod(0o777)
+        uploads.chmod(0o777)
+
+
 def up(name: str, timeout: float = 90.0) -> Lab:
     lab = get(name)
     if lab.kind == "docker":
@@ -101,11 +117,23 @@ def up(name: str, timeout: float = 90.0) -> Lab:
         # over /data at container start; without this, a fresh/reset ./data has no "uploads"
         # subfolder yet, so the symlink inside the container points nowhere and Apache serves
         # every path under it as 403 Forbidden instead of actually storing/serving a file.
-        (lab.data_dir / "uploads").mkdir(parents=True, exist_ok=True)
+        _prepare_docker_data(lab)
         r = _run(["docker", "compose", "-p", lab.project, "up", "-d", "--build"], lab.dir,
                  {"SHOP_PORT": str(lab.port)})
         if r.returncode != 0:
             raise LabError(f"docker compose up failed:\n{r.stderr[-1500:]}")
+        probe = _run([
+            "docker", "compose", "-p", lab.project, "exec", "-T", "--user", "www-data",
+            "shop", "php", "-r",
+            'if (!in_array("sqlite", PDO::getAvailableDrivers(), true)) '
+            '{fwrite(STDERR,"SQLITE_DRIVER_MISSING");exit(2);} '
+            'if (!is_writable("/data") || !is_writable("/data/uploads")) '
+            '{fwrite(STDERR,"LAB_DATA_NOT_WRITABLE");exit(3);}',
+        ], lab.dir, {"SHOP_PORT": str(lab.port)})
+        if probe.returncode != 0:
+            category = next((c for c in ("SQLITE_DRIVER_MISSING", "LAB_DATA_NOT_WRITABLE")
+                             if c in probe.stderr), "CONTAINER_PREFLIGHT_FAILED")
+            raise LabError(f"{name}: {category}")
     else:
         if not (lab.dir / "node_modules").is_dir():
             npm = shutil.which("npm") or "npm"
@@ -125,13 +153,22 @@ def up(name: str, timeout: float = 90.0) -> Lab:
     return wait_healthy(lab, timeout)
 
 
+def _is_lab_process(proc: psutil.Process, lab: Lab) -> bool:
+    """A PID file alone is not ownership proof after PID reuse."""
+    if "node" not in proc.name().lower() or Path(proc.cwd()).resolve() != lab.dir.resolve():
+        return False
+    expected = (lab.dir / "server.js").resolve()
+    return any((lab.dir / arg).resolve() == expected for arg in proc.cmdline()[1:]
+               if not arg.startswith("-"))
+
+
 def _node_alive(lab: Lab) -> bool:
     pf = _pid_file(lab)
     if not pf.exists():
         return False
     try:
         proc = psutil.Process(int(pf.read_text(encoding="utf-8")))
-        return proc.is_running() and "node" in proc.name().lower()
+        return proc.is_running() and _is_lab_process(proc, lab)
     except (psutil.Error, ValueError):
         return False
 
@@ -146,12 +183,14 @@ def down(name: str) -> None:
     if pf.exists():
         try:
             proc = psutil.Process(int(pf.read_text(encoding="utf-8")))
-            if "node" in proc.name().lower():  # only the process this module started
+            if _is_lab_process(proc, lab):
                 proc.terminate()
                 try:
                     proc.wait(timeout=10)
                 except psutil.TimeoutExpired:
                     proc.kill()
+            else:
+                raise LabError(f"{name}: recorded PID is not this lab; refusing termination")
         except (psutil.Error, ValueError):
             pass
         pf.unlink(missing_ok=True)
@@ -245,9 +284,8 @@ def assert_loopback_only(name: str) -> dict[str, object]:
         pid = int(pf.read_text(encoding="utf-8"))
         proc = psutil.Process(pid)
         # Verify the recorded process is our node server (not a stray process).
-        cmdline = proc.cmdline()
-        if "server.js" not in " ".join(cmdline):
-            raise LabError(f"{name}: pid {pid} is not the lab server: {cmdline}")
+        if not _is_lab_process(proc, lab):
+            raise LabError(f"{name}: recorded PID is not the lab server")
         # Prove process ownership: the pid-file PID must own the listening socket
         # on the lab's expected host:port (127.0.0.1:port), not merely any socket
         # on that port number.
@@ -263,33 +301,18 @@ def assert_loopback_only(name: str) -> dict[str, object]:
                 f"{name}: socket on 127.0.0.1:{lab.port} owned by PID "
                 f"{socket_owner_pid}, but pid file records PID {pid}"
             )
-        # psutil.net_connections() does not reliably report LISTEN sockets on
-        # Windows, so prove loopback-only binding with socket bind tests:
-        #   - binding to 127.0.0.1:port must fail (already in use => loopback bound)
-        #   - binding to 0.0.0.0:port must succeed (not bound on all interfaces)
-        loopback_bound = False
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(2.0)
+        # A wildcard bind conflicts with a loopback listener on Linux too;
+        # bind failure cannot distinguish the two. Inspect the verified owner's
+        # actual listening addresses instead, and still probe local interfaces.
         try:
-            s.bind(("127.0.0.1", lab.port))
-        except OSError:
-            loopback_bound = True
-        finally:
-            s.close()
-        if not loopback_bound:
-            raise LabError(f"{name}: not bound to 127.0.0.1:{lab.port}")
-        all_interfaces_free = False
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(2.0)
-        try:
-            s.bind(("0.0.0.0", lab.port))
-            all_interfaces_free = True
-        except OSError:
-            all_interfaces_free = False
-        finally:
-            s.close()
-        if not all_interfaces_free:
-            raise LabError(f"{name}: also bound to 0.0.0.0:{lab.port} (not loopback only)")
+            listeners = {c.laddr[0] for c in proc.net_connections(kind="inet")
+                         if c.type == socket.SOCK_STREAM and c.laddr
+                         and c.laddr[1] == lab.port
+                         and c.status in (psutil.CONN_LISTEN, psutil.CONN_NONE)}
+        except (psutil.Error, OSError) as exc:
+            raise LabError(f"{name}: cannot inspect owned listeners") from exc
+        if listeners != {"127.0.0.1"}:
+            raise LabError(f"{name}: unexpected listening addresses: {sorted(listeners)}")
         published = {f"127.0.0.1:{lab.port}"}
     refused: dict[str, str] = {}
     for ip in non_loopback_addresses():

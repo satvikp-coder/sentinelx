@@ -30,7 +30,6 @@ from sentinelx.evidence.store import EvidenceStore
 from sentinelx.policy.redaction import redact
 
 _SESSION = "shield-runtime-v2"
-_ACTIVE = next(s for s in ShieldStatus if s.name == "ACTIVE").value
 _TERMINAL = {"EXPIRED", "REMOVED", "REJECTED"}
 
 
@@ -144,6 +143,8 @@ class ShieldRuntimeStore:
         The staging lifecycle is not the served proxy lifecycle.
         """
         with self._lock, transaction(self._conn):
+            if rule.status != "ACTIVE":
+                raise ValueError("staging lifecycle has not activated this rule")
             latest = self.latest_approval(session_id, subject)
             if latest is None or latest[1] != approval_seq or latest[0].decision.value != "approve":
                 raise ValueError("approval changed before activation")
@@ -152,7 +153,9 @@ class ShieldRuntimeStore:
                 raise ValueError("rule is not a durable proposal")
             if canonical_rule_hash(existing[0]) != canonical_rule_hash(rule):
                 raise ValueError("proposal changed before activation")
-            revision = self.upsert(rule, status=_ACTIVE)
+            # Persist the already-activated lifecycle object; do not promote a
+            # proposal merely because its caller supplied approval metadata.
+            revision = self.upsert(rule)
             self._append_event("SHIELD_RULE_ACTIVATED", {
                 "rule_id": rule.id, "target_id": rule.target_id, "rule_hash": gate_hash,
                 "enforcement_hash": canonical_rule_hash(rule), "revision": revision,
@@ -194,11 +197,11 @@ class ShieldRuntimeStore:
 
     def active_rules(self, now: datetime | None = None) -> list[ShieldRule]:
         now = now or datetime.now(UTC)
-        return [r for r, status in self.all_rules() if status == _ACTIVE and r.expires_at > now]
+        return [r for r, status in self.all_rules() if status == "ACTIVE" and r.expires_at > now]
 
     def expire_overdue(self, now: datetime) -> int:
         with self._lock, transaction(self._conn):
-            overdue = [r.id for r, s in self.all_rules() if s == _ACTIVE and r.expires_at <= now]
+            overdue = [r.id for r, s in self.all_rules() if s == "ACTIVE" and r.expires_at <= now]
             for rid in overdue:
                 self.set_status(rid, "EXPIRED")
             return len(overdue)

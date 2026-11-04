@@ -88,6 +88,7 @@ class PlannedStep:
     est_tokens_out: int = 0
     needs_docker: bool = False
     note: str = ""
+    scan_report_root: Path | None = None
 
 
 @dataclass
@@ -158,6 +159,11 @@ def docker_running() -> bool:
         return False
 
 
+def _fix_commands(report: Path | None) -> list[list[str]]:
+    return ([[PY, "scripts/run_fix.py", "--target", "vibe_notes_node",
+              "--scan-report", str(report)]] if report is not None else [])
+
+
 def build_steps(evaluations: Path | None = None) -> list[PlannedStep]:
     ev = Path(evaluations) if evaluations else ROOT / "evaluations"
     manifest = ev / "manifest.json"
@@ -185,12 +191,11 @@ def build_steps(evaluations: Path | None = None) -> list[PlannedStep]:
                     live=True, profile="nvidia_glimmer", est_calls=12,
                     est_tokens_in=2000, est_tokens_out=800),
         PlannedStep("fix",
-                    [[PY, "scripts/run_fix.py", "--target", "vibe_notes_node",
-                      "--scan-report", str(fix_report)]]
-                    if fix_report else [],
+                    _fix_commands(fix_report),
                     live=True, profile="baseten_spark_open", est_calls=6,
                     est_tokens_in=3000, est_tokens_out=1500,
-                    note="" if fix_report else "no scan report for vibe_notes_node yet"),
+                    note="" if fix_report else "no scan report for vibe_notes_node yet",
+                    scan_report_root=ev),
         PlannedStep("shield", [[PY, "scripts/run_three_way.py"]]),
         PlannedStep("evcs", [[PY, "scripts/run_evcs_all.py"]]),
         PlannedStep("report", [[*cli_cmd(), "report", "build"]]),
@@ -260,16 +265,14 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
             if only and step.name != only:
                 continue
             rec = StepRecord(step.name, step.commands)
-            if step.note:
-                rec.skipped_reason = step.note
-            else:
-                rec.skipped_reason = "dry-run: not executed"
-                if step.live:
-                    worst = _worst_case_usd_pure(step)
-                    rec.estimated = {"profile": step.profile,
-                                     "expected_model_calls": step.est_calls,
-                                     "worst_case_usd": worst,
-                                     "guard_exit_code": None}
+            rec.skipped_reason = "dry-run: not executed"
+            if step.live:
+                worst = _worst_case_usd_pure(step)
+                rec.estimated = {"profile": step.profile,
+                                 "expected_model_calls": step.est_calls,
+                                 "worst_case_usd": worst,
+                                 "guard_exit_code": None,
+                                 "prerequisite_note": step.note or None}
             records.append(rec)
         # write manifest without subprocess (no git_commit)
         manifest = {
@@ -293,6 +296,12 @@ def execute(steps: list[PlannedStep], *, dry_run: bool, only: str | None,
     for step in steps:
         if only and step.name != only:
             continue
+        if step.scan_report_root is not None:
+            # The scan earlier in THIS plan may have created a report. Resolve
+            # at execution time rather than permanently skipping a fresh run.
+            report = latest_scan_report(step.scan_report_root, "vibe_notes_node")
+            step.commands = _fix_commands(report)
+            step.note = "" if report else "no scan report for vibe_notes_node yet"
         record = StepRecord(step.name, step.commands)
         if step.note:
             record.skipped_reason = step.note
