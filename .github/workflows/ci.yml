@@ -16,6 +16,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev,browser]"
+      - run: pip install -e sdk/python
       - run: python scripts/setup_browsers.py --with-deps
       - run: ruff check .
       - run: pytest -rs
@@ -31,3 +32,4 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run build
+      - run: npm test --workspace sdk/typescript

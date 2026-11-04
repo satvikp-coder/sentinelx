@@ -5,8 +5,21 @@
  * Every number displayed comes from backend-derived data only.
  */
 
-const BASE_URL = "http://127.0.0.1:8080";
-const DEMO_TOKEN = "sentinelx-demo-local-only";
+declare global {
+  interface Window {
+    SENTINELX_API_BASE_URL?: string;
+    SENTINELX_DEMO_TOKEN?: string;
+  }
+}
+// Optional operator configuration loaded before the bundle; never a provider key.
+const endpoint = new URL(window.SENTINELX_API_BASE_URL ?? "http://127.0.0.1:8080");
+if (endpoint.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(endpoint.hostname)
+    || endpoint.username || endpoint.password || endpoint.search || endpoint.hash
+    || endpoint.pathname !== "/") {
+  throw new Error("The local demo API requires a loopback HTTP origin");
+}
+const BASE_URL = endpoint.origin;
+const DEMO_TOKEN = window.SENTINELX_DEMO_TOKEN ?? "sentinelx-demo-local-only";
 
 export type LabelMode = "LIVE" | "RECORDED" | "SIMULATED";
 
@@ -178,7 +191,7 @@ export const api = {
         // ignore malformed events
       }
     };
-    es.onerror = () => es.close();
+    // EventSource reconnects with Last-Event-ID; cleanup closes it on unmount.
     return () => es.close();
   },
 
@@ -205,10 +218,22 @@ export const api = {
       method: "POST", body: JSON.stringify(body),
     }),
 
+  shieldEvidence: () => request<{ok: boolean; chain_status: string; events_checked: number;
+    events: Array<{id: string; kind: string; state: string; timestamp_utc: string}>}>("/api/v1/shield/evidence"),
   listShieldRules: (): Promise<ShieldRuleData[]> => request("/api/v1/shield/rules"),
   createShieldRule: (body: { route_pattern: string; intent: string; mode: string; ttl_minutes: number; reason: string }) =>
     request<ShieldRuleData>("/api/v1/shield/rules", {
       method: "POST", body: JSON.stringify(body),
+    }),
+  approveShieldRule: (id: string, sessionId: string) =>
+    request<ShieldRuleData>(`/api/v1/shield/rules/${id}/approve`, {
+      method: "POST", body: JSON.stringify({session_id: sessionId, action_id: id, tool: "shield_rule"}),
+    }),
+  recordShieldApproval: (id: string, sessionId: string) =>
+    request("/api/v1/approvals", {
+      method: "POST", body: JSON.stringify({session_id: sessionId, action_id: id,
+        tool: "shield_rule", arguments: {}, reviewer: "local-demo-operator",
+        rationale: "Human approved this displayed temporary rule", decision: "approve"}),
     }),
   removeShieldRule: (id: string) =>
     request(`/api/v1/shield/rules/${id}`, { method: "DELETE" }),

@@ -40,6 +40,7 @@ def build_config() -> ShieldConfig:
     data["mode"] = os.environ.get("SHIELD_MODE", data["mode"])
     data["auto_shield"] = _flag("SHIELD_AUTO_SHIELD", data["auto_shield"])
     data["lab_mode"] = _flag("SHIELD_LAB_MODE", data["lab_mode"])
+    data["kill_switch_file"] = os.environ.get("SHIELD_KILL_SWITCH_FILE", data["kill_switch_file"])
     return ShieldConfig.model_validate(data)
 
 
@@ -75,7 +76,8 @@ class ShieldApp:
         await self.proxy(scope, receive, send)
 
 
-def build_app(config: ShieldConfig, benign: list[dict[str, Any]] | None = None) -> ShieldApp:
+def build_app(config: ShieldConfig, benign: list[dict[str, Any]] | None = None,
+              runtime_store: Any = None) -> ShieldApp:
     conn = connect(":memory:")
     migrate(conn)
     store = EvidenceStore(conn)
@@ -86,9 +88,14 @@ def build_app(config: ShieldConfig, benign: list[dict[str, Any]] | None = None) 
     recorder = ShieldRecorder(store, session.id, config.evidence_batch_interval_s,
                               config.suspicious_rate_cap_per_min)
     return ShieldApp(ShieldProxy(config, store, session.id, detector, recorder,
-                                 benign_requests=benign))
+                                 benign_requests=benign, runtime_store=runtime_store))
 
 
 def create_shield_app() -> ShieldApp:
     benign_file = os.environ.get("SHIELD_BENIGN_FILE")
-    return build_app(build_config(), load_benign_requests(benign_file) if benign_file else [])
+    from .runtime import ShieldRuntimeStore, default_runtime_db
+
+    runtime = ShieldRuntimeStore(default_runtime_db(os.environ.get("SHIELD_RUNTIME_DB")))
+    return build_app(build_config(),
+                     load_benign_requests(benign_file) if benign_file else [],
+                     runtime_store=runtime)

@@ -3,7 +3,7 @@
 ## Pre-Release
 
 - [ ] All code committed locally on `work/ds` branch
-- [ ] No unpushed commits (intentionally not pushed)
+- [ ] Reviewed main pushed normally, with remote SHA verified
 - [ ] `git status` clean
 - [ ] `git diff --check` passes
 - [ ] `ruff check .` passes
@@ -51,7 +51,7 @@
 - [ ] Credentials rotation (if applicable)
 - [ ] Organizer rule confirmation
 - [ ] License choice (repo owner decision — NOT made)
-- [ ] CI verification (GitHub Actions not configured)
+- [ ] CI verification (workflow exists; require actual green run for the integrated SHA)
 - [ ] Making repository public (NOT done — kept private)
 - [ ] Video recording (3-minute demo)
 - [ ] Video publishing

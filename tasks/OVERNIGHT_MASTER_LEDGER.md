@@ -78,6 +78,23 @@ Columns: Task ID | Feature | Original requirement | Starting state | Files chang
 | Live model benchmark | No credentials available | Organizer-provided API credentials |
 | Scans stay PENDING, shields stay PROPOSED | Execution/activation not yet integrated | Scanner/shield execution pipeline |
 
+## Shield Recovery SH-01..SH-08 (2026-11-04)
+
+Starting SHA 28d98a9; focused commits 591ac8d, 1260039, ddb9ccb, b319e0b and
+docs. Full record: tasks/SHIELD_RECOVERY.result.md,
+tasks/SHIELD_RECOVERY_TEST_MATRIX.md, tasks/SHIELD_RECOVERY_E2E.md.
+
+| Defect | Status |
+|--------|--------|
+| SH-01 approval format mismatch | FIXED (canonical `shield_rule:{rule_id}:{digest}`) |
+| SH-02 API/proxy disconnection | FIXED (shared runtime store; real subprocess E2E) |
+| SH-03 expiry/removal not propagated | FIXED (local lifecycle + runtime store) |
+| SH-04 persistence failure left ACTIVE | FIXED (compensation + 503 + rollback) |
+| SH-05 gate crash on empty evidence | FIXED (structured rejection + real rejection event) |
+| SH-06 cross-session/revocation ignored | FIXED (session-scoped exact lookup; latest record wins; 24h max age) |
+| SH-07 sensitive echoes/logs | FIXED (path templating + redaction in logs/evidence/responses) |
+| SH-08 no real E2E tests | FIXED (12 public API + proxy tests incl. real subprocess proxy) |
+
 ## Notes
 
 - Statuses are VERIFIED_LOCAL only when the existing implementation and relevant tests were checked and pass.
@@ -86,3 +103,5 @@ Columns: Task ID | Feature | Original requirement | Starting state | Files chang
 - Task 29: Tailwind @tailwind directives not processed by Vite's lightningcss; structural layout works.
 - LICENSE: not chosen (owner decision). Repo visibility: not changed (kept private).
 - Merged: NO. Pushed: NO. Deployed: NO. Published: NO.
+- Shield activation is VERIFIED_LOCAL (public API + real proxy + subprocess E2E);
+  browser/Docker/hosted-CI validation and independent Codex review still required.

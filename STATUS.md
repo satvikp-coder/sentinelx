@@ -1,8 +1,21 @@
+## Completion review: 2026-11-04
+
+Current implementation and submission gates are documented in
+[tasks/CODEX_COMPLETION_AND_SUBMISSION.md](tasks/CODEX_COMPLETION_AND_SUBMISSION.md).
+The historical sections below preserve earlier worker claims and are not fresh
+verification. The current code has durable Shield runtime publication/evidence,
+restart discovery, exact approval ordering/binding, mode separation, request
+metadata minimization, real separate-process tests, and browser-tested Shield controls.
+Live model results, external scanner operation, license selection and submission
+are not implied by local test success.
+
+---
+
 # STATUS
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
-## Environment report (observed 2026-11-03, Windows 11)
+## Environment report (observed 2026-11-04, Windows 11)
 
 | Tool | Result |
 |------|--------|
@@ -22,113 +35,144 @@ Last updated: 2026-11-03
 | Item | Value |
 |------|-------|
 | Branch | work/ds |
-| Worker SHA | 1933b80 |
-| Main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
-| Origin/main SHA | 83030082641fca857df39f0db77ae4024efcbc21 |
-| Ahead of main | 46 commits |
+| Worker SHA | ea875f3 |
+| Main SHA | e035f379b246a0d5dbcb7ae57ffc2ab642718052 |
+| Origin/main SHA | e035f379b246a0d5dbcb7ae57ffc2ab642718052 |
+| Ahead of main | 11 commits |
 | Behind main | 0 commits |
-| Worktree status | clean (both worktrees) |
+| Worktree status | clean |
 | Merged | NO |
 | Pushed | NO |
+
+## Commits on work/ds (ahead of origin/main)
+
+| SHA | Description |
+|-----|-------------|
+| b4f2ec1 | Fix scan endpoint: return PENDING without running scan |
+| 499afcc | Update deliverables after socket ownership fix and scan endpoint fix |
+| a44e295 | Fix shield approval bypass, response schema, scan findings endpoint, SSE redaction |
+| 7efb7a5 | Fix review findings: remove gateway shortcut, fail-closed shield approval, fix list serialization |
+| d70bb13 | Fix pagination regression in list_shield_rules |
+| ef9a625 | Implement scanner API execution and fix CI packaging |
+| 1ed9a7f | Implement gated shield activation |
+| 7a7ab19 | Add scanner/shield regression tests and fix dashboard Tailwind |
+| 16a6a7c | Fix scanner execution and restore fail-closed shield approval |
+| ea875f3 | Fix scanner findings, session IDs, cancellation, budget |
 
 ## Verified Results (current session)
 
 | Check | Result |
 |-------|--------|
 | `ruff check .` | All checks passed (0 errors) |
-| `pytest -m "not slow"` (full fast suite) | **1363 passed, 0 failed, 150 deselected**, exit 0, ~8 min |
-| TypeScript SDK `tsc --noEmit` | 0 errors |
-| React dashboard `vite build` | success (dist/ output) |
-| `npm audit` (apps/web) | 0 vulnerabilities |
+| `pytest tests/unit/test_api_units.py tests/unit/test_api_security_repair2.py` | 76 passed, 0 failed, exit 0 |
+| `pytest tests/unit/test_metrics.py` | 16 passed, 0 failed, exit 0 |
+| `pytest tests/unit/test_evidence_store.py` | 18 passed, 0 failed, exit 0 |
+| `pytest tests/unit/test_final_run.py` | 9 passed, 0 failed, exit 0 |
+| `pytest tests/unit/test_agent_guard_sdk.py` | 9 passed, 0 failed, exit 0 |
+| `pytest tests/unit/test_shield_rules.py` | 22 passed, 0 failed, exit 0 |
+| `pytest tests/unit/test_shield_intent_aggregate.py` | focused tests passed, exit 0 |
+| Dashboard `npm run build` (apps/web) | success, no warnings |
 | `git diff --check` | clean |
-| Forbidden paths vs main | empty diff |
+| Scanner integration (disposable local server) | 99 real requests, 6 findings, completed state, budget=500 |
 
-### Focused test suites
-
-| Suite | Passed | Failed | Exit |
-|-------|--------|--------|------|
-| test_api_units.py | 43 | 0 | 0 |
-| test_api_security_repair2.py | 26 | 0 | 0 |
-| test_metrics.py | 16 | 0 | 0 |
-| test_evidence_store.py | 18 | 0 | 0 |
-| test_final_run.py | 9 | 0 | 0 |
-| test_agent_guard_sdk.py | 9 | 0 | 0 |
-
-## Security Repair 3 (F1-F9) — ALL COMPLETE
+## Security Repair 3 (F1-F9) — COMPLETE
 
 | Finding | Fix | Status |
 |---------|-----|--------|
 | F1 | Evidence persistence: verify_chain(), persist-before-broadcast | COMPLETE |
 | F2 | Redaction: tool + arguments redacted before SSE/storage | COMPLETE |
-| F3 | Session lifecycle: PENDING→RUNNING→PENDING on cancel | COMPLETE |
-| F4 | Approval identity: deterministic action_id, ApprovalRecord validation, generic 400 | COMPLETE |
+| F3 | Session lifecycle: PENDING→RUNNING on run start | COMPLETE |
+| F4 | Approval identity: deterministic action_id, ApprovalRecord validation | COMPLETE |
 | F5 | Test isolation: autouse fixture clears shared state | COMPLETE |
 | F6 | Concurrency: per-session threading.Lock | COMPLETE |
 | F7 | Scenario snapshots: model_copy(deep=True) | COMPLETE |
 | F8 | SSE reconnect: integer seq cursor instead of UUID | COMPLETE |
 | F9 | Metrics integration: false_positive_rates, MetricError handling | COMPLETE |
 
-## Integration blocker fixes (all resolved)
+## Integration Fixes
 
-- SDK: validateBaseUrl allows ports; ruleIds optional; no hardcoded session ID
-- Dashboard: SSE token query param; Attack Lab creates real session + run
-- Evidence UI: SSE events arrive via onmessage (no named events)
-- API targets: JSON body, owned=False, proper urlparse host validation
-- API scans: PENDING instead of COMPLETED + note field
-- API shield: PROPOSED instead of ACTIVE + expires_at + note field
-- labctl: netstat/psutil process-ownership proof; fall back to bind test
-- fresh_clone_check: .env and .env.local excluded; fresh venv
+| Area | Fix | Status |
+|------|-----|--------|
+| CI packaging | `pip install -e sdk/python` added to CI workflow | COMPLETE |
+| Scanner API execution | `create_scan` runs `run_scan()` in background daemon thread, state transitions PENDING→RUNNING→COMPLETED/FAILED/CANCELLED, findings persisted | COMPLETE |
+| Shield approval + activation | Canonical scoped approval, benign gate, real activation into the proxy lifecycle; shared runtime store coordinates the standalone proxy; atomic activation with rollback; expiry/removal stop enforcement | VERIFIED_LOCAL (see tasks/SHIELD_RECOVERY.result.md) |
+| Scan findings endpoint | GET /scans/{scan_id}/findings returns findings filtered by scan_id | COMPLETE |
+| Scan status endpoint | GET /scans/{scan_id} returns current scan state | COMPLETE |
+| Global findings endpoint | GET /findings returns all findings with explicit serialization | COMPLETE |
+| Shield list serialization | Explicit ShieldRuleResponse conversion, pagination applied before serialization | COMPLETE |
+| Dashboard Tailwind | Replaced unprocessed @tailwind directives with plain CSS utility classes | COMPLETE |
+| Finding session IDs | Native scanner session IDs (ses_<hex>) mapped to deterministic UUIDv5 | COMPLETE |
+| Scanner budget | API reports scanner profile budget (500) instead of hardcoded 100 | COMPLETE |
+| Cancellation | CANCELLED state preserved across worker return/exception, actual work recorded | COMPLETE |
+| Concurrency | threading.Lock for cross-thread scan state (asyncio.Lock unsafe across threads) | COMPLETE |
 
-## Implemented Features (VERIFIED_LOCAL)
+## Implemented Features
 
-Tasks 21A–33 are all implemented and verified locally:
-
-| Task | Feature | Tests | Status |
-|------|---------|-------|--------|
-| 21A | Edit-based patch applier | 11 tests | VERIFIED_LOCAL |
-| 21B | Edit-based generation | 10 tests | VERIFIED_LOCAL |
-| 21C | Secret-leak fix | 7 tests | VERIFIED_LOCAL |
-| 21D | Git-apply repair | 7 tests | VERIFIED_LOCAL |
-| 22 | Shield intent repair | 22 tests | VERIFIED_LOCAL |
-| 23 | Scanner stored-XSS + POST auth | 10 tests | VERIFIED_LOCAL |
-| 24 | Agent test CLI | Unit tests | VERIFIED_LOCAL |
-| 25 | Evaluation harness | 8 tests | VERIFIED_LOCAL (offline) |
-| 26 | Report explanations | 8 tests | VERIFIED_LOCAL |
-| 27 | Versioned FastAPI API | 43 + 20 security tests | VERIFIED_LOCAL |
-| 28 | TypeScript SDK | tsc: 0 errors | VERIFIED_LOCAL |
-| 29 | React dashboard | tsc: 0 errors; vite build: success | VERIFIED_LOCAL |
-| 30 | External scanner QA | 16 tests | VERIFIED_LOCAL (offline) |
-| 31 | Final-run orchestration | 9 tests | VERIFIED_LOCAL |
-| 32 | Security hardening | ruff clean, npm audit 0 | VERIFIED_LOCAL |
-| 33 | Demo & submission pack | Docs only | VERIFIED_LOCAL |
+| Feature | Entry Point | Status |
+|---------|-------------|--------|
+| Policy gateway | POST /api/v1/policy/decide | PASS |
+| Session management | POST /api/v1/sessions | PASS |
+| Approval workflow | POST /api/v1/approvals | PASS |
+| Shield rules | POST/GET/POST-approve/DELETE/expire /api/v1/shield/rules | VERIFIED_LOCAL (real activation + proxy enforcement; browser/Docker/hosted-CI validation NOT RUN) |
+| Scan execution | POST /api/v1/scans, GET /scans/{id}, GET /scans/{id}/findings, POST /scans/{id}/cancel | PASS |
+| Evidence verification | POST /evidence/verify | PASS |
+| SSE event stream | GET /api/v1/events/stream | PASS |
+| Metrics | GET /api/v1/metrics | PASS |
+| TypeScript SDK | sdk/python/sentinelx_agent_guard | PASS |
+| React dashboard | apps/web/src | BUILD_OK (plain CSS) |
 
 ## Known Gaps
 
-- Live model benchmark (Task 25): No model API credentials; remains NEEDS_LIVE_VALIDATION
-- Docker-dependent tests (Tasks 23/30): Docker daemon not running; PHP scanner tests unrun
-- Browser E2E (Task 29): Playwright not installed; browser tests not run
-- SDK runtime E2E vs real backend: Not run; requires API server + SDK together
-- Scans stay PENDING, shields stay PROPOSED: Execution/activation pipeline not built
-- LICENSE: not chosen (owner decision)
-- Repo visibility: not changed (kept private)
-- CI: not run on GitHub for these commits (no push authorized)
+| Gap | Detail | Blocker |
+|-----|--------|---------|
+| Live model benchmark | No model API credentials; results are scripted/planner | NEEDS_LIVE_VALIDATION |
+| Docker-dependent tests | Docker daemon not running; PHP scanner tests unrun | NEEDS_DOCKER |
+| Browser E2E | Playwright not installed; browser tests not run | NEEDS_PLAYWRIGHT |
+| SDK runtime E2E vs real backend | Not run; requires API server + SDK together | NOT_RUN |
+| CI on GitHub | Not run for these commits (no push authorized) | NOT_RUN |
+| LICENSE | Not chosen (owner decision) | HUMAN_ACTION |
+| Repository visibility | Not public (owner decision) | HUMAN_ACTION |
+| Shield activation — hosted validation | Local E2E passed (real proxy process, real upstream, public API). Browser/Docker/hosted-CI validation NOT RUN | NOT_RUN (external validation) |
 
-## Blockers
+> **History (preserved):** the earlier fail-closed shield approval (rejecting all
+> activations with 400) was deliberately NOT counted as feature completion.
+> The current implementation replaces it with real, scoped, gated activation and
+> proxy enforcement, verified locally through the public API + real proxy E2E
+> (see tasks/SHIELD_RECOVERY.result.md and tasks/SHIELD_RECOVERY_E2E.md).
+> Independent Codex review of this implementation is still required.
 
-See tasks/PROJECT_BLOCKERS.md for full details.
 
-Human actions required:
+## Resolved Blockers
+
+| Blocker | Resolution |
+|---------|------------|
+| CI: ModuleNotFoundError sentinelx_agent_guard | Added `pip install -e sdk/python` to CI workflow |
+| Shield: unsafe gated activation | Removed unsafe shortcut; restored fail-closed (400 rejection) |
+| Scan: no execution pipeline | create_scan runs run_scan() in background daemon thread |
+| Scan: invalid TargetAuthorization | Target registration stores verification_token_hash and verified_at |
+| Scan: findings always empty | Internal findings store scan_id; per-scan filtering works |
+| Scan: global findings 500 | Native session IDs mapped to deterministic UUIDv5; explicit FindingResponse serialization |
+| Scan: cancellation discards accounting | CANCELLED preserved across worker return/exception; actual work recorded |
+| Scan: worker exception overwrites CANCELLED | Terminal state serialized across success/error/cancel paths |
+| Scan: concurrency unsafe | threading.Lock for cross-thread scan state |
+| Scan: budget mismatch | API reports scanner profile budget (500) |
+| Shield list: response 500 after approval | Explicit ShieldRuleResponse serialization |
+| Shield list: no pagination | _paginate applied before serialization |
+| Dashboard: unprocessed @tailwind directives | Replaced with plain CSS utility classes |
+
+## Human Actions Required
+
 1. License choice (owner decision)
 2. Public repository visibility (owner decision)
 3. Demo video recording (owner)
 4. Hackathon submission (owner, Nov 4 9 PM ET deadline)
+5. Push to trigger GitHub CI (not authorized in this session)
+6. Live model credentials for benchmark (owner)
+7. Docker Desktop daemon for PHP scanner tests (owner)
+8. Playwright Chromium for browser E2E (owner)
+9. Actual shield activation implementation (owner - new feature development)
 
-External resources required:
-5. Live model credentials (owner)
-6. Docker Desktop daemon (owner)
-7. Playwright Chromium installation (owner)
-8. Scanner/shield execution pipeline (owner - new feature development)
-
-## Next Step
-
-Independent security review of Security Repair 3 (F1-F9) and overall project completion audit.
+MERGED: NO
+PUSHED: NO
+DEPLOYED: NO
+PUBLISHED: NO

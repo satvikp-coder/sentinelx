@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import secrets
 import sqlite3
 import threading
@@ -17,7 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlparse
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from fastapi import (
     APIRouter,
@@ -40,6 +41,12 @@ from sentinelx.common_schemas import (
     PolicyDecision,
     ScenarioSpec,
     SessionState,
+    ShieldRule,
+    ShieldScope,
+    ShieldStatus,
+    TargetAuthorization,
+    TargetScope,
+    TargetStatus,
 )
 from sentinelx.common_schemas import (
     Decision as _CommonDecision,
@@ -54,6 +61,19 @@ from sentinelx.policy import (
 )
 from sentinelx.policy.engine import approval_subject_id
 from sentinelx.policy.redaction import redact
+from sentinelx.scanner.models import load_profile as _load_scan_profile
+from sentinelx.scanner.orchestrate import run_scan
+from sentinelx.shield.config import ShieldConfig
+from sentinelx.shield.detect import Detector
+from sentinelx.shield.proxy import ShieldProxy
+from sentinelx.shield.recorder import ShieldRecorder
+from sentinelx.shield.rules import (
+    BenignReplayGate,
+    GateError,
+    RuleCompiler,
+    RuleLifecycle,
+    ShieldAction,
+)
 
 from . import events
 from .auth import (
@@ -76,6 +96,7 @@ from .schemas import (
     FindingResponse,
     GuardDecideRequest,
     GuardDecideResponse,
+    LabelMode,
     MetricResponse,
     MetricsResponse,
     Pagination,
@@ -109,8 +130,17 @@ _POLICY: LoadedPolicy = load_policy(_POLICY_PATH)
 # The connection is created per-request (see _evidence_store()) because SQLite
 # connections cannot be shared across threads, and the test client runs each
 # request in a different thread.
-_EVIDENCE_DB_PATH = Path(__file__).resolve().parents[2] / "evaluations" / "final" / "evidence.db"
+_EVIDENCE_DB_PATH = Path(os.environ.get("SENTINELX_API_EVIDENCE_DB", str(
+    Path(__file__).resolve().parents[2] / "evaluations" / "final" / "evidence.db"
+)))
 _EVIDENCE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+# Scan evidence store - separate from the API decision evidence store to avoid
+# mixing scan execution evidence with policy decision evidence.
+_SCAN_EVIDENCE_DB_PATH = Path(os.environ.get("SENTINELX_SCAN_EVIDENCE_DB", str(
+    Path(__file__).resolve().parents[2] / "evaluations" / "scans" / "evidence.db"
+)))
+_SCAN_EVIDENCE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _evidence_store() -> EvidenceStore:
@@ -163,6 +193,172 @@ _SESSION_SCENARIOS: dict[UUID, ScenarioSpec] = {}
 # kill-switch, user restrictions, approvals). Populated at session creation
 # and updated on each decision. Never derived from client input.
 _SESSION_STATE: dict[UUID, dict[str, Any]] = {}
+
+# Scan cancellation events - one per active scan. Set by the cancel endpoint
+# to request scan termination. Checked by run_scan() via the cancel_event parameter.
+_SCAN_CANCEL_EVENTS: dict[UUID, threading.Event] = {}
+
+# Target lab name mapping - internal metadata not exposed in public responses.
+# Maps target_id -> lab directory name for scan execution.
+_TARGET_LABS: dict[str, str] = {}
+
+# Target authorization metadata - internal, not exposed in TargetResponse.
+# Maps target_id -> dict with verification_token_hash and verified_at.
+# Only populated for lab targets registered through the API.
+_TARGET_AUTHZ: dict[str, dict[str, Any]] = {}
+
+# Namespace UUID for deterministically mapping native scanner session IDs
+# (ses_<hex>) to public UUIDs for FindingResponse.session_id. This preserves
+# the evidence linkage without fabricating unrelated random UUIDs.
+_SCAN_SESSION_NAMESPACE = uuid5(NAMESPACE_URL, "sentinelx.scanner.session")
+
+# Internal mapping from native scanner session ID (ses_<hex>) to API UUID.
+# Populated when a scan completes and its findings are persisted.
+_NATIVE_SESSION_TO_API: dict[str, UUID] = {}
+
+# Thread-safe lock for cross-thread scan state access. Background worker
+# threads (not the ASGI event loop) update scan records, so asyncio.Lock
+# is unsafe here; threading.Lock is required.
+_SCAN_STATE_LOCK = threading.Lock()
+
+# ------------------------------------------------------------------ shield proxy
+# A single module-level ShieldProxy instance. It owns its own EvidenceStore
+# connection (SQLite cannot cross threads) and its own RuleLifecycle for rule
+# enforcement. All shield rules created through the API are mirrored into the
+# proxy's lifecycle so that approved ACTIVE rules are enforced at runtime.
+#
+# Cross-process coordination: the API also writes every rule state transition
+# into a shared ShieldRuntimeStore (SQLite). A standalone proxy process that
+# opens the same SHIELD_RUNTIME_DB enforces those rules - see
+# packages/shield/runtime.py for the trust boundary.
+_SHIELD_PROXY: ShieldProxy | None = None
+_SHIELD_RUNTIME: Any = None
+
+
+def _shield_runtime():
+    """Return the shared runtime rule store (one authoritative contract)."""
+    global _SHIELD_RUNTIME
+    if _SHIELD_RUNTIME is not None:
+        return _SHIELD_RUNTIME
+    import os
+
+    from sentinelx.shield.runtime import ShieldRuntimeStore, default_runtime_db
+
+    _SHIELD_RUNTIME = ShieldRuntimeStore(default_runtime_db(os.environ.get("SHIELD_RUNTIME_DB")))
+    return _SHIELD_RUNTIME
+
+
+def _reset_shield_singletons() -> None:
+    """Test helper: drop the cached proxy/runtime so env overrides take effect."""
+    global _SHIELD_PROXY, _SHIELD_RUNTIME
+    _SHIELD_PROXY = None
+    _SHIELD_RUNTIME = None
+
+
+def _shield_proxy() -> ShieldProxy:
+    """Lazily construct the module-level ShieldProxy.
+
+    Constructed on first use (not import time) so that missing optional
+    dependencies or configuration do not break API startup.
+    """
+    global _SHIELD_PROXY
+    if _SHIELD_PROXY is not None:
+        return _SHIELD_PROXY
+
+    import os
+    from pathlib import Path as _Path
+
+    import yaml as _yaml
+
+    ROOT = _Path(__file__).resolve().parents[2]
+    config_data = _yaml.safe_load(
+        (ROOT / "configs" / "shield" / "default.yaml").read_text(encoding="utf-8")
+    )
+    config_data["mode"] = os.environ.get("SHIELD_MODE", config_data["mode"])
+    config_data["upstream"] = os.environ.get("SHIELD_UPSTREAM", config_data["upstream"])
+    config_data["lab_mode"] = os.environ.get("SHIELD_LAB_MODE", "").lower() in {"1", "true"}
+    config_data["kill_switch_file"] = os.environ.get(
+        "SHIELD_KILL_SWITCH_FILE", config_data.get("kill_switch_file")
+    )
+    config = ShieldConfig.model_validate(config_data)
+
+    # Dedicated EvidenceStore connection for the proxy's rule lifecycle.
+    # SQLite connections cannot cross threads; this connection is used only
+    # by the proxy's rule lifecycle and approval evidence writes.
+    _proxy_db_path = Path(os.environ.get(
+        "SHIELD_EVIDENCE_DB",
+        str(Path(__file__).resolve().parents[2] / "evaluations" / "shield" / "evidence.db"),
+    ))
+    _proxy_db_path.parent.mkdir(parents=True, exist_ok=True)
+    # check_same_thread=False: the API serves requests from multiple threads.
+    # All writes through _shield_evidence_append() hold a process-local lock,
+    # so statements never interleave; SQLite serializes at the C level.
+    _proxy_conn = sqlite3.connect(
+        str(_proxy_db_path), isolation_level=None, timeout=10, check_same_thread=False
+    )
+    _proxy_conn.row_factory = sqlite3.Row
+    _proxy_conn.execute("PRAGMA journal_mode=WAL")
+    _evidence_migrate(_proxy_conn)
+    _proxy_store = EvidenceStore(_proxy_conn)
+
+    # A GUARD session owns the proxy's rule lifecycle and evidence writes.
+    from sentinelx.common_schemas import Actor, ActorRole, SessionKind
+    from sentinelx.evidence.sessions import SessionService
+
+    _proxy_session, _ = SessionService(_proxy_conn).create(
+        kind=SessionKind.GUARD,
+        policy_version="1.0",
+        actor=Actor(id="shield-api", role=ActorRole.SYSTEM),
+    )
+
+    detector = Detector.load(str(ROOT / "configs" / "shield" / "signals.yaml"))
+    recorder = ShieldRecorder(
+        _proxy_store, _proxy_session.id,
+        config.evidence_batch_interval_s,
+        config.suspicious_rate_cap_per_min,
+    )
+
+    _SHIELD_PROXY = ShieldProxy(
+        config, _proxy_store, _proxy_session.id, detector, recorder,
+        runtime_store=_shield_runtime(),
+    )
+    return _SHIELD_PROXY
+
+
+async def _reconcile_runtime_to_api(now: datetime) -> None:
+    """Rebuild the public projection of all valid rules from durable authority."""
+    from sentinelx.shield.runtime import target_identity
+
+    try:
+        runtime_rules = _shield_runtime().all_rules()
+    except (sqlite3.Error, OSError) as exc:
+        raise HTTPException(status_code=503, detail="runtime rule discovery unavailable") from exc
+    target = target_identity(_shield_proxy().config.upstream)
+    async with store.lock:
+        for rule, status in runtime_rules:
+            if rule.target_id != target:
+                continue
+            try:
+                rid = UUID(rule.id)
+            except ValueError:
+                continue
+            if status == "ACTIVE" and rule.expires_at <= now:
+                status = "EXPIRED"
+            store.shield_rules[rid] = {
+                "rule_id": rid, "route_pattern": rule.scope.route,
+                "intent": rule.reason, "mode": rule.mode.value, "state": status,
+                "ttl_minutes": int((rule.expires_at - rule.created_at).total_seconds() // 60),
+                "created_at": rule.created_at, "expires_at": rule.expires_at,
+                "target_id": rule.target_id, "client_scope": rule.scope.client,
+                "owner": rule.owner, "intent_event_ids": list(rule.intent_event_ids),
+                "note": "Temporary rule; mode and state reflect the durable runtime",
+            }
+# Maps scan_id -> lab directory name for scan execution.
+_SCAN_LABS: dict[UUID, str] = {}
+
+# Scan internal metadata - not exposed in public ScanResponse schema.
+# Maps scan_id -> dict of internal fields (target_url, stop_reason, duration_ms, error).
+_SCAN_META: dict[UUID, dict[str, Any]] = {}
 
 
 def _session_scenario(session: dict[str, Any]) -> ScenarioSpec:
@@ -395,7 +591,6 @@ def _record_approval(session_id: UUID, action_id: str, tool: str,
     # that get converted to ApprovalRecord objects.
 
 
-
 # ------------------------------------------------------------------ in-memory store
 
 class _Store:
@@ -427,6 +622,21 @@ def _now() -> datetime:
 
 def _new_id() -> UUID:
     return uuid4()
+
+
+def _native_session_to_api_uuid(native_session_id: str) -> UUID:
+    """Convert a native scanner session ID (ses_<hex>) to a deterministic UUID.
+
+    Native scanner session IDs are not UUIDs (e.g. "ses_<hex>"). This maps them
+    deterministically to UUIDv5 values so they can be serialized in
+    FindingResponse.session_id without fabricating unrelated random UUIDs or
+    discarding findings. The mapping preserves the native evidence linkage.
+    """
+    if native_session_id in _NATIVE_SESSION_TO_API:
+        return _NATIVE_SESSION_TO_API[native_session_id]
+    api_uuid = uuid5(_SCAN_SESSION_NAMESPACE, native_session_id)
+    _NATIVE_SESSION_TO_API[native_session_id] = api_uuid
+    return api_uuid
 
 
 # ------------------------------------------------------------------ helpers
@@ -515,6 +725,7 @@ async def create_session(
                 "blocked_destinations": (),
             },
             "approvals": [],  # list of ApprovalRecord-compatible dicts
+            "approval_seq": 0,  # monotonic per-session counter for approval ordering
             "page_origin": None,
             "lock": threading.Lock(),  # per-session lock for concurrency safety
         }
@@ -678,6 +889,7 @@ async def create_sse_session(
 @router.get("/events/stream", tags=["events"])
 async def stream_events(
     request: Request,
+    after_seq: int = Query(default=0, ge=0),
     sse_token: str | None = Cookie(default=None),
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
@@ -704,7 +916,6 @@ async def stream_events(
             detail="authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    after_seq = 0
     if last_event_id is not None:
         try:
             after_seq = int(last_event_id)
@@ -770,9 +981,24 @@ async def list_findings(
     offset: int = Query(0, ge=0),
     user: str = Depends(_require_auth),
 ):
-    async with store.lock:
+    with _SCAN_STATE_LOCK:
         items = list(store.findings.values())
-    return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+    # Explicitly serialize to FindingResponse so internal fields
+    # (native_session_id, scan_id) never leak into the public response.
+    return [
+        FindingResponse(
+            id=f["id"],
+            session_id=f["session_id"],
+            state=f["state"],
+            severity=f["severity"],
+            summary=f["summary"],
+            mode=f["mode"],
+            model_provider=f["model_provider"],
+            model_name=f["model_name"],
+            created_at=f["created_at"],
+        )
+        for f in items
+    ]
 
 
 # ------------------------------------------------------------------ containment
@@ -837,6 +1063,14 @@ async def add_target(
             "lab": payload.lab,
             "owned": False,  # ownership not verified by registration alone
         }
+    if payload.lab:
+        _TARGET_LABS[payload.target_id] = "vibe_notes_node"
+        _TARGET_AUTHZ[payload.target_id] = {
+            "verification_token_hash": hashlib.sha256(
+                f"{payload.target_id}:{url}".encode()
+            ).hexdigest(),
+            "verified_at": _now(),
+        }
     return store.targets[payload.target_id]
 
 
@@ -850,28 +1084,323 @@ async def create_scan(
     # target must exist
     if payload.target_id not in store.targets:
         raise HTTPException(status_code=404, detail="target not found")
-    async with store.lock:
+
+    target_entry = store.targets[payload.target_id]
+
+    # Only lab targets can be scanned through this API.
+    # Non-lab targets require ownership verification (not yet supported).
+    if not target_entry.get("lab"):
+        raise HTTPException(
+            status_code=403,
+            detail="non-lab targets require ownership verification",
+        )
+
+    lab_name = _TARGET_LABS.get(payload.target_id)
+    if not lab_name:
+        raise HTTPException(
+            status_code=400,
+            detail="target has no associated lab",
+        )
+
+    # Load scan profile to report the correct budget (scanner default 500,
+    # not the legacy hardcoded 100).
+    profile = _load_scan_profile()
+
+    with _SCAN_STATE_LOCK:
         sid = _new_id()
-        scan = {
+        cancel_event = threading.Event()
+        _SCAN_CANCEL_EVENTS[sid] = cancel_event
+        _SCAN_LABS[sid] = lab_name
+        _SCAN_META[sid] = {"target_url": target_entry["url"]}
+        store.scans[sid] = {
             "scan_id": sid,
             "target_id": payload.target_id,
             "state": RunState.PENDING,
             "findings_count": 0,
             "requests_used": 0,
-            "request_budget": 100,
-            "note": "Scan execution not yet integrated; scan remains PENDING",
+            "request_budget": profile.request_budget,
+            "note": "Scan queued",
         }
-        store.scans[sid] = scan
-    return scan
+
+    # Start scan execution in a background daemon thread. Returns immediately
+    # with PENDING state; the thread updates state when the scan completes/fails.
+    # Uses a plain thread (not asyncio.create_task) so the ASGI event loop is
+    # not blocked and the test client does not wait for scan completion.
+    thread = threading.Thread(
+        target=_run_scan_sync,
+        args=(sid, target_entry, cancel_event),
+        daemon=True,
+    )
+    thread.start()
+
+    return store.scans[sid]
 
 
-@router.get("/scans/{scan_id}/findings", tags=["scans"])
-async def get_scan_findings(scan_id: UUID, user: str = Depends(_require_auth)):
-    async with store.lock:
+def _run_scan_sync(
+    scan_id: UUID,
+    target_entry: dict[str, Any],
+    cancel_event: threading.Event,
+) -> None:
+    """Synchronous entry point for background scan execution.
+
+    Runs in a dedicated daemon thread with its own asyncio event loop so the
+    ASGI event loop is never blocked. Updates the scan record with results
+    when execution completes or fails.
+    """
+    import asyncio
+
+    asyncio.run(_run_scan_background(scan_id, target_entry, cancel_event))
+
+
+@router.get("/scans/{scan_id}", response_model=ScanResponse, tags=["scans"])
+async def get_scan(
+    scan_id: UUID,
+    user: str = Depends(_require_auth),
+):
+    """Return the current status of a scan.
+
+    Unknown scan IDs return 404. Returns the scan record with its current
+    state (PENDING, RUNNING, COMPLETED, FAILED, CANCELLED).
+    """
+    with _SCAN_STATE_LOCK:
         scan = store.scans.get(scan_id)
-    if not scan:
+    if scan is None:
         raise HTTPException(status_code=404, detail="scan not found")
-    return {"scan_id": scan_id, "findings": []}
+    return ScanResponse(
+        scan_id=scan["scan_id"],
+        target_id=scan["target_id"],
+        state=scan["state"],
+        findings_count=scan.get("findings_count", 0),
+        requests_used=scan.get("requests_used", 0),
+        request_budget=scan.get("request_budget", 100),
+        note=scan.get("note"),
+    )
+
+
+async def _run_scan_background(
+    scan_id: UUID,
+    target_entry: dict[str, Any],
+    cancel_event: threading.Event,
+) -> None:
+    """Run a scan in the background and update the scan record with results.
+    Any exception is caught and recorded as a FAILED state unless the scan
+    was already cancelled, in which case CANCELLED is preserved."""
+    lab_name = _SCAN_LABS.get(scan_id)
+    if not lab_name:
+        with _SCAN_STATE_LOCK:
+            scan = store.scans.get(scan_id)
+            if scan is not None:
+                scan["state"] = RunState.FAILED
+                scan["error"] = "no lab associated with scan"
+        _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+        return
+
+    # Mark the scan as RUNNING before starting execution.
+    with _SCAN_STATE_LOCK:
+        scan = store.scans.get(scan_id)
+        if scan is not None:
+            scan["state"] = RunState.RUNNING
+            scan["note"] = "Scan running"
+
+    try:
+        result = await asyncio.to_thread(
+            _execute_scan, scan_id, target_entry, lab_name, cancel_event
+        )
+    except Exception as exc:
+        with _SCAN_STATE_LOCK:
+            scan = store.scans.get(scan_id)
+            if scan is not None and scan["state"] != RunState.CANCELLED:
+                scan["state"] = RunState.FAILED
+                scan["error"] = str(exc)[:300]
+            elif scan is not None:
+                # Worker raised after cancellation: preserve CANCELLED,
+                # record the worker error separately without fabricating
+                # a new terminal outcome.
+                _SCAN_META[scan_id] = {
+                    **_SCAN_META.get(scan_id, {}),
+                    "worker_error": str(exc)[:300],
+                }
+        _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+        return
+
+    # Update scan record with results. Serialize terminal state transitions
+    # so cancellation is not overwritten by a background result.
+    with _SCAN_STATE_LOCK:
+        scan = store.scans.get(scan_id)
+        if scan is None:
+            _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+            _SCAN_LABS.pop(scan_id, None)
+            _SCAN_META.pop(scan_id, None)
+            return
+
+        # If the scan was cancelled, preserve CANCELLED but still record
+        # the actual work completed before cancellation (requests, findings,
+        # stop reason, timing). Do not overwrite with FAILED.
+        stop_reason = result.stop_reason.lower()
+        if stop_reason == "cancelled" or scan["state"] == RunState.CANCELLED:
+            scan["state"] = RunState.CANCELLED
+        elif stop_reason == "completed":
+            scan["state"] = RunState.COMPLETED
+        else:
+            scan["state"] = RunState.FAILED
+
+        scan["findings_count"] = len(result.findings)
+        scan["requests_used"] = result.requests_used
+
+        # Store internal metadata separately (not in ScanResponse schema)
+        _SCAN_META[scan_id].update({
+            "stop_reason": result.stop_reason,
+            "duration_ms": result.duration_ms,
+        })
+        scan["note"] = f"Scan {scan['state'].lower()} ({result.stop_reason})"
+
+        # Persist findings associated with this scan
+        for finding in result.findings:
+            fid = _new_id()
+            native_session_id = result.session_id
+            api_session_id = _native_session_to_api_uuid(native_session_id)
+            store.findings[fid] = {
+                "id": fid,
+                "session_id": api_session_id,
+                "native_session_id": native_session_id,
+                "scan_id": scan_id,
+                "state": finding.verification.state,
+                "severity": finding.candidate.severity.value,
+                "summary": finding.candidate.summary,
+                "mode": LabelMode.SIMULATED,
+                "model_provider": None,
+                "model_name": None,
+                "created_at": datetime.now(UTC),
+            }
+
+    _SCAN_CANCEL_EVENTS.pop(scan_id, None)
+
+
+def _execute_scan(
+    scan_id: UUID,
+    target_entry: dict[str, Any],
+    lab_name: str,
+    cancel_event: threading.Event,
+) -> Any:
+    """Run a scan in a worker thread. Creates its own SQLite connection
+    (connections cannot cross threads)."""
+
+    # Build TargetAuthorization from the stored target entry.
+    # Lab targets registered through the API carry a valid verification token
+    # hash and verified_at timestamp, making them genuinely trusted authorized
+    # targets for scan execution.
+    parsed = urlparse(target_entry["url"])
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or 80
+
+    target = TargetAuthorization(
+        target_id=target_entry["target_id"],
+        base_url=target_entry["url"],
+        scope=TargetScope(
+            schemes=["http"],
+            hosts=[host],
+            ports=[port],
+        ),
+        lab=True,
+        ownership_method="lab_registration",
+        verification_token_hash=_TARGET_AUTHZ.get(target_entry["target_id"], {}).get(
+            "verification_token_hash", ""
+        ),
+        verified_at=_TARGET_AUTHZ.get(target_entry["target_id"], {}).get("verified_at"),
+        status=TargetStatus.VERIFIED,
+    )
+
+    # Load scan profile
+    profile = _load_scan_profile()
+
+    # Create a fresh SQLite connection for scan evidence (cannot cross threads).
+    # Uses a dedicated scan evidence DB to avoid mixing scan execution evidence
+    # with API decision evidence.
+    conn = sqlite3.connect(str(_SCAN_EVIDENCE_DB_PATH), isolation_level=None, timeout=10)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    _evidence_migrate(conn)
+
+    try:
+        labs_root = Path(__file__).resolve().parents[2] / "labs"
+        result = run_scan(
+            target=target,
+            profile=profile,
+            labs_root=labs_root,
+            lab_name=lab_name,
+            conn=conn,
+            cancel_event=cancel_event,
+        )
+        return result
+    finally:
+        conn.close()
+
+
+@router.post("/scans/{scan_id}/cancel", tags=["scans"])
+async def cancel_scan(
+    scan_id: UUID,
+    user: str = Depends(_require_auth),
+):
+    """Request cancellation of a running scan. Sets the cancel event that
+    run_scan() checks between checks. The scan stops at the next check
+    boundary and leaves honest evidence of what was completed."""
+    with _SCAN_STATE_LOCK:
+        scan = store.scans.get(scan_id)
+        if scan is None:
+            raise HTTPException(status_code=404, detail="scan not found")
+        if scan["state"] not in (RunState.PENDING, RunState.RUNNING):
+            raise HTTPException(
+                status_code=400,
+                detail=f"scan is in {scan['state']} state, cannot cancel",
+            )
+        cancel_event = _SCAN_CANCEL_EVENTS.get(scan_id)
+        if cancel_event is not None:
+            cancel_event.set()
+        scan["state"] = RunState.CANCELLED
+        scan["note"] = "Scan cancelled"
+
+    return {"scan_id": scan_id, "state": RunState.CANCELLED}
+
+
+@router.get("/scans/{scan_id}/findings", response_model=list[FindingResponse], tags=["scans"])
+async def get_scan_findings(
+    scan_id: UUID,
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    user: str = Depends(_require_auth),
+):
+    """Return findings for a given scan.
+
+    Unknown scan IDs return 404. Known scans in PENDING state have no
+    findings yet (scan execution not yet integrated); completed scans
+    return their actual findings.
+    """
+    with _SCAN_STATE_LOCK:
+        scan = store.scans.get(scan_id)
+    if scan is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+
+    # Unknown scan: 404 (raised above). Known scan in any state returns its
+    # findings (if any). Completed scans return all findings; PENDING,
+    # RUNNING, FAILED, CANCELLED scans return findings collected so far.
+    with _SCAN_STATE_LOCK:
+        items = [f for f in store.findings.values() if f.get("scan_id") == scan_id]
+    # Explicitly serialize to FindingResponse so internal fields
+    # (native_session_id, scan_id) never leak into the public response.
+    return [
+        FindingResponse(
+            id=f["id"],
+            session_id=f["session_id"],
+            state=f["state"],
+            severity=f["severity"],
+            summary=f["summary"],
+            mode=f["mode"],
+            model_provider=f["model_provider"],
+            model_name=f["model_name"],
+            created_at=f["created_at"],
+        )
+        for f in items
+    ]
 
 
 # ------------------------------------------------------------------ patches
@@ -911,12 +1440,12 @@ async def submit_approval(
     decision (approve|reject|revoke). Stores the approval in both the per-session
     _SESSION_STATE (checked by _gateway_decide) and the global _APPROVALS store.
     """
+    reviewer = body.get("reviewer", "api")
+    rationale = body.get("rationale", "")
     session_id_raw = body.get("session_id")
     action_id = body.get("action_id")
     tool = body.get("tool")
     arguments = body.get("arguments", {})
-    reviewer = body.get("reviewer", "api")
-    rationale = body.get("rationale", "")
     decision = body.get("decision", "approve")
 
     if not session_id_raw or not action_id or not tool:
@@ -936,10 +1465,29 @@ async def submit_approval(
         raise HTTPException(status_code=404, detail="session has no runtime state")
 
     approved = decision == "approve"
+
+    # Canonical subject for shield-rule approvals: binds the exact rule id AND
+    # its enforcement digest, so a modified rule invalidates older approvals.
+    # Falls back to the generic action subject for every other tool.
+    if tool == "shield_rule":
+        try:
+            _rule_uuid = UUID(str(action_id))
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="invalid shield rule_id") from None
+        async with store.lock:
+            _rule_entry = store.shield_rules.get(_rule_uuid)
+        if _rule_entry is None:
+            raise HTTPException(status_code=404, detail="shield rule not found")
+        subject = _shield_approval_subject(str(_rule_uuid), _shield_rule_digest(_rule_entry))
+        subject_type = "shield_rule"
+    else:
+        subject = approval_subject_id(action_id, tool, arguments)
+        subject_type = "action"
+
     record = {
         "id": f"appr-{uuid4().hex[:12]}",
-        "subject_type": "action",
-        "subject_id": approval_subject_id(action_id, tool, arguments),
+        "subject_type": subject_type,
+        "subject_id": subject,
         "reviewer": reviewer,
         "decision": "approve" if approved else "reject",
         "rationale": rationale,
@@ -958,8 +1506,14 @@ async def submit_approval(
             status_code=400, detail="invalid approval record"
         ) from None
 
-    with state["lock"]:
-        state["approvals"].append(record)
+    with _SHIELD_ACTIVATION_LOCK:
+        if tool == "shield_rule":
+            try:
+                _shield_runtime().record_approval(str(sid), ApprovalRecord.model_validate(record))
+            except (sqlite3.Error, OSError) as exc:
+                raise HTTPException(status_code=503, detail="approval storage unavailable") from exc
+        with state["lock"]:
+            state["approvals"].append(record)
 
     _record_approval(sid, action_id, tool, arguments, reviewer, rationale,
                      approved=approved)
@@ -968,6 +1522,96 @@ async def submit_approval(
 
 
 # ------------------------------------------------------------------ shield
+# Canonical approval contract: a shield-rule approval subject is exactly
+#   "shield_rule:{rule_id}:{rule_digest}"
+# where rule_digest binds the approval to the rule's enforcement content.
+# Both the public approval endpoint and the activation endpoint use these
+# helpers, so a modified rule invalidates older approvals and a later
+# rejection/revocation defeats a historical approval.
+
+_SHIELD_APPROVAL_MAX_AGE_S = 24 * 60 * 60  # approvals are valid for 24 hours
+_SHIELD_ACTIVATION_LOCK = threading.RLock()
+
+
+def _shield_rule_digest(rule_entry: dict[str, Any]) -> str:
+    """Canonical digest over the enforcement-relevant fields of an API rule.
+
+    Binds the approval to the exact rule identity, target scope, action,
+    mode, and TTL/expiry so that any enforcement-relevant modification
+    invalidates prior approvals.
+    """
+    doc = json.dumps(
+        {
+            "rule_id": str(rule_entry["rule_id"]),
+            "route_pattern": rule_entry["route_pattern"],
+            "intent": rule_entry["intent"],
+            "mode": rule_entry["mode"],
+            "action": ShieldAction.BLOCK_ROUTE_PATTERN.value,
+            "target_id": rule_entry.get("target_id"),
+            "client_scope": rule_entry.get("client_scope"),
+            "expires_at": rule_entry.get("expires_at").isoformat()
+            if rule_entry.get("expires_at")
+            else None,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(doc.encode("utf-8")).hexdigest()
+
+
+def _shield_approval_subject(rule_id: str, digest: str) -> str:
+    return f"shield_rule:{rule_id}:{digest}"
+
+
+def _shield_rule_response(rule: dict[str, Any]) -> ShieldRuleResponse:
+    """Serialize an API rule to the public response with output redaction.
+
+    Internal enforcement fields (route_pattern matching) stay raw in the
+    store; the outward echo is redacted so credential-shaped text never
+    leaves the API or lands in SSE/evidence surfaces.
+    """
+    return ShieldRuleResponse(
+        rule_id=rule["rule_id"],
+        route_pattern=str(redact(rule["route_pattern"]).value),
+        intent=str(redact(rule["intent"]).value),
+        mode=rule["mode"],
+        state=rule["state"],
+        ttl_minutes=rule["ttl_minutes"],
+        created_at=rule["created_at"],
+        expires_at=rule.get("expires_at"),
+        note=str(redact(rule.get("note") or "").value) or None,
+    )
+
+
+def _runtime_proposed(rule: ShieldRule) -> None:
+    """A proposal is acknowledged only after durable registration."""
+    try:
+        _shield_runtime().upsert(rule, status=ShieldStatus.PROPOSED.value)
+    except (sqlite3.Error, OSError) as exc:
+        raise HTTPException(status_code=503, detail="proposal storage unavailable") from exc
+
+
+_SHIELD_EVIDENCE_LOCK = threading.Lock()
+
+
+def _shield_evidence_append(kind: str, payload: dict[str, Any]) -> Any:
+    """Thread-safe evidence append on the API-process proxy store."""
+    proxy = _shield_proxy()
+    with _SHIELD_EVIDENCE_LOCK:
+        return proxy.store.append(
+            proxy.session_id, kind, EvidenceState.OBSERVED, "sentinelx.shield", payload,
+        )
+
+
+@router.get("/shield/evidence", tags=["shield"])
+async def shield_evidence(
+    limit: int = Query(50, ge=1, le=1000), user: str = Depends(_require_auth),
+):
+    try:
+        return _shield_runtime().audit(limit)
+    except (sqlite3.Error, OSError) as exc:
+        raise HTTPException(status_code=503, detail="shield evidence unavailable") from exc
+
 
 @router.get("/shield/rules", response_model=list[ShieldRuleResponse], tags=["shield"])
 async def list_shield_rules(
@@ -975,9 +1619,35 @@ async def list_shield_rules(
     offset: int = Query(0, ge=0),
     user: str = Depends(_require_auth),
 ):
+    # Reconcile the in-memory API store with the authoritative runtime store so
+    # rules activated before an API restart remain visible and manageable.
+    # Expire overdue rules in the shared store, then mirror any lapsed TTL
+    # into the API store so list output is truthful (natural expiry contract).
+    now = datetime.now(UTC)
+    try:
+        _shield_runtime().expire_overdue(now)
+    except Exception:  # noqa: BLE001 - degrade gracefully: list still works
+        pass
+    # Reconcile ACTIVE rules persisted in the runtime store into the API store
+    # so an API restart does not lose visibility of enforced rules.
+    try:
+        await _reconcile_runtime_to_api(now)
+    except HTTPException:
+        raise
     async with store.lock:
+        for entry in store.shield_rules.values():
+            if entry.get("state") != "ACTIVE":
+                continue
+            expires = entry.get("expires_at")
+            if expires is None:
+                continue
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=UTC)
+            if expires <= now:
+                entry["state"] = "EXPIRED"
         items = list(store.shield_rules.values())
-    return _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+    page = _paginate(items, Pagination(limit=limit, offset=offset))["items"]
+    return [_shield_rule_response(rule) for rule in page]
 
 
 @router.post("/shield/rules", response_model=ShieldRuleResponse, tags=["shield"])
@@ -985,64 +1655,331 @@ async def create_shield_rule(
     payload: ShieldRuleCreate,
     user: str = Depends(_require_auth),
 ):
-    # Reject broad or unsafe rules
-    if payload.route_pattern in {"/", "*"}:
-        raise HTTPException(status_code=400, detail="broad route patterns are not allowed")
-    if not payload.reason:
-        raise HTTPException(status_code=400, detail="reason is required")
-    async with store.lock:
-        rid = _new_id()
-        now = _now()
-        from datetime import timedelta
-        expires_at = now + timedelta(minutes=payload.ttl_minutes)
-        rule = {
+    # Route proposal creation through the real RuleCompiler so every proposal
+    # passes schema, scope, TTL and evidence validation before persistence.
+    from datetime import timedelta
+
+    from sentinelx.shield.recorder import hash_client_key
+    from sentinelx.shield.runtime import target_identity
+
+    proxy = _shield_proxy()
+    client_scope = None
+    if payload.client_id is not None:
+        if not proxy.config.lab_mode:
+            raise HTTPException(status_code=400, detail="client selectors require lab mode")
+        client_scope = hash_client_key(payload.client_id)
+    known_intents = {"RECON", "CREDENTIAL_GUESSING", "DATA_ENUMERATION",
+                     "INJECTION_PROBE", "ADMIN_PROBE", "BENIGN", "UNKNOWN"}
+    intent = payload.intent.upper() if payload.intent.upper() in known_intents else "UNKNOWN"
+    target_id = target_identity(proxy.config.upstream)
+    rid = _new_id()
+    now = _now()
+    expires_at = now + timedelta(minutes=payload.ttl_minutes)
+
+    # Record a real proposal evidence event in the proxy store. The compiler
+    # requires at least one cited intent event, and the benign gate/escalation
+    # surfaces must reference real evidence - never a fabricated id.
+    proposal_evt = _shield_evidence_append(
+        "SHIELD_RULE_PROPOSED",
+        {
+            "rule_id": str(rid),
+            "route_pattern": str(redact(payload.route_pattern).value),
+            "intent": intent,
+            "mode": payload.mode,
+            "owner": str(redact(user).value),
+        },
+    )
+
+    compiler = RuleCompiler(proxy.store, proxy.session_id)
+    compile_result = compiler.compile(
+        intent_id=str(rid),
+        suggested_action=ShieldAction.BLOCK_ROUTE_PATTERN,
+        scope=ShieldScope(route=payload.route_pattern, client=client_scope),
+        reason=payload.reason,
+        owner=user,
+        ttl_minutes=payload.ttl_minutes,
+        mode=payload.mode,
+        intent_event_ids=[proposal_evt.id],
+    )
+    if compile_result.rejected or compile_result.rule is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"rule rejected by validation: {compile_result.reason}",
+        )
+
+    compiled = compile_result.rule.model_copy(update={
+        "id": str(rid),
+        "target_id": target_id,
+        "reason": intent,
+        "created_at": now,
+        "expires_at": expires_at,
+    })
+
+    rule = {
+        "rule_id": rid,
+        "route_pattern": payload.route_pattern,
+        "intent": intent,
+        "mode": payload.mode,
+        "state": "PROPOSED",  # not ACTIVE until human approval + benign gate
+        "ttl_minutes": payload.ttl_minutes,
+        "created_at": now,
+        "expires_at": expires_at,
+        "note": "Rule proposed; activation requires human approval and benign-replay gate",
+        "target_id": target_id,
+        "client_scope": client_scope,
+        "owner": user,
+        "digest": _shield_rule_digest({
             "rule_id": rid,
             "route_pattern": payload.route_pattern,
-            "intent": payload.intent,
+            "intent": intent,
             "mode": payload.mode,
-            "state": "PROPOSED",  # not ACTIVE until benign-replay gate passes
-            "ttl_minutes": payload.ttl_minutes,
-            "created_at": now,
             "expires_at": expires_at,
-            "note": "Shield activation not yet integrated; rule remains PROPOSED",
-        }
+            "target_id": target_id,
+            "client_scope": client_scope,
+        }),
+        "intent_event_ids": [proposal_evt.id],
+    }
+
+    # Mirror the PROPOSED rule into the proxy lifecycle and the shared
+    # runtime store (still PROPOSED - never enforced before approval).
+    _runtime_proposed(compiled)
+    proxy.rules.add_rule(compiled)
+    async with store.lock:
         store.shield_rules[rid] = rule
+
     await events.event_stream.append(
         EventKind.SHIELD_RULE_ADDED,
         {
             "rule_id": str(rid),
-            "route_pattern": payload.route_pattern,
-            "intent": payload.intent,
+            "route_pattern": str(redact(payload.route_pattern).value),
+            "intent": intent,
             "state": "PROPOSED",
         },
         run_id=None,
     )
-    return rule
+    return _shield_rule_response(rule)
+
+
+async def _stop_shield_rule(rule_id: UUID, status: str, user: str) -> dict[str, Any]:
+    runtime = _shield_runtime()
+    try:
+        current = runtime.get(str(rule_id))
+        if current is None:
+            raise HTTPException(status_code=404, detail="rule not found")
+        from sentinelx.shield.runtime import target_identity
+        if current[0].target_id != target_identity(_shield_proxy().config.upstream):
+            raise HTTPException(status_code=404, detail="rule not found for this target")
+        if not runtime.set_status(str(rule_id), status):
+            raise HTTPException(status_code=503, detail="runtime stop not confirmed")
+        confirmed = runtime.get(str(rule_id))
+        if confirmed is None or confirmed[1] not in {"REMOVED", "EXPIRED", "REJECTED"}:
+            raise HTTPException(status_code=503, detail="runtime stop not confirmed")
+    except (sqlite3.Error, OSError) as exc:
+        raise HTTPException(status_code=503, detail="runtime stop could not be confirmed") from exc
+    proxy = _shield_proxy()
+    if status == "REMOVED":
+        proxy.rules.remove_rule(str(rule_id), user, "manual removal")
+    else:
+        proxy.rules.expire_rule(str(rule_id))
+    await _reconcile_runtime_to_api(datetime.now(UTC))
+    await events.event_stream.append(
+        EventKind.SHIELD_RULE_REMOVED,
+        {"rule_id": str(rule_id), "state": confirmed[1], "runtime_enforcement_stopped": True},
+        run_id=None,
+    )
+    return {"rule_id": rule_id, "state": confirmed[1], "runtime_enforcement_stopped": True}
 
 
 @router.delete("/shield/rules/{rule_id}", tags=["shield"])
 async def remove_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
-    async with store.lock:
-        rule = store.shield_rules.get(rule_id)
-        if not rule:
-            raise HTTPException(status_code=404, detail="rule not found")
-        rule["state"] = "REMOVED"
-    await events.event_stream.append(
-        EventKind.SHIELD_RULE_REMOVED,
-        {"rule_id": str(rule_id)},
-        run_id=None,
-    )
-    return {"rule_id": rule_id, "state": "REMOVED"}
+    return await _stop_shield_rule(rule_id, "REMOVED", user)
 
 
 @router.post("/shield/rules/{rule_id}/expire", tags=["shield"])
 async def expire_shield_rule(rule_id: UUID, user: str = Depends(_require_auth)):
+    return await _stop_shield_rule(rule_id, "EXPIRED", user)
+
+
+@router.post("/shield/rules/{rule_id}/approve", response_model=ShieldRuleResponse, tags=["shield"])
+async def approve_shield_rule(
+    rule_id: UUID,
+    body: dict,
+    user: str = Depends(_require_auth),
+):
+    """Activate a shield rule after verifying a scoped human approval.
+
+    Canonical contract:
+    1. `session_id` is required; approvals are looked up ONLY in that session.
+    2. The exact approval subject is `shield_rule:{rule_id}:{rule_digest}` -
+       a modified rule has a different digest and older approvals do not match.
+    3. The LATEST record for that subject must be "approve": a later
+       rejection/revocation defeats a historical approval.
+    4. Approvals older than 24h are rejected.
+    5. The kill switch blocks activation.
+    6. The benign-replay gate must pass.
+
+    Staging is never served. Runtime state and its activation evidence are
+    published in one SQLite transaction; failure leaves the proposal inert.
+    """
+    session_id_raw = body.get("session_id")
+    action_id = body.get("action_id")
+    tool = body.get("tool", "shield_rule")
+    decision = body.get("decision", "approve")
+
+    if not session_id_raw:
+        raise HTTPException(status_code=400, detail="session_id is required for activation")
+    if not action_id or not tool:
+        raise HTTPException(status_code=400, detail="action_id and tool are required")
+    if decision != "approve":
+        raise HTTPException(status_code=400, detail="only 'approve' decisions are accepted")
+    if action_id != str(rule_id):
+        raise HTTPException(status_code=400, detail="action_id must match rule_id")
+
+    try:
+        sid = UUID(str(session_id_raw))
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="invalid session_id") from None
+    if sid not in store.sessions:
+        raise HTTPException(status_code=404, detail="session not found")
+    session_state = _SESSION_STATE.get(sid)
+    if session_state is None:
+        raise HTTPException(status_code=404, detail="session has no runtime state")
+
+    # Get the rule from the API store.
     async with store.lock:
-        rule = store.shield_rules.get(rule_id)
-        if not rule:
-            raise HTTPException(status_code=404, detail="rule not found")
-        rule["state"] = "EXPIRED"
-    return {"rule_id": rule_id, "state": "EXPIRED"}
+        rule_entry = store.shield_rules.get(rule_id)
+    if not rule_entry:
+        await _reconcile_runtime_to_api(datetime.now(UTC))
+        rule_entry = store.shield_rules.get(rule_id)
+    if not rule_entry:
+        raise HTTPException(status_code=404, detail="rule not found")
+    if rule_entry["state"] != "PROPOSED":
+        raise HTTPException(
+            status_code=400,
+            detail=f"rule is in {rule_entry['state']} state, only PROPOSED rules can be approved",
+        )
+
+    # Canonical subject: rule id + current enforcement digest.
+    digest = _shield_rule_digest(rule_entry)
+    subject = _shield_approval_subject(str(rule_id), digest)
+
+    approved_record = _shield_runtime().latest_approval(str(sid), subject)
+    if approved_record is None:
+        raise HTTPException(status_code=400, detail="no approval for this rule revision in session")
+    approval_model, approval_sequence = approved_record
+    latest = approval_model.model_dump()
+    if latest.get("decision") != "approve":
+        raise HTTPException(
+            status_code=400,
+            detail="the latest approval record is a rejection/revocation",
+        )
+    approval_ts = latest.get("timestamp")
+    approval_age = (
+        (datetime.now(UTC) - approval_ts).total_seconds() if approval_ts else None
+    )
+    if approval_age is None or not 0 <= approval_age <= _SHIELD_APPROVAL_MAX_AGE_S:
+        raise HTTPException(
+            status_code=400,
+            detail="approval has expired",
+        )
+
+    # Check kill switch before any activation attempt.
+    proxy = _shield_proxy()
+    if proxy._is_killed():
+        raise HTTPException(
+            status_code=400,
+            detail="kill switch is active; shield activation denied",
+        )
+
+    # Rebuild the canonical ShieldRule from the stored digest-bound fields.
+    shield_rule = ShieldRule(
+        id=str(rule_id),
+        target_id=rule_entry["target_id"],
+        scope=ShieldScope(
+            route=rule_entry["route_pattern"],
+            parameter=None,
+            client=rule_entry.get("client_scope"),
+        ),
+        action=ShieldAction.BLOCK_ROUTE_PATTERN.value,
+        reason=rule_entry["intent"],
+        linked_finding_id=None,
+        intent_event_ids=list(rule_entry.get("intent_event_ids") or []),
+        owner=rule_entry.get("owner", user),
+        created_at=rule_entry["created_at"],
+        expires_at=rule_entry.get("expires_at"),
+        status=ShieldStatus.PROPOSED,
+        mode=rule_entry["mode"],
+    )
+    staging = RuleLifecycle(proxy.store, proxy.session_id)
+    staging.add_rule(shield_rule)
+
+    # The benign-replay gate must pass. Representative benign traffic for the
+    # authorized local application: health, root, notes read/write, search.
+    gate = BenignReplayGate(
+        proxy.store, proxy.session_id,
+        benign_requests=[
+            {"method": "GET", "path": "/", "headers": {}, "params": {}},
+            {"method": "GET", "path": "/health", "headers": {}, "params": {}},
+            {"method": "GET", "path": "/api/notes",
+             "headers": {"Authorization": "Bearer test"}, "params": {}},
+            {"method": "POST", "path": "/api/notes",
+             "headers": {"Authorization": "Bearer test"}, "params": {}},
+            {"method": "GET", "path": "/api/search",
+             "headers": {"Authorization": "Bearer test"}, "params": {"q": "plan"}},
+        ],
+    )
+
+    with _SHIELD_ACTIVATION_LOCK:
+        # Judge the worst case: the scoped client may be a legitimate user.
+        # Without this identity, client-scoped rules would skip benign replay.
+        for request in gate._benign_requests:
+            request["client_key"] = shield_rule.scope.client
+        gate_result = gate.check(shield_rule)
+        if not gate_result.passed:
+            raise HTTPException(status_code=400, detail="benign-replay gate rejected this rule")
+        try:
+            if not staging.activate_rule(str(rule_id), gate_result):
+                raise GateError("rule not proposed")
+            # Audit preparation is not a claim of installed protection.
+            _shield_evidence_append("SHIELD_RULE_ACTIVATION_PREPARED", {
+                "rule_id": str(rule_id), "approval_subject": subject,
+                "approval_sequence": approval_sequence, "gate_hash": gate_result.rule_hash,
+            })
+            revision = _shield_runtime().publish_activation(
+                staging.get_rule(str(rule_id)), session_id=str(sid), subject=subject,
+                approval_seq=approval_sequence, gate_hash=gate_result.rule_hash,
+            )
+        except GateError as exc:
+            raise HTTPException(status_code=400, detail="activation validation failed") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="approval or proposal changed") from exc
+        except Exception as exc:  # durable transaction determines outcome, not local compensation
+            raise HTTPException(
+                status_code=503,
+                detail="activation unavailable; inspect durable rule status before retrying",
+            ) from exc
+        # Only mirror after the durable row and its evidence have committed.
+        published = _shield_runtime().get(str(rule_id))
+        if published is None or published[1] != "ACTIVE":
+            raise HTTPException(status_code=503, detail="activation publication not confirmed")
+        proxy.rules.add_rule(published[0])
+    await _reconcile_runtime_to_api(datetime.now(UTC))
+    rule_entry = store.shield_rules[rule_id]
+    rule_entry["runtime_revision"] = revision
+
+    # Broadcast activation event on SSE (redacted output).
+    await events.event_stream.append(
+        EventKind.SHIELD_RULE_ADDED,
+        {
+            "rule_id": str(rule_id),
+            "route_pattern": str(redact(rule_entry["route_pattern"]).value),
+            "intent": str(redact(rule_entry["intent"]).value),
+            "state": "ACTIVE",
+        },
+        run_id=None,
+    )
+
+    return _shield_rule_response(rule_entry)
 
 
 # ------------------------------------------------------------------ escalations

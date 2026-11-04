@@ -16,8 +16,12 @@ from fastapi.testclient import TestClient
 from apps.api.main import _rate_tokens, app
 from apps.api.routes import (
     _APPROVALS,
+    _NATIVE_SESSION_TO_API,
+    _SCAN_CANCEL_EVENTS,
     _SESSION_SCENARIOS,
     _SESSION_STATE,
+    _TARGET_AUTHZ,
+    _TARGET_LABS,
     store,
 )
 
@@ -55,6 +59,10 @@ def _reset_shared_state():
     _SESSION_STATE.clear()
     _SESSION_SCENARIOS.clear()
     _APPROVALS.clear()
+    _SCAN_CANCEL_EVENTS.clear()
+    _TARGET_LABS.clear()
+    _TARGET_AUTHZ.clear()
+    _NATIVE_SESSION_TO_API.clear()
 
 
 # ------------------------------------------------------------------ health (no auth)
@@ -412,7 +420,272 @@ def test_expire_shield_rule(client):
     assert r.json()["state"] == "EXPIRED"
 
 
-# ------------------------------------------------------------------ targets (no arbitrary URLs)
+# ----------------------------------------------------------- shield list pagination regressions
+
+def test_shield_list_pagination_limit1_offsets(client):
+    """Three rules, limit=1, offsets 0/1/2 return the correct single item."""
+    ids = []
+    for i in range(3):
+        r = client.post("/api/v1/shield/rules",
+                        json={"route_pattern": f"/api/p{i}", "intent": "recon",
+                              "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                        headers=AUTH)
+        assert r.status_code == 200
+        ids.append(r.json()["rule_id"])
+
+    for offset in range(3):
+        r = client.get(f"/api/v1/shield/rules?limit=1&offset={offset}", headers=AUTH)
+        assert r.status_code == 200
+        page = r.json()
+        assert len(page) == 1, f"offset {offset}: expected 1 item, got {len(page)}: {page}"
+        assert page[0]["rule_id"] == ids[offset], \
+            f"offset {offset}: expected {ids[offset]}, got {page[0]['rule_id']}"
+
+    # Offset past end returns empty
+    r = client.get("/api/v1/shield/rules?limit=1&offset=3", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json() == []
+
+    # Invalid limit rejected
+    r = client.get("/api/v1/shield/rules?limit=0", headers=AUTH)
+    assert r.status_code == 422
+
+
+def test_shield_list_response_schema(client):
+    """List response objects validate as ShieldRuleResponse (no internal metadata leakage)."""
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/z", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    rules = r.json()
+    rule = next(rr for rr in rules if rr["rule_id"] == rid)
+    # Only schema-compliant fields present
+    assert set(rule.keys()) <= {
+        "rule_id", "route_pattern", "intent", "mode", "state",
+        "ttl_minutes", "created_at", "expires_at", "note",
+    }, f"unexpected fields: {set(rule.keys())}"
+
+
+# ------------------------------------------------------------------ shield approval regressions
+
+def test_shield_approve_rejects_missing_approval(client):
+    """Activation with no stored approval must be rejected."""
+    # Create a real session (activation requires an existing session)
+    r = client.post("/api/v1/sessions",
+                    json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    sid = r.json()["id"]
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/x", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+    # Rule must remain PROPOSED
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    rules = r.json()
+    assert any(rr["rule_id"] == rid and rr["state"] == "PROPOSED"
+               for rr in rules)
+
+
+def test_shield_approve_rejects_wrong_action_id(client):
+    """POST /approvals with action_id != rule_id must be rejected."""
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/x", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": str(uuid4()), "action_id": "different-action-id",
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    assert any(rr["rule_id"] == rid and rr["state"] == "PROPOSED"
+               for rr in r.json())
+
+
+def test_shield_approve_rejects_cross_session(client):
+    """Approval from another session must be rejected."""
+    # Create two sessions
+    r1 = client.post("/api/v1/sessions",
+                     json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                     headers=AUTH)
+    assert r1.status_code == 200
+    r2 = client.post("/api/v1/sessions",
+                     json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                     headers=AUTH)
+    assert r2.status_code == 200
+    sid2 = r2.json()["id"]
+
+    # Create rule under session 1
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/x", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+
+    # Try to approve with session 2's session_id
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": sid2, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    assert any(rr["rule_id"] == rid and rr["state"] == "PROPOSED"
+               for rr in r.json())
+
+
+def test_shield_approve_rejects_rejected_approval(client):
+    """A rejected approval must not activate a rule."""
+    # Create a session first
+    r = client.post("/api/v1/sessions",
+                    json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    sid = r.json()["id"]
+
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/x", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+    # Submit a rejected approval first
+    r = client.post("/api/v1/approvals",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "rejected",
+                          "decision": "reject"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    # Now try to approve the rule using the same action_id
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "bob", "rationale": "try again",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    assert any(rr["rule_id"] == rid and rr["state"] == "PROPOSED"
+               for rr in r.json())
+
+
+def test_shield_approve_valid_approves_rule(client):
+    """A valid scoped approval activates the rule through the gated path."""
+    # Create session
+    r = client.post("/api/v1/sessions",
+                    json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    sid = r.json()["id"]
+
+    # Create rule
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/x", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+
+    # Store approval via POST /api/v1/approvals
+    r = client.post("/api/v1/approvals",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test approve",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
+
+    # Activate the rule — must succeed with ACTIVE and proxy registration
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test approve",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
+    data = r.json()
+    assert data["state"] == "ACTIVE", f"expected ACTIVE, got {data}"
+
+    # Listing stays consistent
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200, f"listing must not 500: {r.status_code}: {r.text}"
+    rules = r.json()
+    assert any(rr["rule_id"] == rid and rr["state"] == "ACTIVE"
+               for rr in rules)
+
+
+def test_shield_approve_duplicate_is_idempotent(client):
+    """First activation succeeds; a duplicate request on the now-ACTIVE rule
+    is rejected because only PROPOSED rules can be activated."""
+    r = client.post("/api/v1/sessions",
+                    json={"scenario_id": "S1", "lab": "vibe_notes_node", "arm": "A"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    sid = r.json()["id"]
+    r = client.post("/api/v1/shield/rules",
+                    json={"route_pattern": "/api/x", "intent": "recon",
+                          "mode": "monitor", "ttl_minutes": 60, "reason": "test"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    rid = r.json()["rule_id"]
+    # Store approval
+    r = client.post("/api/v1/approvals",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test approve",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 200
+    # First activation succeeds
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test approve",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text}"
+    assert r.json()["state"] == "ACTIVE"
+    # Second identical attempt — rejected, rule stays ACTIVE (not corrupted)
+    r = client.post(f"/api/v1/shield/rules/{rid}/approve",
+                    json={"session_id": sid, "action_id": rid,
+                          "tool": "shield_rule", "arguments": {},
+                          "reviewer": "alice", "rationale": "test approve",
+                          "decision": "approve"},
+                    headers=AUTH)
+    assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+    r = client.get("/api/v1/shield/rules", headers=AUTH)
+    assert r.status_code == 200
+    assert any(rr["rule_id"] == rid and rr["state"] == "ACTIVE"
+               for rr in r.json())
+
+
+# -------------------------------------------------------------- findings / patches / escalations
 
 def test_target_localhost_allowed(client):
     r = client.post("/api/v1/targets",
@@ -439,7 +712,7 @@ def test_target_public_rejected(client):
 
 def test_create_scan(client):
     client.post("/api/v1/targets",
-                json={"target_id": "t-scan", "url": "http://127.0.0.1:8080/", "lab": True},
+                json={"target_id": "t-scan", "url": "http://127.0.0.1:18081/", "lab": True},
                 headers=AUTH)
     r = client.post("/api/v1/scans",
                     json={"target_id": "t-scan", "model": False},

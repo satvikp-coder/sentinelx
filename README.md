@@ -72,7 +72,14 @@ The shield is a TEMPORARY SHIELD, NOT A FIX; monitor mode never blocks. This exa
 sequence (with the benign request sent by httpx) is run by `python scripts/readme_smoke.py`.
 
 ## Honest status
-**Early prototype.** The typed contracts, evidence store, policy gateway, a synthetic attack lab, an independent verifier, a Python Agent Guard SDK, a lab-only Site Guard CLI and a shield reverse proxy exist locally and are tested; the agent in the lab is a SIMULATED scripted program, not an LLM. No model integration, API or dashboard exists yet. See [STATUS.md](STATUS.md) for real test output and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design (a design is not proof of working code).
+**Local security prototype.** Agent Guard, the lab-only scanner/fixer, a FastAPI
+backend, TypeScript/Python SDKs, and a React dashboard are implemented. The default
+agent evaluation is SIMULATED; no live model benchmark was run in this completion
+review. Shield was exercised through separate local API/proxy/upstream processes,
+including approval, real HTTP blocking, restart recovery and removal. The dashboard
+Shield workflow was exercised in Chromium. This is a single-operator local demo,
+not production multi-user authorization. See
+[completion and submission gates](tasks/CODEX_COMPLETION_AND_SUBMISSION.md).
 
 ## Planned vs implemented
 
@@ -91,7 +98,8 @@ sequence (with the benign request sent by httpx) is run by `python scripts/readm
 | IncidentTwin containment (EVCS) | implemented (15 attack cases) |
 | Scanner (Site Guard) | authorization gate + GuardedClient + 11-check catalog + independent verifier + coverage ledger; stored XSS + POST authz checks added |
 | Fixer | implemented (structured edits + unified diff; secret-safe retry diagnostics) |
-| Shield (reverse proxy) | implemented (intent classification, injection protection, TTL, kill switch) |
+| Shield (reverse proxy) | implemented (deterministic narrow rules, human approval, representative benign replay,
+SQLite runtime/evidence, TTL and kill switch; no blanket injection-protection claim) |
 | Agent Guard SDK (Python / TypeScript) | Python SDK implemented; TypeScript SDK implemented |
 | Site Guard CLI | implemented (local; lab targets only) |
 | API (FastAPI) | implemented (/api/v1, event streaming, SSE) |

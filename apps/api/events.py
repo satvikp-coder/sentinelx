@@ -21,6 +21,8 @@ from uuid import UUID, uuid4
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
+from sentinelx.policy.redaction import redact
+
 from .schemas import EventKind, EventStreamMessage
 
 
@@ -59,7 +61,7 @@ class EventStream:
                 id=uuid4(),
                 seq=self._seq,
                 kind=kind,
-                payload=payload,
+                payload=redact(payload).value,
                 timestamp=datetime.now(UTC),
             )
             self._events.append(ev)
@@ -114,20 +116,17 @@ async def sse_stream_generator(request: Request, after_seq: int = 0):
     The client sends ``Last-Event-ID`` (mapped to ``after_seq``) to reconnect
     and resume from the last seen sequence.
     """
-    # Replay any missed events first.
-    for ev in event_stream.replay(after_seq):
-        msg = EventStreamMessage(
-            seq=ev.seq,
-            id=ev.id,
-            kind=ev.kind.value,
-            payload=ev.payload,
-            timestamp=ev.timestamp.isoformat(),
-        )
-        yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))
-
-    # Then stream new events until the client disconnects.
+    # Subscribe before replay: appends while the consumer reads replay are
+    # queued. Sequence filtering removes overlap without losing the boundary.
     q = await event_stream.subscribe()
     try:
+        for ev in event_stream.replay(after_seq):
+            msg = EventStreamMessage(
+                seq=ev.seq, id=ev.id, kind=ev.kind.value,
+                payload=redact(ev.payload).value, timestamp=ev.timestamp.isoformat(),
+            )
+            after_seq = ev.seq
+            yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))
         while True:
             if await request.is_disconnected():
                 break
@@ -139,11 +138,15 @@ async def sse_stream_generator(request: Request, after_seq: int = 0):
                 continue
             if ev is None:
                 break
+            if ev.seq <= after_seq:
+                continue
+            after_seq = ev.seq
+            redacted_payload = redact(ev.payload).value
             msg = EventStreamMessage(
                 seq=ev.seq,
                 id=ev.id,
                 kind=ev.kind.value,
-                payload=ev.payload,
+                payload=redacted_payload,
                 timestamp=ev.timestamp.isoformat(),
             )
             yield _sse_line(ev.kind.value, msg.model_dump_json(), ev_id=str(ev.seq))
