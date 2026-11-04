@@ -316,3 +316,16 @@ def test_arbitrary_short_request_markers_are_not_telemetry(client):
     proxy = routes._shield_proxy()
     proxy._log({"path": "/" + marker, "request_id": marker, "method": marker})
     assert marker not in str(proxy.stats())
+
+
+def test_runtime_publication_cannot_promote_an_unactivated_proposal(client):
+    sid, rid = proposal(client)
+    approval(client, sid, rid)
+    runtime = routes._shield_runtime()
+    entry = routes.store.shield_rules[UUID(rid)]
+    subject = routes._shield_approval_subject(rid, routes._shield_rule_digest(entry))
+    _, seq = runtime.latest_approval(sid, subject)
+    with pytest.raises(ValueError, match="lifecycle"):
+        runtime.publish_activation(runtime.get(rid)[0], session_id=sid, subject=subject,
+                                   approval_seq=seq, gate_hash="synthetic-negative-control")
+    assert runtime.get(rid)[1] == "PROPOSED"

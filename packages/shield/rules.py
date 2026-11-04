@@ -128,8 +128,10 @@ class RuleCompiler:
         Returns a CompileResult with the rule (if valid) or rejection reason.
         """
         # Validate action
-        if suggested_action not in ShieldAction:
-            return CompileResult(None, True, f"Action {suggested_action} not in catalog")
+        try:
+            suggested_action = ShieldAction(suggested_action)
+        except (ValueError, TypeError):
+            return CompileResult(None, True, "Action not in catalog")
 
         # Validate scope
         if not scope.route or scope.route == "/" or scope.route == "*":

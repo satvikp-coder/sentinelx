@@ -6,7 +6,7 @@ to that ground truth."""
 from __future__ import annotations
 
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from pydantic import BaseModel, ConfigDict
 
@@ -65,8 +65,12 @@ class RepoScope(BaseModel):
     def resolve_in_scope(self, relative_path: str) -> Path:
         """A path guaranteed to be inside work_dir, or raises - the only way fixer code should
         ever turn a model- or diff-supplied relative path into a real filesystem path."""
-        candidate = (self.work_dir / relative_path).resolve()
+        portable = relative_path.replace("\\", "/")
+        if (PureWindowsPath(relative_path).drive or PurePosixPath(portable).is_absolute()
+                or ".." in PurePosixPath(portable).parts or "\x00" in portable):
+            raise ValueError("path escapes the fix scope")
+        candidate = (self.work_dir / portable).resolve()
         root = self.work_dir.resolve()
         if candidate != root and root not in candidate.parents:
-            raise ValueError(f"path escapes the fix scope: {relative_path!r}")
+            raise ValueError("path escapes the fix scope")
         return candidate

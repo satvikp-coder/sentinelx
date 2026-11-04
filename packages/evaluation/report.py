@@ -405,10 +405,18 @@ def write_report(report: dict[str, Any], run_dir: str | Path) -> list[Path]:
 
 
 def numbers_signature(report: dict[str, Any]) -> str:
-    """Everything except latency, run ids, dates and git info: equal for reproducible runs."""
+    """Stable outcomes/action counts, excluding timing and browser request multiplicity.
+
+    Chromium may retry a denied page request. Preserve raw counts in the report,
+    but compare the presence of that control here. Tool decision counts and all
+    outcome numerators/denominators remain exact.
+    """
     arms = json.loads(json.dumps(report["arms"], sort_keys=True))
     for a in arms.values():
         a.pop("latency", None)
+        rules = a.get("decisions_by_rule", {})
+        if "EGRESS_BLOCKED" in rules:
+            rules["EGRESS_BLOCKED"] = int(rules["EGRESS_BLOCKED"] > 0)
         for inv in a.get("invalid", []):
             inv.pop("run_id", None)
     stable = {"arms": arms, "pairing": report["pairing"],
