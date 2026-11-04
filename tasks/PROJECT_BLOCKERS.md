@@ -1,3 +1,13 @@
+# Current completion status
+
+See [CODEX_COMPLETION_AND_SUBMISSION.md](CODEX_COMPLETION_AND_SUBMISSION.md) for
+current fixes, execution evidence and owner-only gates. Earlier entries below
+are historical; in particular, Shield no longer universally rejects activation,
+and GitHub Actions is configured. Do not describe CI as green without the
+actual workflow result for the integrated SHA.
+
+---
+
 # Sentinel X — Project Blockers
 
 **Audit date:** 2026-11-04

@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+from pathlib import PurePosixPath
 
 # Patterns that suggest a secret may be present.
 SECRET_PATTERNS = [
@@ -31,7 +32,8 @@ SECRET_PATTERNS = [
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=60)
 
 
 def main() -> int:
@@ -59,6 +61,12 @@ def main() -> int:
             if len(parts) < 2:
                 continue
             status, filepath = parts[0], parts[1]
+            # Credential files are never opened, even from historical objects.
+            name = PurePosixPath(filepath).name
+            if name == ".env" or name.startswith(".env."):
+                print(f"CREDENTIAL FILE REQUIRES OWNER REVIEW: {commit[:8]}:{filepath}")
+                found_any = True
+                continue
             # Skip deletions
             if status.startswith("D"):
                 continue
@@ -76,16 +84,11 @@ def main() -> int:
                     continue
                 for m in matches:
                     line_no = content[: m.start()].count("\n") + 1
-                    matched_line = (
-                        content.splitlines()[line_no - 1]
-                        if line_no <= len(content.splitlines())
-                        else ""
-                    )
-                    # Redact the matched content in the output
-                    redacted = re.sub(r"[A-Za-z0-9+/=]{8,}", "[REDACTED]", matched_line)
+                    # Never print a matched line: partial regex redaction can
+                    # expose surrounding credentials or arbitrary secret formats.
                     print(
                         f"POTENTIAL SECRET: {commit[:8]}:{filepath}:{line_no} "
-                        f"({desc}): {redacted[:120]}"
+                        f"({desc}; value omitted)"
                     )
                     found_any = True
 

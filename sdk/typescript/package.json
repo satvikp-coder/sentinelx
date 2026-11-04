@@ -5,15 +5,22 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "lint": "echo 'lint: not configured'",
-    "test": "echo 'test: not configured'",
+    "lint": "tsc --noEmit",
+    "test": "npm run build && node --test tests/runtime.cjs",
     "prepack": "npm run build"
   },
-  "keywords": ["sentinelx", "agent-guard", "security", "policy"],
+  "keywords": [
+    "sentinelx",
+    "agent-guard",
+    "security",
+    "policy"
+  ],
   "license": "UNLICENSED",
   "devDependencies": {
     "typescript": "^5.5.0"

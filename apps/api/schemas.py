@@ -295,10 +295,11 @@ class ApprovalRecordResponse(APIModel):
 # ---------------------------------------------------------------- shield rules
 
 class ShieldRuleCreate(APIModel):
+    client_id: str | None = Field(default=None, min_length=1, max_length=200)
     route_pattern: str = Field(min_length=1, max_length=200)
     intent: str = Field(min_length=1, max_length=100)
     mode: ShieldMode
-    ttl_minutes: int = Field(default=60, ge=1, le=10080)  # max 7 days
+    ttl_minutes: int = Field(default=60, ge=1, le=1440)  # compiler maximum: 24 hours
     reason: str = Field(min_length=1, max_length=500)
 
 

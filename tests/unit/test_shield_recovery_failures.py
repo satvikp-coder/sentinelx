@@ -361,21 +361,11 @@ def test_sh04_runtime_store_failure_rolls_back(upstream, client, monkeypatch):
                         headers=AUTH)
         assert r.status_code == 200
 
-        class _FailingRuntime:
-            def upsert(self, *a, **k):
-                raise RuntimeError("injected runtime store failure")
+        # Fail the real publication write, retaining approval and transaction logic.
+        def fail_upsert(*args, **kwargs):
+            raise OSError("injected runtime store failure")
 
-            def set_status(self, *a, **k):
-                raise RuntimeError("injected runtime store failure")
-
-            def expire_overdue(self, *a, **k):
-                return 0
-
-            def active_rules(self, *a, **k):
-                return []
-
-        import apps.api.routes as routes_mod
-        monkeypatch.setattr(routes_mod, "_shield_runtime", lambda: _FailingRuntime())
+        monkeypatch.setattr(_shield_runtime(), "upsert", fail_upsert)
 
         r = client.post(f"/api/v1/shield/rules/{rid}/approve",
                         json={"session_id": sid, "action_id": rid, "tool": "shield_rule",

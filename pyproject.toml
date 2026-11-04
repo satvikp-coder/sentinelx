@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sentinelx"
 version = "0.0.0"
-description = "Sentinel X - Agent Security Digital Twin (hackathon prototype; scaffold only)"
+description = "Sentinel X - Agent Guard and Site Guard local security prototype"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -27,7 +27,7 @@ browser = ["playwright>=1.48,<2"]
 
 [tool.setuptools]
 package-dir = {"sentinelx" = "packages", "sentinelx_cli" = "cli/sentinelx_cli"}
-packages = ["sentinelx", "sentinelx.common_schemas", "sentinelx.agent_runtime", "sentinelx.model_clients", "sentinelx.adversarial", "sentinelx.policy", "sentinelx.evidence", "sentinelx.investigator", "sentinelx.containment", "sentinelx.verifier", "sentinelx.scanner", "sentinelx.fixer", "sentinelx.shield", "sentinelx.evaluation", "sentinelx.report", "sentinelx_cli"]
+packages = ["sentinelx", "sentinelx.common_schemas", "sentinelx.agent_runtime", "sentinelx.model_clients", "sentinelx.adversarial", "sentinelx.policy", "sentinelx.evidence", "sentinelx.investigator", "sentinelx.containment", "sentinelx.verifier", "sentinelx.scanner", "sentinelx.scanner.checks", "sentinelx.agent_test", "sentinelx.external_scanner", "sentinelx.fixer", "sentinelx.shield", "sentinelx.evaluation", "sentinelx.report", "sentinelx_cli"]
 
 [project.scripts]
 sentinelx = "sentinelx_cli.main:main"

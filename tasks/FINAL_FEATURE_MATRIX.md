@@ -1,3 +1,15 @@
+# Current verification scope
+
+The authoritative completion review is
+[CODEX_COMPLETION_AND_SUBMISSION.md](CODEX_COMPLETION_AND_SUBMISSION.md).
+Earlier status labels below are historical worker reports. Chromium exercised
+the Shield public workflow and opened all ten screens; that is not comprehensive
+browser coverage of every feature. Separate-process Shield HTTP enforcement,
+restart recovery and durable evidence have dedicated production-path tests.
+No live model benchmark or external scanner operation is claimed.
+
+---
+
 # Sentinel X — Final Feature Matrix
 
 **Date:** 2026-11-04

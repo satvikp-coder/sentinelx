@@ -80,7 +80,8 @@ def rule_hash(rule: ShieldRule) -> str:
     """Stable hash of what the gate judged: identity, scope, action and cited intent."""
     body = json.dumps(
         {"id": rule.id, "target": rule.target_id, "scope": rule.scope.model_dump(mode="json"),
-         "action": rule.action, "intent": rule.intent_event_ids},
+         "action": rule.action, "intent": rule.intent_event_ids,
+         "mode": rule.mode, "expires_at": rule.expires_at.isoformat()},
         sort_keys=True)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
@@ -120,6 +121,7 @@ class RuleCompiler:
         linked_finding_id: Id | None = None,
         ttl_minutes: int | None = None,
         intent_event_ids: list[Id] | None = None,
+        mode: ShieldMode = ShieldMode.ENFORCE,
     ) -> CompileResult:
         """Compile a rule from an AttackIntent and suggested action.
 
@@ -182,6 +184,7 @@ class RuleCompiler:
             created_at=now,
             expires_at=expires,
             status=ShieldStatus.PROPOSED,
+            mode=mode,
         )
 
         return CompileResult(rule, False, None)

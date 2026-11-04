@@ -62,6 +62,15 @@ def path_template(path: str) -> str:
     return re.sub(r"/([^/?#]+)", repl, path)
 
 
+def telemetry_path(path: str) -> str:
+    """Retain a fixed route vocabulary, never arbitrary request path segments."""
+    known = {"api", "health", "health.php", "notes", "orders", "items", "checkout",
+             "login", "signup", "search", "admin", "reset", "share", "{}", "{id}"}
+    clean = path.split("?", 1)[0].split("#", 1)[0]
+    return "/".join(s if s in known or not s else "{segment}"
+                    for s in path_template(clean).split("/"))
+
+
 class ShieldRecorder:
     def __init__(self, store: EvidenceStore, session_id: str, batch_interval_s: float = 5.0,
                  suspicious_rate_cap_per_min: int = 20, clock: Callable[[], float] = time.monotonic
@@ -85,8 +94,9 @@ class ShieldRecorder:
 
         entry = {
             "client_key": client_key,
-            "method": method,
-            "path_template": str(_redact(path_template(path)).value),
+            "method": method if method in {"GET", "POST", "PUT", "PATCH", "DELETE",
+                                          "HEAD", "OPTIONS"} else "OTHER",
+            "path_template": str(_redact(telemetry_path(path)).value),
             "status": status,
             "size": size,
             "latency_ms": round(latency_ms, 2),

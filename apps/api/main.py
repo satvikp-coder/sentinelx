@@ -80,10 +80,8 @@ async def _size_and_rate_middleware(request: Request, call_next):
             ).model_dump(mode="json"),
         )
 
-    async def receive():
-        return {"type": "http.request", "body": body, "more_body": False}
-
-    request._receive = receive
+    # Starlette caches body() and replays it to the downstream app. Replacing
+    # receive with an endless http.request breaks disconnect handling for SSE.
     return await call_next(request)
 
 

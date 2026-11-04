@@ -14,6 +14,23 @@ DOCKER_COUNTS = {"passed": 0, "failed": 0, "skipped": 0}
 DOCKER_SKIPPED: list[str] = []
 
 
+@pytest.fixture(autouse=True)
+def isolate_api_durable_state(request, tmp_path, monkeypatch):
+    """Recovered durable rules must not make another API test's data visible."""
+    if not request.node.name or not request.module.__name__.split('.')[-1].startswith(
+        ("test_api", "test_shield")
+    ):
+        yield
+        return
+    from apps.api import routes
+
+    routes._reset_shield_singletons()
+    monkeypatch.setenv("SHIELD_RUNTIME_DB", str(tmp_path / "api-runtime.db"))
+    monkeypatch.setenv("SHIELD_EVIDENCE_DB", str(tmp_path / "api-shield-evidence.db"))
+    yield
+    routes._reset_shield_singletons()
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.live_notes = []  # type: ignore[attr-defined]  # filled by live tests, printed below
 

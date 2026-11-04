@@ -1,3 +1,16 @@
+## Completion review: 2026-11-04
+
+Current implementation and submission gates are documented in
+[tasks/CODEX_COMPLETION_AND_SUBMISSION.md](tasks/CODEX_COMPLETION_AND_SUBMISSION.md).
+The historical sections below preserve earlier worker claims and are not fresh
+verification. The current code has durable Shield runtime publication/evidence,
+restart discovery, exact approval ordering/binding, mode separation, request
+metadata minimization, real separate-process tests, and browser-tested Shield controls.
+Live model results, external scanner operation, license selection and submission
+are not implied by local test success.
+
+---
+
 # STATUS
 
 Last updated: 2026-11-04

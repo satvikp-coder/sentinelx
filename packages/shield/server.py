@@ -40,6 +40,7 @@ def build_config() -> ShieldConfig:
     data["mode"] = os.environ.get("SHIELD_MODE", data["mode"])
     data["auto_shield"] = _flag("SHIELD_AUTO_SHIELD", data["auto_shield"])
     data["lab_mode"] = _flag("SHIELD_LAB_MODE", data["lab_mode"])
+    data["kill_switch_file"] = os.environ.get("SHIELD_KILL_SWITCH_FILE", data["kill_switch_file"])
     return ShieldConfig.model_validate(data)
 
 

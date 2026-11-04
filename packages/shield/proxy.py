@@ -173,19 +173,24 @@ class ShieldProxy:
         req = {"method": method, "path": path, "params": params, "headers": headers,
                "client_key": client_key}
         # Local lifecycle rules (auto-shield and single-process demo paths).
-        decision = evaluate_rules(self.rules.list_rules(), req)
-        if not decision.allowed:
-            return decision
+        local = self.rules.list_rules()
         # Shared runtime rules activated by the API control plane. The store
         # re-validates payload hashes; invalid rows are never enforced.
         if self.runtime_store is not None:
             try:
-                shared = self.runtime_store.active_rules()
+                from .runtime import target_identity
+
+                # API-managed copies are projections, never a fallback. Even
+                # a deleted/corrupt row must not resurrect a cached ACTIVE rule.
+                local = [rule for rule in local if not rule.target_id.startswith("shield:")]
+                shared = [rule for rule in self.runtime_store.active_rules()
+                          if rule.target_id == target_identity(self.config.upstream)]
             except Exception:  # noqa: BLE001 - an unreadable store must not block traffic
-                shared = []
+                # A stale local projection cannot override unavailable authority.
+                return evaluate_rules([], req)
             if shared:
-                return evaluate_rules(shared, req)
-        return decision
+                return evaluate_rules(local + shared, req)
+        return evaluate_rules(local, req)
 
     @staticmethod
     def _rule_spec(intent: str, path: str, params: dict[str, str]
@@ -378,7 +383,8 @@ class ShieldProxy:
                     evt = self.store.append(
                         self.session_id, "shield_intent", EvidenceState.INFERRED,
                         "sentinelx.shield",
-                        {"request_id": headers.get("x-request-id"), "intent": intent,
+                        {"request_id": hash_client_key(headers.get("x-request-id", "")),
+                         "intent": intent,
                          "signals": [s.name for s in signals], "client_key": client_key,
                          "confidence": confidence})
                     self._consider_rule(client_key, intent, path, params, evt.id)
@@ -456,10 +462,16 @@ class ShieldProxy:
         # Redact the raw path before retention: request paths may carry
         # credential-shaped values. Normalize ids with path_template first so
         # the log stays useful, then redact any remaining secret shapes.
-        from .recorder import path_template
+        from .recorder import telemetry_path
 
         safe = dict(entry)
-        safe["path"] = str(redact(path_template(str(entry.get("path", "")))).value)
+        if "request_id" in safe:
+            safe["request_id"] = hash_client_key(str(safe["request_id"]))
+        safe["path"] = telemetry_path(str(entry.get("path", "")))
+        if "method" in safe and safe["method"] not in {
+            "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS",
+        }:
+            safe["method"] = "OTHER"
         if len(self.request_log) < 20000:
             self.request_log.append(safe)
 

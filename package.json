@@ -1,8 +1,11 @@
 {
   "name": "sentinelx-workspace",
   "private": true,
-  "workspaces": ["apps/web", "sdk/typescript"],
+  "workspaces": [
+    "apps/web",
+    "sdk/typescript"
+  ],
   "scripts": {
-    "build": "npm run build --workspace apps/web"
+    "build": "npm run build --workspace sdk/typescript && npm run build --workspace apps/web"
   }
 }
