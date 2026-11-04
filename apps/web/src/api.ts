@@ -97,6 +97,16 @@ export interface FindingData {
   created_at: string;
 }
 
+export interface ScanData {
+  scan_id: string;
+  target_id: string;
+  state: string;
+  findings_count: number;
+  requests_used: number;
+  request_budget: number;
+  note: string | null;
+}
+
 export interface ShieldRuleData {
   rule_id: string;
   route_pattern: string;
@@ -214,9 +224,12 @@ export const api = {
     request("/api/v1/targets", { method: "POST", body: JSON.stringify(body) }),
 
   createScan: (body: { target_id: string; model?: boolean }) =>
-    request<{ scan_id: string; state: string; findings_count: number }>("/api/v1/scans", {
+    request<ScanData>("/api/v1/scans", {
       method: "POST", body: JSON.stringify(body),
     }),
+  getScan: (id: string) => request<ScanData>(`/api/v1/scans/${id}`),
+  scanFindings: (id: string) => request<FindingData[]>(`/api/v1/scans/${id}/findings`),
+  cancelScan: (id: string) => request(`/api/v1/scans/${id}/cancel`, { method: "POST" }),
 
   shieldEvidence: () => request<{ok: boolean; chain_status: string; events_checked: number;
     events: Array<{id: string; kind: string; state: string; timestamp_utc: string}>}>("/api/v1/shield/evidence"),

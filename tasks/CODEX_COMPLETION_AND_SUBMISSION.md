@@ -63,6 +63,17 @@ away from existing project evaluations. No providers or external targets are cal
   581.30 seconds. Separate clean-clone smoke: **234 passed, exit 0**.
 - Project-wide Ruff, SDK/runtime tests, dashboard build/Chromium workflow and
   forbidden-path audit passed. npm audit reported **0 vulnerabilities**.
+- Post-merge main: **1429 passed, 150 deselected, exit 0**, 541.62 seconds.
+  The first attempt had 2 failures caused by the reviewer's network guard blocking
+  the machine's own lab-binding probes; those 2 tests passed after correcting only
+  that external guard, followed by the complete successful rerun. No product test
+  was weakened and no application change was needed for that retry.
+- Completed the missing scanner dashboard start/status/cancel/findings controls.
+  Chromium exercised the actual Node application using a disposable database:
+  scan COMPLETED with **12 reported findings** rendered. This is a finding count,
+  not a recall/accuracy measurement. The lab must already be running.
+- Compiled SDK against the actual main API: **2 authorized tool calls executed,
+  0 external tool calls executed**; default execution arguments matched policy.
 
 Final premerge/postmerge test summaries, exact integrated SHA and remote/CI status
 must be checked in the final reviewer output/workflow; no earlier count is a
