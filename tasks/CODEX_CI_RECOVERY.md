@@ -40,6 +40,9 @@ The web job passed. The live-model test was skipped; no real model ran.
    its atomic durable publication. It does not promote a proposal merely because
    a caller supplied approval metadata. This also removes a confusing indirect
    ACTIVE constant while preserving the activation-assignment audit.
+8. Declare `psutil` as a runtime dependency, not a dev-only dependency: normal
+   lab-manager execution imports it. A fresh plain `pip install -e .` environment
+   successfully imported psutil, the lab manager and the CLI without dev extras.
 
 ## Execution so far
 
