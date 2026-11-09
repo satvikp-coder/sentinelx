@@ -5,6 +5,14 @@
 Sentinel X checks an AI agent's proposed actions and tests vulnerabilities in applications you are authorized to inspect.
 It records evidence, independently checks outcomes and proposed patches, and offers narrow, human-approved temporary proxy rules while fixes are reviewed.
 
+## At a glance
+
+- **What:** a verification-first guard for AI agents and for web apps you are authorized to test.
+- **Idea:** models propose; deterministic code and independent tests decide.
+- **Built for:** the Meta AI Hackathon (Sentinel X).
+- **Status:** local lab prototype. Non-lab scanning is disabled.
+- **Limits:** results are from our own lab targets, not proof of complete protection. See the sections below.
+
 [![CI](https://github.com/satvikp-coder/sentinelx/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/satvikp-coder/sentinelx/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
